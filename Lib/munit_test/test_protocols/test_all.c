@@ -8,7 +8,7 @@
 // Ensures that yp_TypeError or similar is raised when a type doesn't support a protocol. This
 // doesn't deal with methods only supported on mutable or immutable types: mutability is not a
 // "protocol".
-// FIXME Is the distinction between yp_TypeError and yp_MethodError really that important? Should
+// TODO Is the distinction between yp_TypeError and yp_MethodError really that important? Should
 // everything below just be yp_TypeError? I'm choosing the equivalent to what Python raises but the
 // distinction is sometimes arbitrary (i.e. in Python next is a function but close is a method).
 // TODO This test could also check exceptions and invalidateds return correct exceptions.

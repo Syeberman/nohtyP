@@ -2,7 +2,7 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME yp_iter_items, yp_iter_keys, yp_iter_values
+// TODO yp_iter_items, yp_iter_keys, yp_iter_values only applies to mapping objects.
 
 // TODO Ensure yp_iter2/yp_max_keyN/etc properly handles exception passthrough, even in cases where
 // one of the arguments would be ignored.
@@ -15,6 +15,8 @@
 // providing specifically so as to allow for code to safely ignore exceptions temporarily, so it
 // should probably be treated differently. WHICH MEANS! That perhaps some other tests should be
 // rethought so that they don't allow partial updates in exception passthrough cases.
+
+// TODO Include original_object_return tests.
 
 
 // TODO More test cases are needed here.

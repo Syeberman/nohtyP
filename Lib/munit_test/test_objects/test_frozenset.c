@@ -2,19 +2,16 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME "frozendict_dirty", "dict_dirty", and shared key?
-#define x_types_init()                                                                   \
-    {                                                                                    \
-        fixture_type_frozenset, fixture_type_set, fixture_type_iter, fixture_type_tuple, \
-                fixture_type_list, fixture_type_frozenset_dirty, fixture_type_set_dirty, \
-                fixture_type_frozendict, fixture_type_dict, NULL                         \
-    }
+// TODO "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
+#define x_types_init()                                                                 \
+    {fixture_type_frozenset, fixture_type_set, fixture_type_iter, fixture_type_tuple,  \
+            fixture_type_list, fixture_type_frozenset_dirty, fixture_type_set_dirty,   \
+            fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
+            fixture_type_dict_dirty, NULL}
 
-#define friend_types_init()                                                     \
-    {                                                                           \
-        fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
-                fixture_type_set_dirty, NULL                                    \
-    }
+#define friend_types_init()                                                  \
+    {fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
+            fixture_type_set_dirty, NULL}
 
 // Returns true iff type can store unhashable objects.
 static int type_stores_unhashables(fixture_type_t *type)

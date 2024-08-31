@@ -5,6 +5,7 @@
 // TODO fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, and
 // fixture_type_set_dirty are tricky because they require hashable types but in (key, value) the
 // value may not be hashable.
+// TODO "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
 #define x_types_init()                                                                  \
     {fixture_type_frozendict, fixture_type_dict, fixture_type_iter, fixture_type_tuple, \
             fixture_type_list, fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL}

@@ -7,19 +7,15 @@
 
 // Sets should accept themselves, their pairs, iterators, frozenset/set, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
-// FIXME Should dict really be here? What about dict key and item views (when implemented)?
-#define x_types_init(type)                                                              \
-    {                                                                                   \
-        (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, \
-                fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
-                fixture_type_set_dirty, fixture_type_frozendict, fixture_type_dict,     \
-                fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL            \
-    }
+// TODO Add dict key and item views (when implemented).
+// TODO "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
+#define x_types_init(type)                                                           \
+    {(type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, \
+            fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty,  \
+            fixture_type_set_dirty, fixture_type_frozendict, fixture_type_dict,      \
+            fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL}
 
-#define friend_types_init(type)    \
-    {                              \
-        (type), (type)->pair, NULL \
-    }
+#define friend_types_init(type) {(type), (type)->pair, NULL}
 
 // Returns true iff type can store unhashable objects.
 static int type_stores_unhashables(fixture_type_t *type)
@@ -2251,6 +2247,13 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
         assert_raises(yp_pop(so), yp_KeyError);  // Calling again still raises KeyError.
         assert_len(so, 0);
         yp_decrefN(N(so, first));
+    }
+
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ypObject *so = type->newN(N(items[0]));
+        ead(popped, yp_pop(so), assert_obj(popped, is, items[0]));
+        yp_decref(so);
     }
 
 tear_down:

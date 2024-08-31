@@ -302,6 +302,12 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
     assert_raises(yp_getindexC(sq, yp_SLICE_DEFAULT), yp_IndexError);
     assert_raises(yp_getindexC(sq, yp_SLICE_LAST), yp_IndexError);
 
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ead(zero, yp_getindexC(sq, 0), assert_obj(zero, is, items[0]));
+        ead(one, yp_getindexC(sq, 1), assert_obj(one, is, items[1]));
+    }
+
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
     obj_array_decref(items);
@@ -469,6 +475,13 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     ead(slice, yp_getsliceC4(sq, -100, 100, 2),
             assert_sequence(slice, items[0], items[2], items[4]));
 
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ypObject *zero_one = yp_getsliceC4(sq, 0, 1, 1);
+        ead(zero, yp_getindexC(zero_one, 0), assert_obj(zero, is, items[0]));
+        yp_decrefN(N(zero_one));
+    }
+
     assert_sequence(sq, items[0], items[1], items[2], items[3], items[4]);  // sq unchanged.
 
     yp_decref(sq);
@@ -526,6 +539,12 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
 
     // intstore.
     ead(zero, yp_getitem(sq, intstore_0), assert_obj(zero, eq, items[0]));
+
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ead(zero, yp_getitem(sq, int_0), assert_obj(zero, is, items[0]));
+        ead(one, yp_getitem(sq, int_1), assert_obj(one, is, items[1]));
+    }
 
     // Exception passthrough.
     assert_isexception(yp_getitem(sq, yp_SyntaxError), yp_SyntaxError);
@@ -595,6 +614,12 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 
     // intstore.
     ead(zero, yp_getdefault(sq, intstore_0, items[2]), assert_obj(zero, eq, items[0]));
+
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ead(zero, yp_getdefault(sq, int_0, items[2]), assert_obj(zero, is, items[0]));
+        ead(two, yp_getdefault(sq, int_2, items[2]), assert_obj(two, is, items[2]));
+    }
 
     // Exception passthrough.
     assert_isexception(yp_getdefault(sq, yp_SyntaxError, items[2]), yp_SyntaxError);
@@ -2148,6 +2173,14 @@ static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixt
         yp_decref(sq);
     }
 
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        ead(popped, yp_popindexC(sq, 0), assert_obj(popped, is, items[0]));
+        ead(popped, yp_popindexC(sq, 1), assert_obj(popped, is, items[2]));
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -2193,6 +2226,14 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
         assert_sequence(sq, items[0], items[1], items[0]);
         ead(popped, yp_pop(sq), assert_obj(popped, eq, items[0]));
         assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
+    }
+
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ead(popped, yp_pop(sq), assert_obj(popped, is, items[1]));
+        ead(popped, yp_pop(sq), assert_obj(popped, is, items[0]));
         yp_decref(sq);
     }
 

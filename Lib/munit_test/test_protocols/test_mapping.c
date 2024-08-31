@@ -3,11 +3,10 @@
 
 // FIXME _ypDict_deepcopy
 // FIXME frozendict_eq where the hash has been cached (introduce _test_comparisons)
-// FIXME The various dict iterators
 
 // Mappings should accept themselves, their pairs, iterators, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
-// FIXME "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
+// TODO "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
 #define x_types_init(type)                                                             \
     {(type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list,   \
             fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
@@ -99,6 +98,12 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
         yp_decrefN(N(int_1, intstore_1, mp_int_1));
     }
 
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ead(value, yp_getitem(mp, keys[0]), assert_obj(value, is, values[0]));
+        ead(value, yp_getitem(mp, keys[1]), assert_obj(value, is, values[1]));
+    }
+
     // Exception passthrough.
     assert_isexception(yp_getitem(mp, yp_SyntaxError), yp_SyntaxError);
     assert_isexception(yp_getitem(empty, yp_SyntaxError), yp_SyntaxError);
@@ -161,6 +166,12 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
         ead(value, yp_getdefault(mp_int_1, intstore_1, values[2]),
                 assert_obj(value, eq, values[0]));
         yp_decrefN(N(int_1, intstore_1, mp_int_1));
+    }
+
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ead(value, yp_getdefault(mp, keys[0], values[2]), assert_obj(value, eq, values[0]));
+        ead(value, yp_getdefault(mp, keys[1], values[2]), assert_obj(value, eq, values[1]));
     }
 
     // Exception passthrough.
@@ -464,6 +475,15 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
         yp_decrefN(N(int_1, intstore_1, int_2, intstore_2, mp));
     }
 
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        ead(value, yp_popvalue3(mp, keys[2], values[3]), assert_obj(value, is, values[2]));
+        ead(value, yp_popvalue3(mp, keys[3], values[3]), assert_obj(value, is, values[3]));
+        ead(value, yp_popvalue2(mp, keys[1]), assert_obj(value, is, values[1]));
+        yp_decref(mp);
+    }
+
     // Exception passthrough.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
@@ -557,6 +577,17 @@ static MunitResult test_popitem(const MunitParameter params[], fixture_t *fixtur
         assert_obj(error_value, is, error_key);
         assert_len(mp, 0);
         yp_decrefN(N(mp, first_key, first_value, second_key, second_value));
+    }
+
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ypObject *key, *value;
+        ypObject *mp = type->newK(K(keys[0], values[0]));
+        yp_popitem(mp, &key, &value);
+        assert_obj(key, is, keys[0]);
+        assert_obj(value, is, values[0]);
+        assert_len(mp, 0);
+        yp_decrefN(N(mp, key, value));
     }
 
 tear_down:
@@ -660,6 +691,14 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
         assert_raises(yp_setdefault(mp, intstore_1, values[2]), yp_TypeError);
         assert_mapping(mp, int_1, values[0]);
         yp_decrefN(N(int_1, intstore_1, mp));
+    }
+
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (type->original_object_return) {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ead(value, yp_setdefault(mp, keys[0], values[2]), assert_obj(value, is, values[0]));
+        ead(value, yp_setdefault(mp, keys[2], values[2]), assert_obj(value, is, values[2]));
+        yp_decref(mp);
     }
 
     // Exception passthrough.

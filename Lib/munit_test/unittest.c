@@ -398,6 +398,7 @@ static fixture_type_t fixture_type_type_struct = {
         FALSE,  // is_mapping
         TRUE,   // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 // There is only one NoneType object: yp_None.
@@ -429,6 +430,7 @@ static fixture_type_t fixture_type_NoneType_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 static ypObject *new_rand_bool(const rand_obj_supplier_memo_t *memo)
@@ -466,6 +468,7 @@ static fixture_type_t fixture_type_bool_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 static ypObject *new_rand_int(const rand_obj_supplier_memo_t *memo)
@@ -501,6 +504,7 @@ static fixture_type_t fixture_type_int_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 static ypObject *new_rand_intstore(const rand_obj_supplier_memo_t *memo)
@@ -536,6 +540,7 @@ static fixture_type_t fixture_type_intstore_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 static ypObject *new_rand_float(const rand_obj_supplier_memo_t *memo)
@@ -571,6 +576,7 @@ static fixture_type_t fixture_type_float_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 static ypObject *new_rand_floatstore(const rand_obj_supplier_memo_t *memo)
@@ -606,6 +612,7 @@ static fixture_type_t fixture_type_floatstore_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 static ypObject *new_rand_iter(const rand_obj_supplier_memo_t *memo)
@@ -656,6 +663,7 @@ static fixture_type_t fixture_type_iter_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 // TODO Ranges that cover more values, not just 32-bit-ish.
@@ -756,6 +764,7 @@ static fixture_type_t fixture_type_range_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         TRUE,   // is_patterned
+        FALSE,  // original_object_return
 };
 
 static ypObject *new_rand_bytes(const rand_obj_supplier_memo_t *memo)
@@ -816,6 +825,7 @@ static fixture_type_t fixture_type_bytes_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 static ypObject *new_rand_bytearray(const rand_obj_supplier_memo_t *memo)
@@ -876,6 +886,7 @@ static fixture_type_t fixture_type_bytearray_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 // TODO Return larger characters than just ascii.
@@ -938,6 +949,7 @@ static fixture_type_t fixture_type_str_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 // TODO Return larger characters than just ascii.
@@ -1001,6 +1013,7 @@ static fixture_type_t fixture_type_chrarray_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
@@ -1043,6 +1056,7 @@ static fixture_type_t fixture_type_tuple_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
@@ -1085,6 +1099,7 @@ static fixture_type_t fixture_type_list_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
@@ -1128,6 +1143,7 @@ static fixture_type_t fixture_type_frozenset_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
@@ -1171,6 +1187,7 @@ static fixture_type_t fixture_type_set_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 // Adds and discards a unique object from so such that it will contain a deleted entry.
@@ -1256,6 +1273,7 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 static ypObject *new_set_dirty(ypObject *x)
@@ -1313,6 +1331,7 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
@@ -1402,6 +1421,7 @@ static fixture_type_t fixture_type_frozendict_struct = {
         TRUE,   // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
@@ -1464,6 +1484,7 @@ static fixture_type_t fixture_type_dict_struct = {
         TRUE,   // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 // Adds and discards a unique object from mp such that it will contain a deleted entry.
@@ -1563,6 +1584,7 @@ static fixture_type_t fixture_type_frozendict_dirty_struct = {
         TRUE,   // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 static ypObject *new_dict_dirty(ypObject *x)
@@ -1632,6 +1654,7 @@ static fixture_type_t fixture_type_dict_dirty_struct = {
         TRUE,   // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
 };
 
 static ypObject *new_rand_function_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
@@ -1677,6 +1700,7 @@ static fixture_type_t fixture_type_function_struct = {
         FALSE,  // is_mapping
         TRUE,   // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
 };
 
 fixture_type_t *fixture_type_type = &fixture_type_type_struct;

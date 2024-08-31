@@ -838,7 +838,8 @@ typedef struct _fixture_type_t {
     int is_setlike;
     int is_mapping;
     int is_callable;
-    int is_patterned;  // i.e. range doesn't store values, it stores a pattern
+    int is_patterned;            // i.e. range doesn't store values, it stores a pattern
+    int original_object_return;  // A collection that *always* returns the object that was stored
 } fixture_type_t;
 
 extern fixture_type_t *fixture_type_type;
