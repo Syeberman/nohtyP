@@ -1264,11 +1264,18 @@ ypAPI ypObject *const yp_s_star_args;         // "*args"
 ypAPI ypObject *const yp_s_star_star_kwargs;  // "**kwargs"
 
 // Immortal built-in functions.
+
+// yp_call signature: yp_func_chr(i, /)
 ypAPI ypObject *const yp_func_chr;
+// yp_call signature: yp_func_hash(obj, /)
 ypAPI ypObject *const yp_func_hash;
+// yp_call signature: yp_func_iscallable(obj, /)
 ypAPI ypObject *const yp_func_iscallable;
+// yp_call signature: yp_func_len(obj, /)
 ypAPI ypObject *const yp_func_len;
+// yp_call signature: yp_func_reversed(sequence, /)
 ypAPI ypObject *const yp_func_reversed;
+// yp_call signature: yp_func_sorted(iterable, /, *, key=yp_None, reverse=yp_False)
 ypAPI ypObject *const yp_func_sorted;
 
 
@@ -1510,29 +1517,50 @@ ypAPI ypObject *yp_type(ypObject *object);
 
 // The immortal type objects. Calling a type object (e.g., with yp_callN) typically constructs an
 // object of that type.
-// FIXME Document the calling signature for these objects, perhaps in a "callable objects" section
-// after the yp_call section?
+
+// yp_t_invalidated does not currently support yp_call.
 ypAPI ypObject *const yp_t_invalidated;
+// yp_t_exception does not currently support yp_call.
 ypAPI ypObject *const yp_t_exception;
+// yp_call signature: yp_t_type(object, /)
 ypAPI ypObject *const yp_t_type;
+// yp_call signature: yp_t_NoneType()
 ypAPI ypObject *const yp_t_NoneType;
+// yp_call signature: yp_t_bool(x=yp_False, /)
 ypAPI ypObject *const yp_t_bool;
+// yp_call signature: yp_t_int(x=0, /, base=yp_None)
 ypAPI ypObject *const yp_t_int;
+// yp_call signature: yp_t_intstore(x=0, /, base=yp_None)
 ypAPI ypObject *const yp_t_intstore;
+// yp_call signature: yp_t_float(x=0, /)
 ypAPI ypObject *const yp_t_float;
+// yp_call signature: yp_t_floatstore(x=0, /)
 ypAPI ypObject *const yp_t_floatstore;
+// yp_call signature: yp_t_iter(object, sentinel=, /)
 ypAPI ypObject *const yp_t_iter;
+// yp_call signature: yp_t_bytes(source=yp_bytes_empty, encoding=, errors=)
 ypAPI ypObject *const yp_t_bytes;
+// yp_call signature: yp_t_bytearray(source=yp_bytes_empty, encoding=, errors=)
 ypAPI ypObject *const yp_t_bytearray;
+// yp_call signature: yp_t_str(object=yp_str_empty, encoding=, errors=)
 ypAPI ypObject *const yp_t_str;
+// yp_call signature: yp_t_chrarray(object=yp_str_empty, encoding=, errors=)
 ypAPI ypObject *const yp_t_chrarray;
+// yp_call signature: yp_t_tuple(iterable=yp_tuple_empty, /)
 ypAPI ypObject *const yp_t_tuple;
+// yp_call signature: yp_t_list(iterable=yp_tuple_empty, /)
 ypAPI ypObject *const yp_t_list;
+// yp_call signature: yp_t_frozenset(iterable=yp_frozenset_empty, /)
 ypAPI ypObject *const yp_t_frozenset;
+// yp_call signature: yp_t_set(iterable=yp_frozenset_empty, /)
 ypAPI ypObject *const yp_t_set;
+// yp_call signature: yp_t_frozendict(object=yp_frozendict_empty, /, **kwargs)
 ypAPI ypObject *const yp_t_frozendict;
+// yp_call signature: yp_t_dict(object=yp_frozendict_empty, /, **kwargs)
 ypAPI ypObject *const yp_t_dict;
+// yp_call signature: yp_t_range(x, y=, step=1, /)
 ypAPI ypObject *const yp_t_range;
+// yp_t_function does not currently support yp_call.
 ypAPI ypObject *const yp_t_function;
 
 
