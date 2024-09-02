@@ -625,7 +625,8 @@ ypAPI ypObject *yp_concat(ypObject *sequence, ypObject *x);
 // Returns a new reference to factor shallow-copies of sequence, concatenated.
 ypAPI ypObject *yp_repeatC(ypObject *sequence, yp_ssize_t factor);
 
-// Returns a new reference to the i-th item of sequence.
+// Returns a new reference to the i-th item of sequence. Returns yp_IndexError if i is out of
+// bounds.
 ypAPI ypObject *yp_getindexC(ypObject *sequence, yp_ssize_t i);
 
 // Returns a new reference to the slice of sequence from i to j with step k. The Python-equivalent
@@ -672,7 +673,8 @@ ypAPI yp_ssize_t yp_countC5(
 // Equivalent to yp_countC5(sequence, x, 0, yp_SLICE_LAST, exc).
 ypAPI yp_ssize_t yp_countC(ypObject *sequence, ypObject *x, ypObject **exc);
 
-// Sets the i-th item of sequence to x. Sets *exc on error.
+// Sets the i-th item of sequence to x. Raises yp_IndexError if i is out of bounds. Sets *exc on
+// error.
 ypAPI void yp_setindexC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc);
 
 // Sets the slice of sequence, from i to j with step k, to x. The Python-equivalent "defaults" for i
@@ -683,8 +685,13 @@ ypAPI void yp_setsliceC6(
 // Equivalent to yp_setindexC(sequence, yp_asssizeC(i, exc), x, exc).
 ypAPI void yp_setitem(ypObject *sequence, ypObject *i, ypObject *x, ypObject **exc);
 
-// Removes the i-th item from sequence. Sets *exc on error.
+// Removes the i-th item from sequence. Raises yp_IndexError if i is out of bounds. Sets *exc on
+// error.
 ypAPI void yp_delindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc);
+
+// Removes the i-th item from sequence. Does _not_ raise an exception if i is out of bounds. Sets
+// *exc on error.
+ypAPI void yp_dropindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc);
 
 // Removes the elements of the slice from sequence, from i to j with step k. The Python- equivalent
 // "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1. Sets *exc on error.
@@ -693,6 +700,9 @@ ypAPI void yp_delsliceC5(
 
 // Equivalent to yp_delindexC(sequence, yp_asssizeC(i, exc), exc).
 ypAPI void yp_delitem(ypObject *sequence, ypObject *i, ypObject **exc);
+
+// Equivalent to yp_dropindexC(sequence, yp_asssizeC(i, exc), exc).
+ypAPI void yp_dropitem(ypObject *sequence, ypObject *i, ypObject **exc);
 
 // Appends x to the end of sequence. Sets *exc on error.
 ypAPI void yp_append(ypObject *sequence, ypObject *x, ypObject **exc);
@@ -709,11 +719,12 @@ ypAPI void yp_irepeatC(ypObject *sequence, yp_ssize_t factor, ypObject **exc);
 // *exc on error.
 ypAPI void yp_insertC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc);
 
-// Removes the i-th item from sequence and returns it. The Python-equivalent "default" for i is -1.
+// Removes the i-th item from sequence and returns it. Returns yp_IndexError if i is out of bounds.
+// The Python-equivalent "default" for i is -1.
 ypAPI ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i);
 
-// Equivalent to yp_popindexC(sequence, -1). Note that for sequences, yp_push and yp_pop together
-// implement a stack (last in, first out).
+// Removes the last item from sequence and returns it. Returns yp_IndexError if sequence is empty.
+// Note that for sequences, yp_push and yp_pop together implement a stack (last in, first out).
 ypAPI ypObject *yp_pop(ypObject *sequence);
 
 // Removes the first item from sequence that equals x. Raises yp_ValueError if x is not contained in
@@ -839,8 +850,8 @@ ypAPI void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc);
 // Removes element x from set. Raises yp_KeyError if x is not contained in set. Sets *exc on error.
 ypAPI void yp_remove(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes element x from set if it is present. Does _not_ raise yp_KeyError if x is not contained
-// in set. Sets *exc on error.
+// Removes element x from set. Does _not_ raise an exception if x is not contained in set. Sets *exc
+// on error.
 ypAPI void yp_discard(ypObject *set, ypObject *x, ypObject **exc);
 
 // Removes an arbitrary item from set and returns a new reference to it. You cannot use the order of
@@ -883,8 +894,11 @@ ypAPI void yp_setitem(ypObject *mapping, ypObject *key, ypObject *x, ypObject **
 
 // Removes the item with the given key from mapping. Raises yp_KeyError if key is not in mapping.
 // Sets *exc on error.
-// FIXME Something like discard that doesn't raise an exception.
 ypAPI void yp_delitem(ypObject *mapping, ypObject *key, ypObject **exc);
+
+// Removes the item with the given key from mapping. Does _not_ raise an exception if key is not in
+// mapping. Sets *exc on error.
+ypAPI void yp_dropitem(ypObject *mapping, ypObject *key, ypObject **exc);
 
 // If key is in mapping, remove it and return a new reference to its value, else return a new
 // reference to defval. defval _can_ be an exception: if it is, then that exception is raised on a

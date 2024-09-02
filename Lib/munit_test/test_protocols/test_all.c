@@ -73,6 +73,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises(yp_getdefault(self, yp_i_zero, yp_None), yp_TypeError);
         assert_raises_exc(yp_setitem(self, yp_i_zero, yp_None, &exc), yp_TypeError);
         assert_raises_exc(yp_delitem(self, yp_i_zero, &exc), yp_TypeError);
+        assert_raises_exc(yp_dropitem(self, yp_i_zero, &exc), yp_TypeError);
     }
 
     if (!type->is_sequence && !type->is_setlike) {
@@ -106,8 +107,9 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises_exc(yp_setsliceC6(self, 0, 0, 1, yp_None, &exc), yp_TypeError);
         // yp_setitem is tested elsewhere.
         assert_raises_exc(yp_delindexC(self, 0, &exc), yp_TypeError);
+        assert_raises_exc(yp_dropindexC(self, 0, &exc), yp_TypeError);
         assert_raises_exc(yp_delsliceC5(self, 0, 0, 1, &exc), yp_TypeError);
-        // yp_delitem is tested elsewhere.
+        // yp_delitem and yp_dropitem are tested elsewhere.
         assert_raises_exc(yp_append(self, yp_None, &exc), yp_MethodError);
         // yp_push is tested elsewhere.
         assert_raises_exc(yp_extend(self, self, &exc), yp_MethodError);

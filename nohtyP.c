@@ -70,6 +70,14 @@
 // str.strip/etc. Really the bulk of the issues are in the str/bytes methods, as those tried hard to
 // be non-mutating.
 
+// TODO Python also has confusion in the terms delete (as in list.delitem), remove (set.remove()),
+// and discard (set.discard()); the distinctions are fairly arbitrary. And partly because of that,
+// and partly because discarditem is wordy, and partly because it's not called removeitem so it
+// wouldn't have symmetry with discarditem anyway, I'm using a new term "drop" (list.dropitem) for
+// "discard" (i.e. no error if not present). Python uses this for itertools.dropwhile(), but that's
+// the only use of drop. Does this introduction and meaning for "drop" make things clearer or not?
+// Would it make sense to rename set.discard() to set.drop()/etc?
+
 #define yp_FUTURE
 #include "nohtyP.h"
 
@@ -360,8 +368,10 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 typedef ypObject *(*objproc)(ypObject *);
 typedef ypObject *(*objobjproc)(ypObject *, ypObject *);
 typedef ypObject *(*objobjobjproc)(ypObject *, ypObject *, ypObject *);
+typedef ypObject *(*objobjintproc)(ypObject *, ypObject *, int);
 typedef ypObject *(*objssizeproc)(ypObject *, yp_ssize_t);
 typedef ypObject *(*objssizeobjproc)(ypObject *, yp_ssize_t, ypObject *);
+typedef ypObject *(*objssizeintproc)(ypObject *, yp_ssize_t, int);
 typedef ypObject *(*objsliceproc)(ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t);
 typedef ypObject *(*objsliceobjproc)(ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t, ypObject *);
 typedef ypObject *(*objvalistproc)(ypObject *, int, va_list);
@@ -396,7 +406,7 @@ typedef struct {
     countfunc       tp_count;
     objssizeobjproc tp_setindex;
     objsliceobjproc tp_setslice;
-    objssizeproc    tp_delindex;
+    objssizeintproc tp_delindex;
     objsliceproc    tp_delslice;
     objobjproc      tp_append;
     objobjproc      tp_extend;
@@ -519,10 +529,10 @@ typedef struct {
     objobjproc    tp_push;
     objproc       tp_clear;  // delete references to contained objects
     objproc       tp_pop;
-    objobjobjproc tp_remove;      // if onmissing is NULL, raise exception if missing
+    objobjintproc tp_remove;
     objobjobjproc tp_getdefault;  // if defval is NULL, raise exception if missing
     objobjobjproc tp_setitem;
-    objobjproc    tp_delitem;
+    objobjintproc tp_delitem;
     objobjproc    tp_update;
 
     // Sequence operations
@@ -596,8 +606,10 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
     static ypObject *yp_UNUSED name ## _objproc(ypObject *x) { return retval; } \
     static ypObject *yp_UNUSED name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
     static ypObject *yp_UNUSED name ## _objobjobjproc(ypObject *x, ypObject *y, ypObject *z) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objobjintproc(ypObject *x, ypObject *y, int b) { return retval; } \
     static ypObject *yp_UNUSED name ## _objssizeproc(ypObject *x, yp_ssize_t i) { return retval; } \
     static ypObject *yp_UNUSED name ## _objssizeobjproc(ypObject *x, yp_ssize_t i, ypObject *y) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objssizeintproc(ypObject *x, yp_ssize_t i, int b) { return retval; } \
     static ypObject *yp_UNUSED name ## _objsliceproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k) { return retval; } \
     static ypObject *yp_UNUSED name ## _objsliceobjproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y) { return retval; } \
     static ypObject *yp_UNUSED name ## _objvalistproc(ypObject *x, int n, va_list args) { return retval; } \
@@ -638,7 +650,7 @@ DEFINE_GENERIC_METHODS(ExceptionMethod, x);  // for exception objects; returns "
             *methodErrorName##_countfunc,       /* tp_count */                       \
             *typeErrorName##_objssizeobjproc,   /* tp_setindex */                    \
             *typeErrorName##_objsliceobjproc,   /* tp_setslice */                    \
-            *typeErrorName##_objssizeproc,      /* tp_delindex */                    \
+            *typeErrorName##_objssizeintproc,   /* tp_delindex */                    \
             *typeErrorName##_objsliceproc,      /* tp_delslice */                    \
             *methodErrorName##_objobjproc,      /* tp_append */                      \
             *methodErrorName##_objobjproc,      /* tp_extend */                      \
@@ -3073,10 +3085,10 @@ static ypTypeObject ypIter_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -3932,10 +3944,10 @@ static ypTypeObject ypInvalidated_Type = {
         InvalidatedError_objobjproc,     // tp_push
         InvalidatedError_objproc,        // tp_clear
         InvalidatedError_objproc,        // tp_pop
-        InvalidatedError_objobjobjproc,  // tp_remove
+        InvalidatedError_objobjintproc,  // tp_remove
         InvalidatedError_objobjobjproc,  // tp_getdefault
         InvalidatedError_objobjobjproc,  // tp_setitem
-        InvalidatedError_objobjproc,     // tp_delitem
+        InvalidatedError_objobjintproc,  // tp_delitem
         InvalidatedError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -4025,10 +4037,10 @@ static ypTypeObject ypException_Type = {
         ExceptionMethod_objobjproc,     // tp_push
         ExceptionMethod_objproc,        // tp_clear
         ExceptionMethod_objproc,        // tp_pop
-        ExceptionMethod_objobjobjproc,  // tp_remove
+        ExceptionMethod_objobjintproc,  // tp_remove
         ExceptionMethod_objobjobjproc,  // tp_getdefault
         ExceptionMethod_objobjobjproc,  // tp_setitem
-        ExceptionMethod_objobjproc,     // tp_delitem
+        ExceptionMethod_objobjintproc,  // tp_delitem
         ExceptionMethod_objobjproc,     // tp_update
 
         // Sequence operations
@@ -4288,10 +4300,10 @@ static ypTypeObject ypType_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -4395,10 +4407,10 @@ static ypTypeObject ypNoneType_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -4524,10 +4536,10 @@ static ypTypeObject ypBool_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -4909,10 +4921,10 @@ static ypTypeObject ypInt_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -4979,10 +4991,10 @@ static ypTypeObject ypIntStore_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -6030,10 +6042,10 @@ static ypTypeObject ypFloat_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -6100,10 +6112,10 @@ static ypTypeObject ypFloatStore_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -6534,13 +6546,13 @@ static ypObject *_ypSequence_setitem(ypObject *x, ypObject *key, ypObject *value
     return type->tp_as_sequence->tp_setindex(x, index, value);
 }
 
-static ypObject *_ypSequence_delitem(ypObject *x, ypObject *key)
+static ypObject *_ypSequence_delitem(ypObject *x, ypObject *key, int raise_on_missing)
 {
     ypObject     *exc = yp_None;
     ypTypeObject *type = ypObject_TYPE(x);
     yp_ssize_t    index = yp_index_asssizeC(key, &exc);
     if (yp_isexceptionC(exc)) return exc;
-    return type->tp_as_sequence->tp_delindex(x, index);
+    return type->tp_as_sequence->tp_delindex(x, index, raise_on_missing);
 }
 
 #pragma endregion sequence
@@ -9913,10 +9925,10 @@ static ypObject *bytearray_setindex(ypObject *b, yp_ssize_t i, ypObject *x)
     return yp_None;
 }
 
-static ypObject *bytearray_delindex(ypObject *b, yp_ssize_t i)
+static ypObject *bytearray_delindex(ypObject *b, yp_ssize_t i, int raise_on_missing)
 {
     if (!ypSequence_AdjustIndexC(ypBytes_LEN(b), &i)) {
-        return yp_IndexError;
+        return raise_on_missing ? yp_IndexError : yp_None;
     }
 
     ypBytes_ELEMMOVE(b, i, i + 1);
@@ -10048,8 +10060,7 @@ static ypObject *bytearray_pop(ypObject *b)
     return result;
 }
 
-// onmissing must be an immortal, or NULL.
-static ypObject *bytearray_remove(ypObject *b, ypObject *x, ypObject *onmissing)
+static ypObject *bytearray_remove(ypObject *b, ypObject *x, int raise_on_missing)
 {
     yp_uint8_t *x_data;
     yp_ssize_t  x_len;
@@ -10071,8 +10082,7 @@ static ypObject *bytearray_remove(ypObject *b, ypObject *x, ypObject *onmissing)
     return yp_None;
 
 missing:
-    if (onmissing == NULL) return yp_ValueError;
-    return onmissing;
+    return raise_on_missing ? yp_ValueError : yp_None;
 }
 
 // TODO allow custom min/max methods?
@@ -10371,7 +10381,7 @@ static ypSequenceMethods ypBytes_as_sequence = {
         bytes_count,                  // tp_count
         TypeError_objssizeobjproc,    // tp_setindex
         TypeError_objsliceobjproc,    // tp_setslice
-        TypeError_objssizeproc,       // tp_delindex
+        TypeError_objssizeintproc,    // tp_delindex
         TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
@@ -10433,10 +10443,10 @@ static ypTypeObject ypBytes_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -10881,10 +10891,10 @@ static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
     return ypStringLib_setslice_fromstring7(s, i, i + 1, 1, &x_asitem, 1, x_enc);
 }
 
-static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i)
+static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i, int raise_on_missing)
 {
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
-        return yp_IndexError;
+        return raise_on_missing ? yp_IndexError : yp_None;
     }
 
     // It's possible we will need to downconvert s in order to delete s[i]. The logic to do this is
@@ -10942,8 +10952,7 @@ static ypObject *chrarray_pop(ypObject *s)
     return result;
 }
 
-// onmissing must be an immortal, or NULL.
-static ypObject *chrarray_remove(ypObject *s, ypObject *x, ypObject *onmissing)
+static ypObject *chrarray_remove(ypObject *s, ypObject *x, int raise_on_missing)
 {
     void      *x_data;
     yp_ssize_t x_len;
@@ -10967,8 +10976,7 @@ static ypObject *chrarray_remove(ypObject *s, ypObject *x, ypObject *onmissing)
     return yp_None;
 
 missing:
-    if (onmissing == NULL) return yp_ValueError;
-    return onmissing;
+    return raise_on_missing ? yp_ValueError : yp_None;
 }
 
 static ypObject *chrarray_extend(ypObject *s, ypObject *iterable)
@@ -11398,7 +11406,7 @@ static ypSequenceMethods ypStr_as_sequence = {
         str_count,                    // tp_count
         TypeError_objssizeobjproc,    // tp_setindex
         TypeError_objsliceobjproc,    // tp_setslice
-        TypeError_objssizeproc,       // tp_delindex
+        TypeError_objssizeintproc,    // tp_delindex
         TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
@@ -11460,10 +11468,10 @@ static ypTypeObject ypStr_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -12601,6 +12609,21 @@ static ypObject *_ypTuple_setslice_fromtuple(
     return yp_None;
 }
 
+// Returns NULL if i is out of bounds.
+static ypObject *_ypTuple_popindex(ypObject *sq, yp_ssize_t i)
+{
+    ypObject *result;
+
+    if (!ypSequence_AdjustIndexC(ypTuple_LEN(sq), &i)) {
+        return NULL;
+    }
+
+    result = ypTuple_ARRAY(sq)[i];
+    ypTuple_ELEMMOVE(sq, i, i + 1);
+    ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
+    return result;
+}
+
 // Public Methods
 
 static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
@@ -12764,7 +12787,7 @@ static ypObject *tuple_count(
         ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *count)
 {
     ypObject  *result;
-    yp_ssize_t step = 1;     // ignored; assumed unchanged by ypSlice_AdjustIndicesC
+    yp_ssize_t step = 1;  // ignored; assumed unchanged by ypSlice_AdjustIndicesC
     yp_ssize_t slicelength;
     yp_ssize_t i;
     yp_ssize_t n = 0;
@@ -12815,17 +12838,13 @@ static ypObject *list_setslice(
     }
 }
 
+// TODO Support a pop with a default rather than raising an exception? Same for the other "pops".
 static ypObject *list_popindex(ypObject *sq, yp_ssize_t i)
 {
-    ypObject *result;
-
-    if (!ypSequence_AdjustIndexC(ypTuple_LEN(sq), &i)) {
+    ypObject *result = _ypTuple_popindex(sq, i);
+    if (result == NULL) {
         return yp_IndexError;
     }
-
-    result = ypTuple_ARRAY(sq)[i];
-    ypTuple_ELEMMOVE(sq, i, i + 1);
-    ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
     return result;
 }
 
@@ -12850,9 +12869,12 @@ static ypObject *list_reverse(ypObject *sq)
     return yp_None;
 }
 
-static ypObject *list_delindex(ypObject *sq, yp_ssize_t i)
+static ypObject *list_delindex(ypObject *sq, yp_ssize_t i, int raise_on_missing)
 {
-    ypObject *result = list_popindex(sq, i);
+    ypObject *result = _ypTuple_popindex(sq, i);
+    if (result == NULL) {
+        return raise_on_missing ? yp_IndexError : yp_None;
+    }
     if (yp_isexceptionC(result)) return result;
     yp_decref(result);
     return yp_None;
@@ -13120,8 +13142,7 @@ static ypObject *list_pop(ypObject *sq)
     return ypTuple_ARRAY(sq)[ypTuple_LEN(sq)];
 }
 
-// onmissing must be an immortal, or NULL
-static ypObject *list_remove(ypObject *sq, ypObject *x, ypObject *onmissing)
+static ypObject *list_remove(ypObject *sq, ypObject *x, int raise_on_missing)
 {
     yp_ssize_t i;
     for (i = 0; i < ypTuple_LEN(sq); i++) {
@@ -13136,8 +13157,7 @@ static ypObject *list_remove(ypObject *sq, ypObject *x, ypObject *onmissing)
         ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
         return yp_None;
     }
-    if (onmissing == NULL) return yp_ValueError;
-    return onmissing;
+    return raise_on_missing ? yp_ValueError : yp_None;
 }
 
 static ypObject *tuple_dealloc(ypObject *sq, void *memo)
@@ -13179,7 +13199,7 @@ static ypSequenceMethods ypTuple_as_sequence = {
         tuple_count,                  // tp_count
         TypeError_objssizeobjproc,    // tp_setindex
         TypeError_objsliceobjproc,    // tp_setslice
-        TypeError_objssizeproc,       // tp_delindex
+        TypeError_objssizeintproc,    // tp_delindex
         TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
@@ -13241,10 +13261,10 @@ static ypTypeObject ypTuple_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -16467,13 +16487,11 @@ static ypObject *frozenset_len(ypObject *so, yp_ssize_t *len)
     return yp_None;
 }
 
-// onmissing must be an immortal, or NULL
-static ypObject *set_remove(ypObject *so, ypObject *x, ypObject *onmissing)
+static ypObject *set_remove(ypObject *so, ypObject *x, int raise_on_missing)
 {
     ypObject *result = _ypSet_pop_bycurrenthash(so, x);
     if (result == ypSet_dummy) {
-        if (onmissing == NULL) return yp_KeyError;
-        return onmissing;
+        return raise_on_missing ? yp_KeyError : yp_None;
     }
     if (yp_isexceptionC(result)) return result;  // TODO As usual, what if this is yp_KeyError?
     yp_decref(result);
@@ -16586,10 +16604,10 @@ static ypTypeObject ypFrozenSet_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -16677,7 +16695,7 @@ static ypTypeObject ypSet_Type = {
         set_remove,               // tp_remove
         TypeError_objobjobjproc,  // tp_getdefault
         TypeError_objobjobjproc,  // tp_setitem
-        TypeError_objobjproc,     // tp_delitem
+        TypeError_objobjintproc,  // tp_delitem
         set_update,               // tp_update
 
         // Sequence operations
@@ -17503,10 +17521,12 @@ static ypObject *dict_setitem(ypObject *mp, ypObject *key, ypObject *value)
     return _ypDict_push(mp, key, value, &spaceleft, 0);
 }
 
-static ypObject *dict_delitem(ypObject *mp, ypObject *key)
+static ypObject *dict_delitem(ypObject *mp, ypObject *key, int raise_on_missing)
 {
     ypObject *result = _ypDict_pop(mp, key);
-    if (result == ypSet_dummy) return yp_KeyError;
+    if (result == ypSet_dummy) {
+        return raise_on_missing ? yp_KeyError : yp_None;
+    }
     if (yp_isexceptionC(result)) return result;
     yp_decref(result);
     return yp_None;
@@ -17910,10 +17930,10 @@ static ypTypeObject ypFrozenDict_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         frozendict_getdefault,      // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -17994,7 +18014,7 @@ static ypTypeObject ypDict_Type = {
         MethodError_objobjproc,     // tp_push
         dict_clear,                 // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         frozendict_getdefault,      // tp_getdefault
         dict_setitem,               // tp_setitem
         dict_delitem,               // tp_delitem
@@ -18529,7 +18549,7 @@ static ypSequenceMethods ypRange_as_sequence = {
         range_count,                  // tp_count
         TypeError_objssizeobjproc,    // tp_setindex
         TypeError_objsliceobjproc,    // tp_setslice
-        TypeError_objssizeproc,       // tp_delindex
+        TypeError_objssizeintproc,    // tp_delindex
         TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
@@ -18591,10 +18611,10 @@ static ypTypeObject ypRange_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -19768,10 +19788,10 @@ static ypTypeObject ypFunction_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         TypeError_objobjobjproc,    // tp_getdefault
         TypeError_objobjobjproc,    // tp_setitem
-        TypeError_objobjproc,       // tp_delitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -20070,7 +20090,14 @@ void yp_setsliceC6(
 
 void yp_delindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc)
 {
-    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_delindex, (sequence, i), exc);
+    _yp_REDIRECT_EXC2(
+            sequence, tp_as_sequence, tp_delindex, (sequence, i, /*raise_on_missing=*/TRUE), exc);
+}
+
+void yp_dropindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc)
+{
+    _yp_REDIRECT_EXC2(
+            sequence, tp_as_sequence, tp_delindex, (sequence, i, /*raise_on_missing=*/FALSE), exc);
 }
 
 void yp_delsliceC5(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject **exc)
@@ -20105,7 +20132,7 @@ ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i)
 
 void yp_remove(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    _yp_REDIRECT_EXC1(sequence, tp_remove, (sequence, x, NULL), exc);
+    _yp_REDIRECT_EXC1(sequence, tp_remove, (sequence, x, /*raise_on_missing=*/TRUE), exc);
 }
 
 void yp_reverse(ypObject *sequence, ypObject **exc)
@@ -20185,7 +20212,7 @@ void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc)
 
 void yp_discard(ypObject *set, ypObject *x, ypObject **exc)
 {
-    _yp_REDIRECT_EXC1(set, tp_remove, (set, x, yp_None), exc);
+    _yp_REDIRECT_EXC1(set, tp_remove, (set, x, /*raise_on_missing=*/FALSE), exc);
 }
 
 ypObject *yp_getitem(ypObject *mapping, ypObject *key)
@@ -20200,7 +20227,12 @@ void yp_setitem(ypObject *mapping, ypObject *key, ypObject *x, ypObject **exc)
 
 void yp_delitem(ypObject *mapping, ypObject *key, ypObject **exc)
 {
-    _yp_REDIRECT_EXC1(mapping, tp_delitem, (mapping, key), exc);
+    _yp_REDIRECT_EXC1(mapping, tp_delitem, (mapping, key, /*raise_on_missing=*/TRUE), exc);
+}
+
+void yp_dropitem(ypObject *mapping, ypObject *key, ypObject **exc)
+{
+    _yp_REDIRECT_EXC1(mapping, tp_delitem, (mapping, key, /*raise_on_missing=*/FALSE), exc);
 }
 
 ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *defval)
