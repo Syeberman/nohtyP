@@ -706,6 +706,13 @@ static ypObject *NotImplemented_comparefunc(ypObject *x, ypObject *y)
 // For use when an object contains no references to other objects
 static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo) { return yp_None; }
 
+// For use as tp_freeze for immutable objects.
+static ypObject *Immutable_freezefunc(ypObject *x)
+{
+    yp_ASSERT(!ypObject_IS_MUTABLE(x), "Immutable_freezefunc called for mutable object");
+    return yp_None;
+}
+
 // list/tuple internals that are shared among other types
 #define ypTuple_ARRAY(sq) ((ypObject **)((ypObject *)sq)->ob_data)
 #define ypTuple_LEN ypObject_LEN
@@ -3047,7 +3054,7 @@ static ypTypeObject ypIter_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,     // tp_freeze
+        Immutable_freezefunc,    // tp_freeze
         TypeError_objproc,       // tp_unfrozen_copy
         TypeError_objproc,       // tp_frozen_copy
         TypeError_traversefunc,  // tp_unfrozen_deepcopy
@@ -3408,33 +3415,14 @@ typedef struct _yp_deepcopy_memo_t {
 
 extern ypObject *const yp_RecursionLimitError;
 
-static ypObject *_yp_freeze(ypObject *x)
-{
-    int           oldCode = ypObject_TYPE_CODE(x);
-    int           newCode = ypObject_TYPE_CODE_AS_FROZEN(oldCode);
-    ypTypeObject *newType;
-    ypObject     *result;
-
-    // Check if it's already frozen (no-op) or if it can't be frozen (error)
-    if (oldCode == newCode) return yp_None;
-    newType = ypTypeTable[newCode];
-    yp_ASSERT(newType != NULL, "all types should have an immutable counterpart");
-
-    // Freeze the object, possibly reduce memory usage, etc
-    // FIXME Support unfreezable objects. Let tp_freeze set the type code as appropriate, then
-    // inspect it after to see if it worked. (Or return yp_NotImplemented.) Perhaps return an
-    // exception if the top-level freeze doesn't freeze, but in the case of deep freeze allow deeper
-    // objects to silently fail to freeze.
-    result = newType->tp_freeze(x);  // FIXME FIXME shouldn't oldType control freezing?
-    if (yp_isexceptionC(result)) return result;
-    ypObject_SET_TYPE_CODE(x, newCode);  // FIXME FIXME shouldn't tp_freeze control type code?
-    return result;
-}
-
+// TODO Support unfreezable objects. Perhaps tp_freeze can return yp_NotImplemented in this case.
+// yp_freeze should raise an error in this case, but yp_deepfreeze might do something different...
+// TODO Make sure we don't modify immortals...although immortals should be immutable anyway.
 void yp_freeze(ypObject *x, ypObject **exc)
 {
-    ypObject *result = _yp_freeze(x);
+    ypObject *result = ypObject_TYPE(x)->tp_freeze(x);
     if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
+    yp_ASSERT(!ypObject_IS_MUTABLE(x), "tp_freeze didn't freeze the object");
 }
 
 static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
@@ -3445,9 +3433,11 @@ static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
     ypObject *result;
 
     // Avoid recursion: we only have to visit each object once
-    // TODO Switch to recursion depth check? In fact, reconsider anywhere we take a "weak reference"
-    // to an object as a means of preventing recursion. (And, also, if we do this we need a
-    // keepalive like deepcopy does.)
+    // TODO Consider switching to a keepalive list like deepcopy does. For example, if we have a
+    // large object x that's reachable many times (i.e. [x] * 1000000, as a silly example), we
+    // are going to process all of x each time. However, if we remember that we've already
+    // deep-frozen x, then we will only process it once...at the expense of maintaning keepalive
+    // all the time for every call to yp_deepfreeze.
     id = yp_intC((yp_ssize_t)x);
     yp_pushunique(memo, id, &exc);
     yp_decref(id);
@@ -3458,13 +3448,14 @@ static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
 
     // Freeze current object before going deep
     // XXX tp_traverse must propagate exceptions returned by visitor
-    result = _yp_freeze(x);
+    result = ypObject_TYPE(x)->tp_freeze(x);
     if (yp_isexceptionC(result)) return result;
+    yp_ASSERT(!ypObject_IS_MUTABLE(x), "tp_freeze didn't freeze the object");
     return ypObject_TYPE(x)->tp_traverse(x, _yp_deepfreeze, memo);
 }
 
-// TODO All "deep" operations may try to operate on immortals...but shouldn't all immortals be
-// immutable already anyway?
+// TODO Support unfreezable objects. Perhaps raise an error if the top-level freeze doesn't freeze,
+// but in the case of deep freeze allow deeper objects to silently fail to freeze.
 void yp_deepfreeze(ypObject *x, ypObject **exc)
 {
     ypObject *memo = yp_setN(0);
@@ -3499,6 +3490,8 @@ static ypObject *_yp_deepcopy_memo_setitem(void *_memo, ypObject *x, ypObject *x
     ypObject           *x_id;
 
     // We keep the objects in memo uninitialized until we need them.
+    // TODO Since we know the type of objects stored in memo, it'd be nice to use the methods
+    // directly, rather than going through the indirection of yp_append and yp_setitem.
     if (memo->keep_alive == NULL) {
         memo->keep_alive = yp_listN(0);
         memo->copies = yp_dictK(0);
@@ -4262,7 +4255,7 @@ static ypTypeObject ypType_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,   // tp_freeze
+        Immutable_freezefunc,  // tp_freeze
         type_frozen_copy,      // tp_unfrozen_copy
         type_frozen_copy,      // tp_frozen_copy
         type_frozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -4369,7 +4362,7 @@ static ypTypeObject ypNoneType_Type = {
         NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,       // tp_freeze
+        Immutable_freezefunc,      // tp_freeze
         nonetype_frozen_copy,      // tp_unfrozen_copy
         nonetype_frozen_copy,      // tp_frozen_copy
         nonetype_frozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -4498,7 +4491,7 @@ static ypTypeObject ypBool_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,   // tp_freeze
+        Immutable_freezefunc,  // tp_freeze
         bool_frozen_copy,      // tp_unfrozen_copy
         bool_frozen_copy,      // tp_frozen_copy
         bool_frozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -4761,6 +4754,12 @@ static ypObject *int_dealloc(ypObject *i, void *memo)
     return yp_None;
 }
 
+static ypObject *intstore_freeze(ypObject *i)
+{
+    ypObject_SET_TYPE_CODE(i, ypInt_CODE);
+    return yp_None;
+}
+
 static ypObject *int_unfrozen_copy(ypObject *i) { return yp_intstoreC(ypInt_VALUE(i)); }
 
 static ypObject *int_frozen_copy(ypObject *i)
@@ -4883,7 +4882,7 @@ static ypTypeObject ypInt_Type = {
         NULL,                        // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        Immutable_freezefunc,   // tp_freeze
         int_unfrozen_copy,      // tp_unfrozen_copy
         int_frozen_copy,        // tp_frozen_copy
         int_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -4953,7 +4952,7 @@ static ypTypeObject ypIntStore_Type = {
         NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        intstore_freeze,        // tp_freeze
         int_unfrozen_copy,      // tp_unfrozen_copy
         int_frozen_copy,        // tp_frozen_copy
         int_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -5902,6 +5901,12 @@ static ypObject *float_dealloc(ypObject *f, void *memo)
     return yp_None;
 }
 
+static ypObject *floatstore_freeze(ypObject *f)
+{
+    ypObject_SET_TYPE_CODE(f, ypFloat_CODE);
+    return yp_None;
+}
+
 static ypObject *float_unfrozen_copy(ypObject *f) { return yp_floatstoreCF(ypFloat_VALUE(f)); }
 
 static ypObject *float_frozen_copy(ypObject *f)
@@ -6004,7 +6009,7 @@ static ypTypeObject ypFloat_Type = {
         NULL,                          // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        Immutable_freezefunc,     // tp_freeze
         float_unfrozen_copy,      // tp_unfrozen_copy
         float_frozen_copy,        // tp_frozen_copy
         float_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -6074,7 +6079,7 @@ static ypTypeObject ypFloatStore_Type = {
         NULL,                               // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        floatstore_freeze,        // tp_freeze
         float_unfrozen_copy,      // tp_unfrozen_copy
         float_frozen_copy,        // tp_frozen_copy
         float_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -9830,6 +9835,12 @@ static ypObject *_ypBytes_coerce_intorbytes(
 
 // Public Methods
 
+static ypObject *bytearray_freeze(ypObject *b)
+{
+    ypObject_SET_TYPE_CODE(b, ypBytes_CODE);
+    return yp_None;
+}
+
 static ypObject *bytes_unfrozen_copy(ypObject *b)
 {
     return ypStringLib_new_copy(ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE);
@@ -10405,7 +10416,7 @@ static ypTypeObject ypBytes_Type = {
         NULL,                          // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        Immutable_freezefunc,     // tp_freeze
         bytes_unfrozen_copy,      // tp_unfrozen_copy
         bytes_frozen_copy,        // tp_frozen_copy
         bytes_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -10495,7 +10506,7 @@ static ypTypeObject ypByteArray_Type = {
         NULL,                              // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        bytearray_freeze,         // tp_freeze
         bytes_unfrozen_copy,      // tp_unfrozen_copy
         bytes_frozen_copy,        // tp_frozen_copy
         bytes_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -10815,6 +10826,12 @@ static void _ypStr_coerce_encoding_free(ypObject *x, void *x_data)
     }
 }
 
+
+static ypObject *chrarray_freeze(ypObject *s)
+{
+    ypObject_SET_TYPE_CODE(s, ypStr_CODE);
+    return yp_None;
+}
 
 static ypObject *str_unfrozen_copy(ypObject *s)
 {
@@ -11430,7 +11447,7 @@ static ypTypeObject ypStr_Type = {
         NULL,                        // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        Immutable_freezefunc,   // tp_freeze
         str_unfrozen_copy,      // tp_unfrozen_copy
         str_frozen_copy,        // tp_frozen_copy
         str_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -11520,7 +11537,7 @@ static ypTypeObject ypChrArray_Type = {
         NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        chrarray_freeze,        // tp_freeze
         str_unfrozen_copy,      // tp_unfrozen_copy
         str_frozen_copy,        // tp_frozen_copy
         str_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -12977,6 +12994,12 @@ static ypObject *tuple_traverse(ypObject *sq, visitfunc visitor, void *memo)
     return yp_None;
 }
 
+static ypObject *list_freeze(ypObject *sq)
+{
+    ypObject_SET_TYPE_CODE(sq, ypTuple_CODE);
+    return yp_None;
+}
+
 static ypObject *tuple_unfrozen_copy(ypObject *sq) { return _ypTuple_copy(ypList_CODE, sq); }
 
 static ypObject *tuple_frozen_copy(ypObject *sq)
@@ -13223,7 +13246,7 @@ static ypTypeObject ypTuple_Type = {
         NULL,                          // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        Immutable_freezefunc,     // tp_freeze
         tuple_unfrozen_copy,      // tp_unfrozen_copy
         tuple_frozen_copy,        // tp_frozen_copy
         tuple_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -13315,7 +13338,7 @@ static ypTypeObject ypList_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        list_freeze,              // tp_freeze
         tuple_unfrozen_copy,      // tp_unfrozen_copy
         tuple_frozen_copy,        // tp_frozen_copy
         tuple_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -16058,9 +16081,10 @@ static ypObject *frozenset_traverse(ypObject *so, visitfunc visitor, void *memo)
     return yp_None;
 }
 
-static ypObject *frozenset_freeze(ypObject *so)
+static ypObject *set_freeze(ypObject *so)
 {
-    return yp_None;  // no-op, currently
+    ypObject_SET_TYPE_CODE(so, ypFrozenSet_CODE);
+    return yp_None;
 }
 
 static ypObject *frozenset_unfrozen_copy(ypObject *so)
@@ -16566,7 +16590,7 @@ static ypTypeObject ypFrozenSet_Type = {
         NULL,                              // tp_repr
 
         // Freezing, copying, and invalidating
-        frozenset_freeze,             // tp_freeze
+        Immutable_freezefunc,         // tp_freeze
         frozenset_unfrozen_copy,      // tp_unfrozen_copy
         frozenset_frozen_copy,        // tp_frozen_copy
         frozenset_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -16654,7 +16678,7 @@ static ypTypeObject ypSet_Type = {
         NULL,                        // tp_repr
 
         // Freezing, copying, and invalidating
-        frozenset_freeze,             // tp_freeze
+        set_freeze,                   // tp_freeze
         frozenset_unfrozen_copy,      // tp_unfrozen_copy
         frozenset_frozen_copy,        // tp_frozen_copy
         frozenset_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -17302,9 +17326,10 @@ static ypObject *frozendict_traverse(ypObject *mp, visitfunc visitor, void *memo
     return yp_None;
 }
 
-static ypObject *frozendict_freeze(ypObject *mp)
+static ypObject *dict_freeze(ypObject *mp)
 {
-    return yp_None;  // no-op, currently
+    ypObject_SET_TYPE_CODE(mp, ypFrozenDict_CODE);
+    return yp_None;
 }
 
 static ypObject *frozendict_unfrozen_copy(ypObject *x)
@@ -17892,7 +17917,7 @@ static ypTypeObject ypFrozenDict_Type = {
         NULL,                               // tp_repr
 
         // Freezing, copying, and invalidating
-        frozendict_freeze,             // tp_freeze
+        Immutable_freezefunc,          // tp_freeze
         frozendict_unfrozen_copy,      // tp_unfrozen_copy
         frozendict_frozen_copy,        // tp_frozen_copy
         frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -17976,7 +18001,7 @@ static ypTypeObject ypDict_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        frozendict_freeze,             // tp_freeze
+        dict_freeze,                   // tp_freeze
         frozendict_unfrozen_copy,      // tp_unfrozen_copy
         frozendict_frozen_copy,        // tp_frozen_copy
         frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -18573,7 +18598,7 @@ static ypTypeObject ypRange_Type = {
         NULL,                          // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        Immutable_freezefunc,   // tp_freeze
         range_frozen_copy,      // tp_unfrozen_copy
         range_frozen_copy,      // tp_frozen_copy
         range_frozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -19055,10 +19080,10 @@ static ypObject *_ypFunction_call_copy_var_kwargs(ypObject *kwargs, int kwargs_i
     yp_ASSERT1(ypObject_IS_MAPPING(kwargs));
 
     if (kwargs_is_copy) {
-        yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
-        // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
-        result = yp_frozendict(kwargs);
+        yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
+        result = dict_freeze(kwargs);
         if (yp_isexceptionC(result)) return result;
+        result = yp_incref(kwargs);
     } else {
         result = yp_frozendict(kwargs);
         if (yp_isexceptionC(result)) return result;
@@ -19750,7 +19775,7 @@ static ypTypeObject ypFunction_Type = {
         NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,       // tp_freeze
+        Immutable_freezefunc,      // tp_freeze
         function_frozen_copy,      // tp_unfrozen_copy
         function_frozen_copy,      // tp_frozen_copy
         MethodError_traversefunc,  // tp_unfrozen_deepcopy

@@ -842,6 +842,8 @@ typedef struct _fixture_type_t {
     int original_object_return;  // A collection that *always* returns the object that was stored
 } fixture_type_t;
 
+// TODO Versions of each of these that build as the mutable type and then freezes, to test that
+// the freezing process still yields a viable object.
 extern fixture_type_t *fixture_type_type;
 extern fixture_type_t *fixture_type_NoneType;
 extern fixture_type_t *fixture_type_bool;
