@@ -32,7 +32,7 @@ static MunitResult _test_newN(
     {
         ypObject *so = any_newN(N(items[0], items[1]));
         assert_type_is(so, type->type);
-        assert_set(so, items[0], items[1]);
+        assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
 
@@ -56,7 +56,7 @@ static MunitResult _test_newN(
     {
         ypObject *so = any_newN(N(items[0], items[0], items[1], items[1]));
         assert_type_is(so, type->type);
-        assert_set(so, items[0], items[1]);
+        assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
 
@@ -107,7 +107,7 @@ static MunitResult _test_new(
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
         ypObject *so = any_new(x);
         assert_type_is(so, type->type);
-        assert_set(so, items[0], items[1]);
+        assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so, x));
     }
 
@@ -124,7 +124,7 @@ static MunitResult _test_new(
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *x = (*x_type)->newN(N(items[0], items[0], items[1]));
         ypObject *so = any_new(x);
-        assert_set(so, items[0], items[1]);
+        assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so, x));
     }
 
@@ -175,7 +175,7 @@ static MunitResult _test_new(
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject * so, x, yp_tupleN(N(items[0], items[1])), so = any_new(x),
-            assert_set(so, items[0], items[1]), yp_decref(so));
+            assert_setlike(so, items[0], items[1]), yp_decref(so));
 
     // x is not an iterable.
     assert_raises(any_new(not_iterable), yp_TypeError);

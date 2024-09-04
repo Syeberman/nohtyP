@@ -635,7 +635,7 @@ DEFINE_GENERIC_METHODS(InvalidatedError, yp_InvalidatedError);  // for Invalidat
 DEFINE_GENERIC_METHODS(ExceptionMethod, x);  // for exception objects; returns "self"
 #undef DEFINE_GENERIC_METHODS
 
-// FIXME Is this yp_MethodError vs yp_TypeError distinction important to nohtyP? In Python it comes
+// TODO Is this yp_MethodError vs yp_TypeError distinction important to nohtyP? In Python it comes
 // down to the historical choices of if it was implemented as a function, as syntax, or as a method.
 #define DEFINE_GENERIC_PROTOCOL_METHODS(prefix, methodErrorName, typeErrorName)      \
     static ypNumberMethods yp_UNUSED   prefix##_NumberMethods[1] = {{                \
@@ -3797,7 +3797,7 @@ static ypObject *_yp_hash_visitor(ypObject *x, void *_memo, yp_hash_t *hash)
     }
 
     // If the hash has already been calculated, return it immediately
-    // FIXME Rethink these "cached hash" optimizations: should we always call the method?
+    // TODO Rethink these "cached hash" optimizations: should we always call the method?
     if (ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID) {
         *hash = ypObject_CACHED_HASH(x);
         return yp_None;
@@ -3834,7 +3834,7 @@ static ypObject *_yp_cachedhash_visitor(ypObject *x, void *_memo, yp_hash_t *has
     ypObject  *result;
 
     // Check cached hash, and recursion depth first
-    // FIXME Rethink these "cached hash" optimizations: should we always call the method?
+    // TODO Rethink these "cached hash" optimizations: should we always call the method?
     if (!ypObject_IS_MUTABLE(x) && ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID) {
         *hash = ypObject_CACHED_HASH(x);
         return yp_None;

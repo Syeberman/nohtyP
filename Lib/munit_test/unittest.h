@@ -523,7 +523,8 @@ extern "C" {
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
-// FIXME Assert the type of obj is a known sequence type? (Similar for assert_set, assert_mapping.)
+// FIXME Assert the type of obj is a known sequence type? (Similar for assert_setlike,
+// assert_mapping.)
 #define _assert_sequence(obj, items, obj_fmt, item_strs, ...)                                   \
     do {                                                                                        \
         yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(items);                                      \
@@ -545,7 +546,7 @@ extern "C" {
 
 // Asserts that obj is a sequence containing exactly the given items in that order. Items are
 // compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getindexC.
-// FIXME Rewrite to use yp_miniiter like assert_set?
+// FIXME Rewrite to use yp_miniiter like assert_setlike?
 #define assert_sequence(obj, ...)                                                          \
     do {                                                                                   \
         ypObject *_ypmt_SEQ_obj = (obj);                                                   \
@@ -556,7 +557,7 @@ extern "C" {
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
-#define _assert_set(obj, items, obj_fmt, item_strs, ...)                                           \
+#define _assert_setlike(obj, items, obj_fmt, item_strs, ...)                                       \
     do {                                                                                           \
         yp_ssize_t  _ypmt_SET_n = yp_lengthof_array(items);                                        \
         yp_ssize_t  _ypmt_SET_i;                                                                   \
@@ -608,13 +609,12 @@ extern "C" {
 // Asserts that obj is a set containing exactly the given items, in any order, without duplicates.
 // Items are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_miniiter.
 // TODO Once the order items are yielded is guaranteed, we can make the order important.
-// FIXME assert_setlike?
-#define assert_set(obj, ...)                                                          \
-    do {                                                                              \
-        ypObject *_ypmt_SET_obj = (obj);                                              \
-        ypObject *_ypmt_SET_items[] = {__VA_ARGS__};                                  \
-        char     *_ypmt_SET_item_strs[] = {STRINGIFY(__VA_ARGS__)};                   \
-        _assert_set(_ypmt_SET_obj, _ypmt_SET_items, "%s", _ypmt_SET_item_strs, #obj); \
+#define assert_setlike(obj, ...)                                                          \
+    do {                                                                                  \
+        ypObject *_ypmt_SET_obj = (obj);                                                  \
+        ypObject *_ypmt_SET_items[] = {__VA_ARGS__};                                      \
+        char     *_ypmt_SET_item_strs[] = {STRINGIFY(__VA_ARGS__)};                       \
+        _assert_setlike(_ypmt_SET_obj, _ypmt_SET_items, "%s", _ypmt_SET_item_strs, #obj); \
     } while (0)
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
@@ -643,7 +643,7 @@ extern "C" {
 // Asserts that obj is a mapping containing exactly the given key/value pairs, in any order, without
 // duplicate keys. Values are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC
 // and yp_getitem.
-// FIXME Compare keys by type as well, just like assert_set does.
+// FIXME Compare keys by type as well, just like assert_setlike does.
 #define assert_mapping(obj, ...)                                                          \
     do {                                                                                  \
         ypObject *_ypmt_MAP_obj = (obj);                                                  \
@@ -748,7 +748,7 @@ extern "C" {
 // local variable definitions. To be used like:
 //
 //     faulty_iter_tests(ypObject * so, x, yp_tupleN(N(items[0], items[1])), so = yp_set(x),
-//             assert_set(so, items[0], items[1]), yp_decref(so));
+//             assert_setlike(so, items[0], items[1]), yp_decref(so));
 #define faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down)        \
     do {                                                                                           \
         ypObject *_ypmt_FLT_ITR_supplier = (iter_supplier);                                        \
