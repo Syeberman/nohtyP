@@ -15453,6 +15453,7 @@ static void _ypSet_movekey(
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
     yp_ASSERT1(!ypSet_ENTRY_USED(loc));
     yp_ASSERT1(loc->se_key != NULL || _ypSet_space_remaining(so) > 0);
+    yp_ASSERT1(!yp_isexceptionC(key));
     yp_ASSERT1(!ypObject_IS_MUTABLE(key));
     yp_ASSERT1(*spaceleft == _ypSet_space_remaining(so));
 
@@ -15481,6 +15482,7 @@ static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, yp
     yp_ASSERT1(_ypSet_space_remaining(so) > 0);
     yp_ASSERT1(ypSet_LEN(so) == ypSet_FILL(so));
     yp_ASSERT1(!ypObject_IS_MUTABLE(key));
+    yp_ASSERT1(!yp_isexceptionC(key));
 
     i = (size_t)hash & mask;
     (*ep) = &ep0[i];
@@ -15510,22 +15512,24 @@ static ypObject *_ypSet_removekey(ypObject *so, ypSet_KeyEntry *loc)
     return oldkey;
 }
 
-// Adds the key to the hash table at the given location if there is enough room, otherwise resizes
-// so and adds the key at the new location. loc must not currently be in use! *spaceleft should be
-// initialized from _ypSet_space_remaining; it will be decremented or reset as appropriate. growhint
-// is the number of additional items, not including key, that are expected to be added to the set.
+// Adds a new key with the given hash at the given *loc, which may require a resize. *loc must point
+// to a currently-unused location in the hash table; it will be updated if a resize occurs.
+// *spaceleft should be initialized from _ypSet_space_remaining; it will be decremented or reset as
+// appropriate. growhint is the number of additional items, not including key, that are expected to
+// be added to the set. Returns an exception on error.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypSet_push(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash,
-        yp_ssize_t *spaceleft, yp_ssize_t growhint)
+static ypObject *_ypSet_push_newkey(ypObject *so, ypSet_KeyEntry **loc, ypObject *key,
+        yp_hash_t hash, yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
     ypObject  *result;
     yp_ssize_t newlen;
 
-    yp_ASSERT1(!ypSet_ENTRY_USED(loc));
+    yp_ASSERT1(!ypSet_ENTRY_USED(*loc));
+    yp_ASSERT1(!yp_isexceptionC(key));
 
     // We need to add the key; it's possible this doesn't involve resizing.
-    if (*spaceleft > 0 || loc->se_key == ypSet_dummy) {
-        _ypSet_movekey(so, loc, yp_incref(key), hash, spaceleft);  // steals key
+    if (*spaceleft > 0 || (*loc)->se_key == ypSet_dummy) {
+        _ypSet_movekey(so, *loc, yp_incref(key), hash, spaceleft);  // steals key
         return yp_None;
     }
 
@@ -15539,13 +15543,16 @@ static ypObject *_ypSet_push(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, y
     result = _ypSet_resize(so, newlen);                                // invalidates loc
     if (yp_isexceptionC(result)) return result;
 
-    _ypSet_movekey_clean(so, yp_incref(key), hash, &loc);  // steals key
+    _ypSet_movekey_clean(so, yp_incref(key), hash, loc);  // steals key, updates loc
     *spaceleft = _ypSet_space_remaining(so);
     return yp_None;
 }
 
-// As _ypSet_push, but calculates the hash using yp_hashC. Returns yp_True if so was modified,
-// yp_False if it wasn't due to the key already being in the set, or an exception on error.
+// Adds the key to the hash table using the hash returned by yp_hashC. *spaceleft should be
+// initialized from _ypSet_space_remaining; it will be decremented or reset as appropriate. growhint
+// is the number of additional items, not including key, that are expected to be added to the set.
+// Returns yp_True if so was modified, yp_False if it wasn't due to the key already being in the
+// set, or an exception on error.
 static ypObject *_ypSet_push_byhash(
         ypObject *so, ypObject *key, yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
@@ -15553,6 +15560,8 @@ static ypObject *_ypSet_push_byhash(
     ypObject       *exc = yp_None;
     ypSet_KeyEntry *loc;
     ypObject       *result;
+
+    yp_ASSERT1(!yp_isexceptionC(key));
 
     // Look for the appropriate entry in the hash table.
     hash = yp_hashC(key, &exc);
@@ -15563,7 +15572,8 @@ static ypObject *_ypSet_push_byhash(
     // If the key is already in the hash table, then there's nothing to do.
     if (ypSet_ENTRY_USED(loc)) return yp_False;
 
-    result = _ypSet_push(so, loc, key, hash, spaceleft, growhint);
+    // _ypSet_push_newkey may resize so, and may update loc and *spaceleft.
+    result = _ypSet_push_newkey(so, &loc, key, hash, spaceleft, growhint);
     if (yp_isexceptionC(result)) return result;
     return yp_True;
 }
@@ -15733,8 +15743,9 @@ static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
         if (yp_isexceptionC(result)) return result;
         if (ypSet_ENTRY_USED(so_loc)) continue;
 
-        result = _ypSet_push(
-                so, so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft, keysleft);
+        // _ypSet_push_newkey may resize so, and may update so_loc and spaceleft.
+        result = _ypSet_push_newkey(
+                so, &so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft, keysleft);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -15885,8 +15896,9 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
         if (ypSet_ENTRY_USED(so_loc)) {
             yp_decref(_ypSet_removekey(so, so_loc));
         } else {
-            result = _ypSet_push(so, so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft,
-                    keysleft);  // may resize so
+            // _ypSet_push_newkey may resize so, and may update so_loc and spaceleft.
+            result = _ypSet_push_newkey(
+                    so, &so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft, keysleft);
             if (yp_isexceptionC(result)) return result;
         }
     }
@@ -16425,8 +16437,12 @@ static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
 static ypObject *set_pushunique(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
+    ypObject  *result;
+
+    if (yp_isexceptionC(x)) return x;
+
     // TODO Overallocate
-    ypObject *result = _ypSet_push_byhash(so, x, &spaceleft, 0);
+    result = _ypSet_push_byhash(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;  // TODO: As usual, what if this is yp_KeyError?
     return result == yp_True ? yp_None : yp_KeyError;
 }
@@ -16434,8 +16450,12 @@ static ypObject *set_pushunique(ypObject *so, ypObject *x)
 static ypObject *set_push(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
+    ypObject  *result;
+
+    if (yp_isexceptionC(x)) return x;
+
     // TODO Overallocate
-    ypObject *result = _ypSet_push_byhash(so, x, &spaceleft, 0);
+    result = _ypSet_push_byhash(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;
     return yp_None;
 }
@@ -17088,9 +17108,10 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
     return yp_None;
 }
 
-// Adds a new key with the given hash at the given key_loc, which may require a resize, and sets
+// Adds a new key with the given hash at the given *key_loc, which may require a resize, and sets
 // value appropriately. *key_loc must point to a currently-unused location in the hash table; it
-// will be updated if a resize occurs. Otherwise behaves as _ypDict_push.
+// will be updated if a resize occurs. *spaceleft should be initialized from _ypSet_space_remaining;
+// it will be decremented or reset as appropriate. Returns an exception on error.
 // XXX Adapted from PyDict_SetItem
 // TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
 // shared keyset contains 5x the keys that we actually use?  That's a large waste in the value
@@ -17103,6 +17124,9 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     yp_ssize_t newlen;
 
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(!ypSet_ENTRY_USED(*key_loc));
+    yp_ASSERT1(!yp_isexceptionC(key));
+    yp_ASSERT1(!yp_isexceptionC(value));
 
     // It's possible we can add the key without resizing
     if (*spaceleft > 0 || (*key_loc)->se_key == ypSet_dummy) {
@@ -17130,11 +17154,33 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     return yp_None;
 }
 
-// Adds the key/value to the dict, overriding existing values, and returning yp_None. *spaceleft
-// should be initialized from _ypSet_space_remaining; it will be decremented or reset as
-// appropriate. Returns an exception on error.
+// Updates the value in the dict for the key at the given key_loc. key_loc must point to a
+// currently-used location in the hash table. Always succeeds.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypDict_push(
+static void _ypDict_push_existingkey(ypObject *mp, ypSet_KeyEntry *key_loc, ypObject *value)
+{
+    ypObject **value_loc;
+
+    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(ypSet_ENTRY_USED(key_loc));
+    yp_ASSERT1(!yp_isexceptionC(value));
+
+    value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
+    if (*value_loc == NULL) {
+        *value_loc = yp_incref(value);
+        ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
+    } else {
+        // FIXME What if yp_decref modifies mp?
+        yp_decref(*value_loc);
+        *value_loc = yp_incref(value);
+    }
+}
+
+// Adds the key/value to the dict, overriding existing values, using the hash returned by up_hashC.
+// *spaceleft should be initialized from _ypSet_space_remaining; it will be decremented or reset as
+// appropriate. growhint is the number of additional items, not including key, that are expected to
+// be added to the dict. Returns an exception on error.
+static ypObject *_ypDict_push_byhash(
         ypObject *mp, ypObject *key, ypObject *value, yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
     yp_hash_t       hash;
@@ -17142,33 +17188,24 @@ static ypObject *_ypDict_push(
     ypSet_KeyEntry *key_loc;
     ypObject       *exc = yp_None;
     ypObject       *result;
-    ypObject      **value_loc;
 
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(!yp_isexceptionC(key));
+    yp_ASSERT1(!yp_isexceptionC(value));
 
     // Look for the appropriate entry in the hash table
     hash = yp_hashC(key, &exc);
-    if (yp_isexceptionC(exc)) return exc;      // also verifies key is not an exception
-    if (yp_isexceptionC(value)) return value;  // verifies value is not an exception
+    if (yp_isexceptionC(exc)) return exc;
     result = _ypSet_lookkey(keyset, key, hash, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the key is already in the hash table, then we need to update the value.
     if (ypSet_ENTRY_USED(key_loc)) {
-        value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
-        if (*value_loc == NULL) {
-            *value_loc = yp_incref(value);
-            ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
-        } else {
-            // FIXME What if yp_decref modifies mp?
-            yp_decref(*value_loc);
-            *value_loc = yp_incref(value);
-        }
+        _ypDict_push_existingkey(mp, key_loc, value);
         return yp_None;
+    } else {
+        // _ypDict_push_newkey may resize mp, and may update key_loc and *spaceleft.
+        return _ypDict_push_newkey(mp, &key_loc, key, hash, value, spaceleft, growhint);
     }
-
-    // Otherwise, we need to add both the key _and_ value, which may involve resizing
-    return _ypDict_push_newkey(mp, &key_loc, key, hash, value, spaceleft, growhint);
 }
 
 // Removes the value from the dict; the key stays in the keyset, but that's of no concern. The
@@ -17220,12 +17257,17 @@ static void _ypDict_iter_items_next(ypObject *itemiter, ypObject **key, ypObject
 // XXX Check for the mp==other case _before_ calling this function
 static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
 {
-    yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
-    yp_ssize_t valuesleft = ypDict_LEN(other);
-    ypObject  *other_keyset = ypDict_KEYSET(other);
-    yp_ssize_t i;
-    ypObject  *other_value;
-    ypObject  *result;
+    yp_ssize_t      spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
+    ypObject       *keyset = ypDict_KEYSET(mp);
+    yp_ssize_t      valuesleft = ypDict_LEN(other);
+    ypObject      **other_values = ypDict_VALUES(other);
+    ypSet_KeyEntry *other_keyset_table = ypSet_TABLE(ypDict_KEYSET(other));
+    yp_ssize_t      i;
+    ypObject       *value;
+    ypObject       *key;
+    yp_hash_t       hash;
+    ypSet_KeyEntry *key_loc;
+    ypObject       *result;
 
     yp_ASSERT(mp != other, "_ypDict_update_fromdict called with mp==other");
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenDict_CODE);
@@ -17234,16 +17276,23 @@ static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
     // values.
 
     for (i = 0; valuesleft > 0; i++) {
-        other_value = ypDict_VALUES(other)[i];
-        if (other_value == NULL) continue;
+        value = other_values[i];
+        if (value == NULL) continue;
+        key = other_keyset_table[i].se_key;
+        hash = other_keyset_table[i].se_hash;
         valuesleft -= 1;
 
-        // FIXME _ypDict_push will call yp_hashC again, even though we already know the hash
-        // FIXME yp_hashC may mutate mp, invalidating valuesleft!
-        // FIXME compare to set_update
-        result = _ypDict_push(
-                mp, ypSet_TABLE(other_keyset)[i].se_key, other_value, &spaceleft, valuesleft);
+        // Look for the appropriate entry in the hash table.
+        result = _ypSet_lookkey(keyset, key, hash, &key_loc);
         if (yp_isexceptionC(result)) return result;
+
+        if (ypSet_ENTRY_USED(key_loc)) {
+            _ypDict_push_existingkey(mp, key_loc, value);
+        } else {
+            // _ypDict_push_newkey may resize mp, and may update key_loc and spaceleft.
+            result = _ypDict_push_newkey(mp, &key_loc, key, hash, value, &spaceleft, valuesleft);
+            if (yp_isexceptionC(result)) return result;
+        }
     }
     return yp_None;
 }
@@ -17265,8 +17314,10 @@ static ypObject *_ypDict_update_fromiter(ypObject *mp, ypObject *itemiter)
             if (yp_isexceptionC2(key, yp_StopIteration)) break;
             return key;
         }
-        length_hint -= 1;  // check for <0 only when we need it in _ypDict_push
-        result = _ypDict_push(mp, key, value, &spaceleft, length_hint);
+        yp_ASSERT1(!yp_isexceptionC(value));  // if key is not an exception, then neither is value
+
+        length_hint -= 1;  // check for <0 only when we need it in _ypDict_push_byhash
+        result = _ypDict_push_byhash(mp, key, value, &spaceleft, length_hint);
         yp_decrefN(2, key, value);
         if (yp_isexceptionC(result)) return result;
     }
@@ -17542,8 +17593,10 @@ static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *de
 static ypObject *dict_setitem(ypObject *mp, ypObject *key, ypObject *value)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
+    if (yp_isexceptionC(key)) return key;
+    if (yp_isexceptionC(value)) return value;
     // TODO Overallocate
-    return _ypDict_push(mp, key, value, &spaceleft, 0);
+    return _ypDict_push_byhash(mp, key, value, &spaceleft, 0);
 }
 
 static ypObject *dict_delitem(ypObject *mp, ypObject *key, int raise_on_missing)
@@ -17621,6 +17674,7 @@ static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *defval)
             ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
         } else {
             yp_ssize_t spaceleft = _ypSet_space_remaining(keyset);
+            // _ypDict_push_newkey may resize mp, and may update key_loc and spaceleft.
             // TODO Overallocate
             result = _ypDict_push_newkey(mp, &key_loc, key, hash, defval, &spaceleft, 0);
             // value_loc is no longer valid
@@ -17641,10 +17695,12 @@ static ypObject *dict_updateK(ypObject *mp, int n, va_list args)
 
     while (n > 0) {
         // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
-        key = va_arg(args, ypObject *);    // borrowed
+        key = va_arg(args, ypObject *);  // borrowed
+        if (yp_isexceptionC(key)) return key;
         value = va_arg(args, ypObject *);  // borrowed
+        if (yp_isexceptionC(value)) return value;
         n -= 1;
-        result = _ypDict_push(mp, key, value, &spaceleft, n);
+        result = _ypDict_push_byhash(mp, key, value, &spaceleft, n);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -18183,8 +18239,12 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
 
     while (n > 0) {
         key = va_arg(args, ypObject *);  // borrowed
+        if (yp_isexceptionC(key)) {
+            yp_decref(newMp);
+            return key;
+        }
         n -= 1;
-        result = _ypDict_push(newMp, key, value, &spaceleft, n);
+        result = _ypDict_push_byhash(newMp, key, value, &spaceleft, n);
         if (yp_isexceptionC(result)) {
             yp_decref(newMp);
             return result;
@@ -18261,7 +18321,7 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
             break;
         }
         length_hint -= 1;
-        result = _ypDict_push(newMp, key, value, &spaceleft, length_hint);
+        result = _ypDict_push_byhash(newMp, key, value, &spaceleft, length_hint);
         yp_decref(key);
         if (yp_isexceptionC(result)) break;
     }
@@ -19951,6 +20011,8 @@ static ypObject *_yp_send(ypObject *iterator, ypObject *value)
     return result;
 }
 
+// TODO In Python we get `TypeError: can't send non-None value to a just-started generator`. Have
+// the same check in nohtyP? (Note that Python allows you to throw into a just-started generator.)
 ypObject *yp_send(ypObject *iterator, ypObject *value)
 {
     if (yp_isexceptionC(value)) {

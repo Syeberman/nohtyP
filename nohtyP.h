@@ -551,8 +551,6 @@ typedef struct _yp_generator_decl_t {
 // "Sends" a value into iterator and returns a new reference to the next yielded value, or an
 // exception. The iterator may ignore the value. value cannot be an exception. When the iterator is
 // exhausted yp_StopIteration is raised.
-// FIXME Support this? `TypeError: can't send non-None value to a just-started generator` (but you
-// can throw)
 ypAPI ypObject *yp_send(ypObject *iterator, ypObject *value);
 
 // Equivalent to yp_send(iterator, yp_None). Typically used on iterators that ignore the value.
