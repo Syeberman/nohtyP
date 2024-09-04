@@ -12,6 +12,31 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
 }
 
 
+// Helper function for assert_setlike. If yp_miniiter_next succeeds, sets *actual to a new reference
+// to the next yielded value, *items_i to the index of the first equal object in items, and returns
+// true; if there is no equal object in items, *items_i is set to n. If mi is exhausted, *actual and
+// *items_i are undefined, and false is returned. If yp_miniiter_next fails, *actual is set to the
+// exception, *items_i is undefined, and true is returned.  n is the number of elements in items.
+extern int _assert_setlike_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t n,
+        ypObject **items, ypObject **actual, yp_ssize_t *items_i)
+{
+    ypObject *eq;
+
+    *actual = yp_miniiter_next(mi, mi_state);  // new ref
+    if (yp_isexceptionC(*actual)) {
+        if (yp_isexceptionC2(*actual, yp_StopIteration)) return FALSE;  // mi is exhausted
+        return TRUE;  // yp_miniiter_next failed with an exception
+    }
+
+    for ((*items_i) = 0; (*items_i) < n; (*items_i)++) {
+        // yp_eq would only fail here if items contained an exception.
+        assert_not_raises(eq = yp_eq(*actual, items[*items_i]));
+        if (eq == yp_True) break;  // equal item found, *items_i is less than n
+    }
+    return TRUE;  // if an equal item was not found, *items_i is equal to n
+}
+
+
 // If something should happen 2 in 23 times: RAND_BOOL_FRACTION(2, 23)
 // TODO Better name? Better argument names?
 #define RAND_BOOL_FRACTION(numerator, denominator) \

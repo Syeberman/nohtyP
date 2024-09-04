@@ -523,8 +523,6 @@ extern "C" {
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
-// FIXME Assert the type of obj is a known sequence type? (Similar for assert_setlike,
-// assert_mapping.)
 #define _assert_sequence(obj, items, obj_fmt, item_strs, ...)                                   \
     do {                                                                                        \
         yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(items);                                      \
@@ -546,7 +544,6 @@ extern "C" {
 
 // Asserts that obj is a sequence containing exactly the given items in that order. Items are
 // compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getindexC.
-// FIXME Rewrite to use yp_miniiter like assert_setlike?
 #define assert_sequence(obj, ...)                                                          \
     do {                                                                                   \
         ypObject *_ypmt_SEQ_obj = (obj);                                                   \
@@ -555,45 +552,41 @@ extern "C" {
         _assert_sequence(_ypmt_SEQ_obj, _ypmt_SEQ_items, "%s", _ypmt_SEQ_item_strs, #obj); \
     } while (0)
 
+extern int _assert_setlike_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t n,
+        ypObject **items, ypObject **actual, yp_ssize_t *items_i);
+
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
 #define _assert_setlike(obj, items, obj_fmt, item_strs, ...)                                       \
     do {                                                                                           \
         yp_ssize_t  _ypmt_SET_n = yp_lengthof_array(items);                                        \
-        yp_ssize_t  _ypmt_SET_i;                                                                   \
         int         _ypmt_SET_found[yp_lengthof_array(items)] = {0};                               \
         yp_uint64_t _ypmt_SET_mi_state;                                                            \
         ypObject   *_ypmt_SET_mi;                                                                  \
+        ypObject   *_ypmt_SET_actual;                                                              \
+        yp_ssize_t  _ypmt_SET_i;                                                                   \
                                                                                                    \
         _assert_len(obj, _ypmt_SET_n, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_SET_n);            \
         _assert_not_raises(_ypmt_SET_mi = yp_miniiter(obj, &_ypmt_SET_mi_state),                   \
                 "yp_miniiter(" obj_fmt ", &mi_state)", __VA_ARGS__);                               \
                                                                                                    \
-        while (1) {                                                                                \
-            ypObject *_ypmt_SET_actual = yp_miniiter_next(_ypmt_SET_mi, &_ypmt_SET_mi_state);      \
-            if (yp_isexceptionC2(_ypmt_SET_actual, yp_StopIteration)) break;                       \
+        while (_assert_setlike_helper(_ypmt_SET_mi, &_ypmt_SET_mi_state, _ypmt_SET_n, items,       \
+                &_ypmt_SET_actual /*new ref*/, &_ypmt_SET_i)) {                                    \
             _assert_not_exception(_ypmt_SET_actual,                                                \
                     "yp_miniiter_next(yp_miniiter(" obj_fmt ", &mi_state), &mi_state)",            \
                     __VA_ARGS__);                                                                  \
-                                                                                                   \
-            for (_ypmt_SET_i = 0; _ypmt_SET_i < _ypmt_SET_n; _ypmt_SET_i++) {                      \
-                ypObject *_ypmt_SET_eq = yp_eq(_ypmt_SET_actual, items[_ypmt_SET_i]);              \
-                _assert_not_exception(_ypmt_SET_eq, "yp_eq(<item in " obj_fmt ">, %s)",            \
-                        __VA_ARGS__, item_strs[_ypmt_SET_i]);                                      \
-                if (_ypmt_SET_eq == yp_False) continue;                                            \
-                if (_ypmt_SET_found[_ypmt_SET_i]) {                                                \
-                    munit_errorf("%s yielded twice from " obj_fmt, item_strs[_ypmt_SET_i],         \
-                            __VA_ARGS__);                                                          \
-                }                                                                                  \
-                _assert_same_type(_ypmt_SET_actual, items[_ypmt_SET_i], "<item in " obj_fmt ">",   \
-                        "%s", __VA_ARGS__, item_strs[_ypmt_SET_i]);                                \
-                _ypmt_SET_found[_ypmt_SET_i] = TRUE;                                               \
-                break;                                                                             \
-            }                                                                                      \
             if (_ypmt_SET_i >= _ypmt_SET_n) {                                                      \
                 munit_errorf("unexpected item yielded from " obj_fmt, __VA_ARGS__);                \
             }                                                                                      \
-                                                                                                   \
+            if (_ypmt_SET_found[_ypmt_SET_i]) {                                                    \
+                munit_errorf(                                                                      \
+                        "%s yielded twice from " obj_fmt, item_strs[_ypmt_SET_i], __VA_ARGS__);    \
+            }                                                                                      \
+            _ypmt_SET_found[_ypmt_SET_i] = TRUE;                                                   \
+            /* We already know from _assert_setlike_helper that _ypmt_SET_actual equals            \
+             * items[_ypmt_SET_i]. Now we need to check that they're the same type. */             \
+            _assert_same_type(_ypmt_SET_actual, items[_ypmt_SET_i], "<item in " obj_fmt ">", "%s", \
+                    __VA_ARGS__, item_strs[_ypmt_SET_i]);                                          \
             yp_decref(_ypmt_SET_actual);                                                           \
         }                                                                                          \
                                                                                                    \
