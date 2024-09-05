@@ -950,7 +950,7 @@ namespace nohtyP
         internal static extern ypObject_p yp_sum( ypObject_p iterable );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern yp_int_t yp_int_bit_lengthC( ypObject_p x, ref ypObject_p exc );
+        internal static extern yp_int_t yp_bit_lengthC( ypObject_p x, ref ypObject_p exc );
 
         internal static ypObject_p yp_sys_maxint = DllImportData( "yp_sys_maxint" );
         internal static ypObject_p yp_sys_minint = DllImportData( "yp_sys_minint" );

@@ -5644,12 +5644,12 @@ static const yp_uint8_t _BitLengthTable[32] = {
 // clang-format on
 
 // XXX Adapted from Python 2.7's bits_in_ulong
-yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc)
+yp_int_t yp_bit_lengthC(ypObject *x, ypObject **exc)
 {
     yp_int_t x_abs;
     yp_int_t x_bits;
 
-    if (ypObject_TYPE_PAIR_CODE(x) != ypInt_CODE) return_yp_CEXC_BAD_TYPE(0, exc, x);
+    if (ypObject_TYPE_PAIR_CODE(x) != ypInt_CODE) return_yp_CEXC_METHOD_ERR(0, exc, x);
 
     x_abs = ypInt_VALUE(x);
     if (x_abs < 0) {
@@ -15175,7 +15175,7 @@ static yp_ssize_t _ypSet_space_remaining(ypObject *so)
 // than ypSet_LEN_MAX.
 // XXX Adapted from Python's dictresize
 // TODO Python uses optimized  _Py_bit_length or _BitScanReverse64 to find next log2 value... we
-// could use yp_int_bit_lengthC!
+// could use yp_bit_lengthC!
 yp_STATIC_ASSERT(ypSet_RESIZE_AT_DNM <= (yp_SSIZE_T_MAX - 1) / ypSet_LEN_MAX,
         ypSet_calc_alloclen_cant_overflow);
 static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
@@ -15219,7 +15219,7 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
     }
     if (yp_isexceptionC(so)) return so;
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    // TODO We could use yp_int_bit_lengthC...
+    // TODO We could use yp_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, alloclen);
     ypSet_FILL(so) = 0;
     yp_memset(ypSet_TABLE(so), 0, alloclen * yp_sizeof(ypSet_KeyEntry));
@@ -15343,7 +15343,7 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
     if (oldkeys == NULL) return yp_MemoryError;
     yp_memset(ypSet_TABLE(so), 0, newalloclen * yp_sizeof(ypSet_KeyEntry));
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    // TODO We could use yp_int_bit_lengthC...
+    // TODO We could use yp_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, newalloclen);
 
     // Clear the new table.
@@ -16483,7 +16483,7 @@ static ypObject *set_clear(ypObject *so)
 
     // Update our attributes and return
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    // TODO We could use yp_int_bit_lengthC...
+    // TODO We could use yp_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, ypSet_ALLOCLEN_MIN);  // we can't make use of the excess anyway
     ypSet_SET_LEN(so, 0);
     ypSet_FILL(so) = 0;

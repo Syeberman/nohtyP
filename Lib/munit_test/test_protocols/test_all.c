@@ -55,7 +55,6 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises(yp_next2(self, yp_None), yp_TypeError);
         assert_raises(yp_throw(self, yp_Exception), yp_TypeError);
         // In Python, operator.length_hint returns zero for None, int, float, function, etc.
-        // FIXME Like Python, allow yp_length_hintC to be called on anything with a length.
         assert_ssizeC_raises_exc(yp_length_hintC(self, &exc), ==, 0, yp_TypeError);
         assert_raises_exc(yp_close(self, &exc), yp_MethodError);
     }
@@ -326,8 +325,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
     }
 
     if (type != fixture_type_int && type != fixture_type_intstore) {
-        // FIXME drop int_ from the name and treat this like a method, raising MethodError?
-        assert_intC_raises_exc(yp_int_bit_lengthC(self, &exc), ==, 0, yp_TypeError);
+        assert_intC_raises_exc(yp_bit_lengthC(self, &exc), ==, 0, yp_MethodError);
     }
 
     if (!type->is_iterable) {

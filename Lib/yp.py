@@ -750,8 +750,8 @@ yp_func(c_yp_int_t, "yp_asintC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
 # yp_float_t yp_asfloatC(ypObject *x, ypObject **exc);
 yp_func(c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
 
-# yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc);
-yp_func(c_yp_int_t, "yp_int_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
+# yp_int_t yp_bit_lengthC(ypObject *x, ypObject **exc);
+yp_func(c_yp_int_t, "yp_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
 
 # ypObject *yp_type(ypObject *object);
 yp_func(c_ypObject_p, "yp_type", ((c_ypObject_p, "object"), ))
@@ -1515,7 +1515,7 @@ class yp_int(ypObject):
 
     def _yp_repr(self): return yp_str(repr(self._asint()))
 
-    def bit_length(self): return yp_int(_yp_int_bit_lengthC(self, yp_None))
+    def bit_length(self): return yp_int(_yp_bit_lengthC(self, yp_None))
 
     # TODO Implement yp_index
     def __index__(self): return self._asint()
