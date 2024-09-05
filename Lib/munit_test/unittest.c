@@ -13,7 +13,7 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
 
 
 // Helper function for assert_setlike. If yp_miniiter_next succeeds, sets *actual to a new reference
-// to the next yielded value, *items_i to the index of the first equal object in items, and returns
+// to the next yielded value, *items_i to the index in items of the first equal object, and returns
 // true; if there is no equal object in items, *items_i is set to n. If mi is exhausted, *actual and
 // *items_i are undefined, and false is returned. If yp_miniiter_next fails, *actual is set to the
 // exception, *items_i is undefined, and true is returned.  n is the number of elements in items.
@@ -34,6 +34,34 @@ extern int _assert_setlike_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
         if (eq == yp_True) break;  // equal item found, *items_i is less than n
     }
     return TRUE;  // if an equal item was not found, *items_i is equal to n
+}
+
+// Helper function for assert_mapping. If yp_miniiter_items_next succeeds, sets *actual_key and
+// *actual_value to new references to the next yielded pair, *items_ki to the "k-index" in items of
+// the first matching key, and returns true; if there is no equal keys in items, *items_ki is set to
+// k. If mi is exhausted, *actual_key, *actual_value, and *items_ki are undefined, and false is
+// returned. If yp_miniiter_items_next fails, *actual_key is set to the exception, *actual_value and
+// *items_ki are undefined, and true is returned.  k is the number of (key, value) pairs in items;
+// the index of the matching key is (*items_ki)*2, and the value is (*items_ki)*2+1.
+extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t k,
+        ypObject **items, ypObject **actual_key, ypObject **actual_value, yp_ssize_t *items_ki)
+{
+    ypObject *eq;
+
+    yp_miniiter_items_next(mi, mi_state, actual_key, actual_value);  // new refs
+    if (yp_isexceptionC(*actual_key)) {
+        assert_ptr(*actual_value, ==, *actual_key);
+        if (yp_isexceptionC2(*actual_key, yp_StopIteration)) return FALSE;  // mi is exhausted
+        return TRUE;  // yp_miniiter_items_next failed with an exception
+    }
+    assert_not_exception(*actual_value);
+
+    for ((*items_ki) = 0; (*items_ki) < k; (*items_ki)++) {
+        // yp_eq would only fail here if items contained an exception.
+        assert_not_raises(eq = yp_eq(*actual_key, items[(*items_ki) * 2]));
+        if (eq == yp_True) break;  // equal key found, *items_ki is less than k
+    }
+    return TRUE;  // if an equal key was not found, *items_ki is equal to k
 }
 
 

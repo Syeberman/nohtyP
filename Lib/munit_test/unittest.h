@@ -501,6 +501,20 @@ extern "C" {
         _assert_same_type(_ypmt_TYPE_a, _ypmt_TYPE_b, "%s", "%s", #a, #b); \
     } while (0)
 
+#define _assert_eq_same_type(a, b, a_fmt, b_fmt, ...)       \
+    do {                                                    \
+        _assert_obj(a, eq, b, a_fmt, b_fmt, __VA_ARGS__);   \
+        _assert_same_type(a, b, a_fmt, b_fmt, __VA_ARGS__); \
+    } while (0)
+
+// Asserts that a and b are equal and of the same type.
+#define assert_eq_same_type(a, b)                                                   \
+    do {                                                                            \
+        ypObject *_ypmt_EQ_TYPE_a = (a);                                            \
+        ypObject *_ypmt_EQ_TYPE_b = (b);                                            \
+        _assert_eq_same_type(_ypmt_EQ_TYPE_a, _ypmt_EQ_TYPE_b, "%s", "%s", #a, #b); \
+    } while (0)
+
 // XXX expected must be a yp_ssize_t.
 #define _assert_len(obj, expected, obj_fmt, expected_fmt, ...)                           \
     do {                                                                                 \
@@ -532,10 +546,7 @@ extern "C" {
             ypObject *_ypmt_SEQ_actual = yp_getindexC(obj, _ypmt_SEQ_i);                        \
             _assert_not_exception(_ypmt_SEQ_actual, "yp_getindexC(" obj_fmt ", %" PRIssize ")", \
                     __VA_ARGS__, _ypmt_SEQ_i);                                                  \
-            _assert_same_type(_ypmt_SEQ_actual, items[_ypmt_SEQ_i],                             \
-                    "yp_getindexC(" obj_fmt ", %" PRIssize ")", "%s", __VA_ARGS__, _ypmt_SEQ_i, \
-                    item_strs[_ypmt_SEQ_i]);                                                    \
-            _assert_obj(_ypmt_SEQ_actual, eq, items[_ypmt_SEQ_i],                               \
+            _assert_eq_same_type(_ypmt_SEQ_actual, items[_ypmt_SEQ_i],                          \
                     "yp_getindexC(" obj_fmt ", %" PRIssize ")", "%s", __VA_ARGS__, _ypmt_SEQ_i, \
                     item_strs[_ypmt_SEQ_i]);                                                    \
             yp_decref(_ypmt_SEQ_actual);                                                        \
@@ -583,10 +594,12 @@ extern int _assert_setlike_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
                         "%s yielded twice from " obj_fmt, item_strs[_ypmt_SET_i], __VA_ARGS__);    \
             }                                                                                      \
             _ypmt_SET_found[_ypmt_SET_i] = TRUE;                                                   \
+                                                                                                   \
             /* We already know from _assert_setlike_helper that _ypmt_SET_actual equals            \
              * items[_ypmt_SET_i]. Now we need to check that they're the same type. */             \
             _assert_same_type(_ypmt_SET_actual, items[_ypmt_SET_i], "<item in " obj_fmt ">", "%s", \
                     __VA_ARGS__, item_strs[_ypmt_SET_i]);                                          \
+                                                                                                   \
             yp_decref(_ypmt_SET_actual);                                                           \
         }                                                                                          \
                                                                                                    \
@@ -610,33 +623,69 @@ extern int _assert_setlike_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
         _assert_setlike(_ypmt_SET_obj, _ypmt_SET_items, "%s", _ypmt_SET_item_strs, #obj); \
     } while (0)
 
+extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t n,
+        ypObject **items, ypObject **actual_key, ypObject **actual_value, yp_ssize_t *items_i);
+
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
-#define _assert_mapping(obj, items, obj_fmt, item_strs, ...)                                    \
-    do {                                                                                        \
-        yp_ssize_t _ypmt_MAP_k = yp_lengthof_array(items) / 2;                                  \
-        yp_ssize_t _ypmt_MAP_i;                                                                 \
-        _assert_len(obj, _ypmt_MAP_k, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_MAP_k);         \
-        for (_ypmt_MAP_i = 0; _ypmt_MAP_i < _ypmt_MAP_k; _ypmt_MAP_i++) {                       \
-            ypObject *_ypmt_MAP_key = items[_ypmt_MAP_i * 2];                                   \
-            ypObject *_ypmt_MAP_value = items[_ypmt_MAP_i * 2 + 1];                             \
-            char     *_ypmt_MAP_key_str = item_strs[_ypmt_MAP_i * 2];                           \
-            char     *_ypmt_MAP_value_str = item_strs[_ypmt_MAP_i * 2 + 1];                     \
-            ypObject *_ypmt_MAP_actual = yp_getitem(obj, _ypmt_MAP_key);                        \
-            _assert_not_exception(_ypmt_MAP_actual, "yp_getitem(" obj_fmt ", %s)", __VA_ARGS__, \
-                    _ypmt_MAP_key_str);                                                         \
-            _assert_same_type(_ypmt_MAP_actual, _ypmt_MAP_value, "yp_getitem(" obj_fmt ", %s)", \
-                    "%s", __VA_ARGS__, _ypmt_MAP_key_str, _ypmt_MAP_value_str);                 \
-            _assert_obj(_ypmt_MAP_actual, eq, _ypmt_MAP_value, "yp_getitem(" obj_fmt ", %s)",   \
-                    "%s", __VA_ARGS__, _ypmt_MAP_key_str, _ypmt_MAP_value_str);                 \
-            yp_decref(_ypmt_MAP_actual);                                                        \
-        }                                                                                       \
+#define _assert_mapping(obj, items, obj_fmt, item_strs, ...)                                       \
+    do {                                                                                           \
+        yp_ssize_t  _ypmt_MAP_k = yp_lengthof_array(items) / 2;                                    \
+        int         _ypmt_MAP_found[yp_lengthof_array(items) / 2] = {0};                           \
+        yp_uint64_t _ypmt_MAP_mi_state;                                                            \
+        ypObject   *_ypmt_MAP_mi;                                                                  \
+        ypObject   *_ypmt_MAP_actual_key;                                                          \
+        ypObject   *_ypmt_MAP_actual_value;                                                        \
+        yp_ssize_t  _ypmt_MAP_ki;                                                                  \
+                                                                                                   \
+        if (yp_lengthof_array(items) % 2 != 0) {                                                   \
+            munit_error("expected an even number of objects for the (key, value) pairs");          \
+        }                                                                                          \
+        _assert_len(obj, _ypmt_MAP_k, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_MAP_k);            \
+        _assert_not_raises(_ypmt_MAP_mi = yp_miniiter_items(obj, &_ypmt_MAP_mi_state),             \
+                "yp_miniiter_items(" obj_fmt ", &mi_state)", __VA_ARGS__);                         \
+                                                                                                   \
+        while (_assert_mapping_helper(_ypmt_MAP_mi, &_ypmt_MAP_mi_state, _ypmt_MAP_k, items,       \
+                &_ypmt_MAP_actual_key /*new ref*/, &_ypmt_MAP_actual_value /*new ref*/,            \
+                &_ypmt_MAP_ki)) {                                                                  \
+            _assert_not_exception(_ypmt_MAP_actual_key,                                            \
+                    "yp_miniiter_items_next(yp_miniiter_items(" obj_fmt                            \
+                    ", &mi_state), &mi_state)",                                                    \
+                    __VA_ARGS__);                                                                  \
+            if (_ypmt_MAP_ki >= _ypmt_MAP_k) {                                                     \
+                munit_errorf("unexpected item yielded from " obj_fmt, __VA_ARGS__);                \
+            }                                                                                      \
+            if (_ypmt_MAP_found[_ypmt_MAP_ki]) {                                                   \
+                munit_errorf("%s yielded twice from " obj_fmt, item_strs[_ypmt_MAP_ki * 2],        \
+                        __VA_ARGS__);                                                              \
+            }                                                                                      \
+            _ypmt_MAP_found[_ypmt_MAP_ki] = TRUE;                                                  \
+                                                                                                   \
+            /* We already know from _assert_mapping_helper that _ypmt_MAP_actual_key equals        \
+             * items[_ypmt_MAP_ki * 2]. Now we need to check that they're the same type. */        \
+            _assert_same_type(_ypmt_MAP_actual_key, items[_ypmt_MAP_ki * 2],                       \
+                    "<key in " obj_fmt ">", "%s", __VA_ARGS__, item_strs[_ypmt_MAP_ki * 2]);       \
+            _assert_eq_same_type(_ypmt_MAP_actual_value, items[_ypmt_MAP_ki * 2 + 1],              \
+                    "<value " obj_fmt "[%s]>", "%s", __VA_ARGS__, item_strs[_ypmt_MAP_ki * 2],     \
+                    item_strs[_ypmt_MAP_ki * 2 + 1]);                                              \
+                                                                                                   \
+            yp_decref(_ypmt_MAP_actual_key);                                                       \
+            yp_decref(_ypmt_MAP_actual_value);                                                     \
+        }                                                                                          \
+                                                                                                   \
+        for (_ypmt_MAP_ki = 0; _ypmt_MAP_ki < _ypmt_MAP_k; _ypmt_MAP_ki++) {                       \
+            if (!_ypmt_MAP_found[_ypmt_MAP_ki]) {                                                  \
+                munit_errorf(                                                                      \
+                        "%s not yielded from " obj_fmt, item_strs[_ypmt_MAP_ki * 2], __VA_ARGS__); \
+            }                                                                                      \
+        }                                                                                          \
+                                                                                                   \
+        yp_decref(_ypmt_MAP_mi);                                                                   \
     } while (0)
 
 // Asserts that obj is a mapping containing exactly the given key/value pairs, in any order, without
 // duplicate keys. Values are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC
-// and yp_getitem.
-// FIXME Compare keys by type as well, just like assert_setlike does.
+// and yp_miniiter_items.
 #define assert_mapping(obj, ...)                                                          \
     do {                                                                                  \
         ypObject *_ypmt_MAP_obj = (obj);                                                  \
