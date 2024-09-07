@@ -1,6 +1,12 @@
 
 #include "munit_test/unittest.h"
 
+// TODO We go to the trouble of having fixture_type_t.rand_items/etc to allow the type to control
+// what types of items are stored inside it. But then we use functions like
+// rand_obj_any_hashability_pair, rand_obj_any_mutable_unique, etc that could return objects that
+// aren't supported by the types under test. If this becomes a problem the tests will fail, but it
+// may become a problem.
+
 
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
 {
@@ -211,7 +217,7 @@ static ypObject *rand_obj_byte(void) { return yp_intC(munit_rand_int_range(0, 25
 // TODO Return more than just latin-1 characters
 static ypObject *rand_obj_chr(void) { return yp_chrC(munit_rand_int_range(0, 255)); }
 
-ypObject *rand_obj_hashable(fixture_type_t *type)
+extern ypObject *rand_obj_hashable(fixture_type_t *type)
 {
     // Start with depth-1 as we are calling _new_rand ourselves.
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH - 1, /*only_hashable=*/TRUE};
@@ -220,34 +226,45 @@ ypObject *rand_obj_hashable(fixture_type_t *type)
     return result;
 }
 
-ypObject *rand_obj(fixture_type_t *type)
+extern ypObject *rand_obj(fixture_type_t *type)
 {
     // Start with depth-1 as we are calling _new_rand ourselves.
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH - 1, /*only_hashable=*/FALSE};
     return type->_new_rand(&memo);
 }
 
-ypObject *rand_obj_any_not_iterable(void)
+extern ypObject *rand_obj_any_not_iterable(void)
 {
     return rand_obj(rand_choice_fixture_type(fixture_types_not_iterable));
 }
 
-ypObject *rand_obj_any_hashable_not_str(void)
+extern ypObject *rand_obj_any_hashable_not_str(void)
 {
     return rand_obj_hashable(rand_choice_fixture_type(fixture_types_immutable_not_str));
 }
 
-ypObject *rand_obj_any_mutable(void)
+extern hashability_pair_t rand_obj_any_hashability_pair(void)
+{
+    hashability_pair_t pair;
+    pair.hashable = rand_obj_hashable(rand_choice_fixture_type(fixture_types_immutable_paired));
+    assert_not_raises(pair.unhashable = yp_unfrozen_copy(pair.hashable));
+    return pair;
+}
+
+extern ypObject *rand_obj_any_mutable(void)
 {
     return rand_obj(rand_choice_fixture_type(fixture_types_mutable));
 }
 
-ypObject *rand_obj_any_hashable(void)
+extern ypObject *rand_obj_any_hashable(void)
 {
     return rand_obj_hashable(rand_choice_fixture_type(fixture_types_immutable));
 }
 
-ypObject *rand_obj_any(void) { return rand_obj(rand_choice_fixture_type(fixture_types_all)); }
+extern ypObject *rand_obj_any(void)
+{
+    return rand_obj(rand_choice_fixture_type(fixture_types_all));
+}
 
 static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
 {
@@ -276,7 +293,7 @@ static ypObject *rand_obj_unique3(yp_ssize_t n, ypObject **array, objvoidfunc su
     }
 }
 
-ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array)
+extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array)
 {
     return rand_obj_unique3(n, array, rand_obj_any_mutable);
 }
@@ -307,7 +324,7 @@ static void rand_objs_any_hashable(yp_ssize_t n, ypObject **array)
     rand_objs3(n, array, rand_obj_any_hashable);
 }
 
-void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
+extern void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
 
 
 static ypObject *_new_items_listKV(yp_ssize_t n, va_list args)
@@ -1824,6 +1841,11 @@ static int fixture_type_is_immutable_not_str(fixture_type_t *type)
 {
     return !type->is_mutable && type != fixture_type_str;
 }
+DEFINE_FIXTURE_TYPES_ARRAYS(immutable_paired);
+static int fixture_type_is_immutable_paired(fixture_type_t *type)
+{
+    return !type->is_mutable && type->pair != type;
+}
 #undef DEFINE_FIXTURE_TYPES_ARRAYS
 
 static void fill_fixture_types_arrays(fixture_types_t *fixture_types, char **param_values_types,
@@ -1921,6 +1943,7 @@ static void initialize_fixture_types(void)
     FILL_FIXTURE_TYPES_ARRAYS(not_setlike);
     FILL_FIXTURE_TYPES_ARRAYS(not_mapping);
     FILL_FIXTURE_TYPES_ARRAYS(immutable_not_str);
+    FILL_FIXTURE_TYPES_ARRAYS(immutable_paired);
 #undef FILL_FIXTURE_TYPES_ARRAYS
 }
 
@@ -1949,7 +1972,7 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array)
 }
 
 
-yp_ssize_t yp_lenC_not_raises(ypObject *container)
+extern yp_ssize_t yp_lenC_not_raises(ypObject *container)
 {
     yp_ssize_t result;
     assert_not_raises_exc(result = yp_lenC(container, &exc));
@@ -2003,21 +2026,22 @@ static void malloc_tracker_pop(void *p)
     }
 }
 
-void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size)
+extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p = yp_mem_default_malloc(actual, size);
     if (p != NULL) malloc_tracker_push(p);
     return p;
 }
 
-void *malloc_tracker_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
+extern void *malloc_tracker_malloc_resize(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newP = yp_mem_default_malloc_resize(actual, p, size, extra);
     if (newP != NULL && newP != p) malloc_tracker_push(newP);
     return newP;
 }
 
-void malloc_tracker_free(void *p)
+extern void malloc_tracker_free(void *p)
 {
     yp_mem_default_free(p);
     if (p != NULL) malloc_tracker_pop(p);

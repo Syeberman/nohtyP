@@ -24,10 +24,9 @@ static int type_stores_unhashables(fixture_type_t *type)
 static MunitResult _test_newK(
         fixture_type_t *type, ypObject *(*any_newK)(int, ...), int test_exception_passthrough)
 {
-    ypObject *int_1 = yp_intC(1);
-    ypObject *intstore_1 = yp_intstoreC(1);
-    ypObject *keys[4];
-    ypObject *values[4];
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *keys[4];
+    ypObject          *values[4];
     obj_array_fill(keys, type->rand_items);
     obj_array_fill(values, type->rand_values);
 
@@ -74,8 +73,8 @@ static MunitResult _test_newK(
     }
 
     // Unhashable key rejected even if equal to other hashable key.
-    assert_raises(any_newK(K(int_1, values[0], intstore_1, values[1])), yp_TypeError);
-    assert_raises(any_newK(K(intstore_1, values[0], int_1, values[1])), yp_TypeError);
+    assert_raises(any_newK(K(pair.hashable, values[0], pair.unhashable, values[1])), yp_TypeError);
+    assert_raises(any_newK(K(pair.unhashable, values[0], pair.hashable, values[1])), yp_TypeError);
 
     // Optimization: empty immortal when n is zero.
     if (type->falsy != NULL) {
@@ -95,21 +94,20 @@ static MunitResult _test_newK(
 
     obj_array_decref(values);
     obj_array_decref(keys);
-    yp_decrefN(N(intstore_1, int_1));
+    yp_decrefN(N(pair.unhashable, pair.hashable));
     return MUNIT_OK;
 }
 
 static MunitResult _test_new(
         fixture_type_t *type, ypObject *(*any_new)(ypObject *), int test_exception_passthrough)
 {
-    fixture_type_t  *x_types[] = x_types_init();
-    fixture_type_t  *friend_types[] = friend_types_init();
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *intstore_1 = yp_intstoreC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *keys[4];
-    ypObject        *values[4];
+    fixture_type_t    *x_types[] = x_types_init();
+    fixture_type_t    *friend_types[] = friend_types_init();
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *keys[4];
+    ypObject          *values[4];
     obj_array_fill(keys, type->rand_items);
     obj_array_fill(values, type->rand_values);
 
@@ -162,9 +160,9 @@ static MunitResult _test_new(
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ead(x, new_itemsK(*x_type, K(int_1, values[0], intstore_1, values[1])),
+            ead(x, new_itemsK(*x_type, K(pair.hashable, values[0], pair.unhashable, values[1])),
                     assert_raises(any_new(x), yp_TypeError));
-            ead(x, new_itemsK(*x_type, K(intstore_1, values[0], int_1, values[1])),
+            ead(x, new_itemsK(*x_type, K(pair.unhashable, values[0], pair.hashable, values[1])),
                     assert_raises(any_new(x), yp_TypeError));
         }
     }
@@ -207,7 +205,7 @@ static MunitResult _test_new(
 
     obj_array_decref(values);
     obj_array_decref(keys);
-    yp_decrefN(N(not_iterable, intstore_1, int_1));
+    yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
     return MUNIT_OK;
 }
 
@@ -494,10 +492,9 @@ tear_down:
 static MunitResult _test_fromkeysN(fixture_type_t *type,
         ypObject *(*any_fromkeysN)(ypObject *, int, ...), int test_exception_passthrough)
 {
-    ypObject *int_1 = yp_intC(1);
-    ypObject *intstore_1 = yp_intstoreC(1);
-    ypObject *keys[4];
-    ypObject *values[4];
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *keys[4];
+    ypObject          *values[4];
     obj_array_fill(keys, type->rand_items);
     obj_array_fill(values, type->rand_values);
 
@@ -543,8 +540,8 @@ static MunitResult _test_fromkeysN(fixture_type_t *type,
     }
 
     // Unhashable key rejected even if equal to other hashable key.
-    assert_raises(any_fromkeysN(values[0], N(int_1, intstore_1)), yp_TypeError);
-    assert_raises(any_fromkeysN(values[0], N(intstore_1, int_1)), yp_TypeError);
+    assert_raises(any_fromkeysN(values[0], N(pair.hashable, pair.unhashable)), yp_TypeError);
+    assert_raises(any_fromkeysN(values[0], N(pair.unhashable, pair.hashable)), yp_TypeError);
 
     // Optimization: empty immortal when n is zero.
     if (type->falsy != NULL) {
@@ -562,20 +559,19 @@ static MunitResult _test_fromkeysN(fixture_type_t *type,
 
     obj_array_decref(values);
     obj_array_decref(keys);
-    yp_decrefN(N(intstore_1, int_1));
+    yp_decrefN(N(pair.unhashable, pair.hashable));
     return MUNIT_OK;
 }
 
 static MunitResult _test_fromkeys(fixture_type_t *type,
         ypObject *(*any_fromkeys)(ypObject *, ypObject *), int test_exception_passthrough)
 {
-    fixture_type_t  *x_types[] = x_types_init();
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *intstore_1 = yp_intstoreC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *keys[4];
-    ypObject        *values[4];
+    fixture_type_t    *x_types[] = x_types_init();
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *keys[4];
+    ypObject          *values[4];
     obj_array_fill(keys, type->rand_items);
     obj_array_fill(values, type->rand_values);
 
@@ -625,9 +621,9 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+            ead(x, (*x_type)->newN(N(pair.hashable, pair.unhashable)),
                     assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
-            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+            ead(x, (*x_type)->newN(N(pair.unhashable, pair.hashable)),
                     assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
         }
     }
@@ -658,7 +654,7 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
 
     obj_array_decref(values);
     obj_array_decref(keys);
-    yp_decrefN(N(not_iterable, intstore_1, int_1));
+    yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
     return MUNIT_OK;
 }
 

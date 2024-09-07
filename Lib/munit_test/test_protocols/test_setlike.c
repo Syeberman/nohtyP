@@ -51,13 +51,12 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
 
     // An unhashable x should match the equal item in so.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *so = type->newN(N(int_1));
-        assert_obj(yp_contains(so, intstore_1), is, yp_True);
-        assert_obj(yp_in(intstore_1, so), is, yp_True);
-        assert_obj(yp_not_in(intstore_1, so), is, yp_False);
-        yp_decrefN(N(int_1, intstore_1, so));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *so = type->newN(N(pair.hashable));
+        assert_obj(yp_contains(so, pair.unhashable), is, yp_True);
+        assert_obj(yp_in(pair.unhashable, so), is, yp_True);
+        assert_obj(yp_not_in(pair.unhashable, so), is, yp_False);
+        yp_decrefN(N(pair.hashable, pair.unhashable, so));
     }
 
     obj_array_decref(items);
@@ -181,30 +180,32 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
 
     // x contains unhashable objects.
     if (type_stores_unhashables(x_type)) {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *unhashable = rand_obj_any_mutable_unique(1, &int_1);
-        ypObject *so = type->newN(N(items[0], int_1));
-        ypObject *empty = type->newN(0);
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *unhashable = rand_obj_any_mutable_unique(1, &pair.hashable);
+        ypObject          *so = type->newN(N(items[0], pair.hashable));
+        ypObject          *empty = type->newN(0);
 
         // x has the same items.
-        ead(x, x_type->newN(N(items[0], intstore_1)), assert_obj(any_cmp(so, x), is, x_same));
+        ead(x, x_type->newN(N(items[0], pair.unhashable)), assert_obj(any_cmp(so, x), is, x_same));
 
         // x is is a proper subset and is not empty.
-        ead(x, x_type->newN(N(intstore_1)), assert_obj(any_cmp(so, x), is, x_subset));
+        ead(x, x_type->newN(N(pair.unhashable)), assert_obj(any_cmp(so, x), is, x_subset));
 
         // x is a proper superset.
-        ead(x, x_type->newN(N(items[0], intstore_1, items[1])),
+        ead(x, x_type->newN(N(items[0], pair.unhashable, items[1])),
                 assert_obj(any_cmp(so, x), is, x_superset));
-        ead(x, x_type->newN(N(items[0], int_1, unhashable)),
+        ead(x, x_type->newN(N(items[0], pair.hashable, unhashable)),
                 assert_obj(any_cmp(so, x), is, x_superset));
-        ead(x, x_type->newN(N(items[0], intstore_1, unhashable)),
+        ead(x, x_type->newN(N(items[0], pair.unhashable, unhashable)),
                 assert_obj(any_cmp(so, x), is, x_superset));
 
         // x overlaps and contains additional items.
-        ead(x, x_type->newN(N(intstore_1, items[1])), assert_obj(any_cmp(so, x), is, x_overlap));
-        ead(x, x_type->newN(N(int_1, unhashable)), assert_obj(any_cmp(so, x), is, x_overlap));
-        ead(x, x_type->newN(N(intstore_1, unhashable)), assert_obj(any_cmp(so, x), is, x_overlap));
+        ead(x, x_type->newN(N(pair.unhashable, items[1])),
+                assert_obj(any_cmp(so, x), is, x_overlap));
+        ead(x, x_type->newN(N(pair.hashable, unhashable)),
+                assert_obj(any_cmp(so, x), is, x_overlap));
+        ead(x, x_type->newN(N(pair.unhashable, unhashable)),
+                assert_obj(any_cmp(so, x), is, x_overlap));
 
         // x does not overlap and contains additional items.
         ead(x, x_type->newN(N(unhashable)), assert_obj(any_cmp(so, x), is, x_no_overlap));
@@ -212,7 +213,7 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
         // so is empty.
         ead(x, x_type->newN(N(unhashable)), assert_obj(any_cmp(empty, x), is, so_empty));
 
-        yp_decrefN(N(int_1, intstore_1, unhashable, so, empty));
+        yp_decrefN(N(pair.hashable, pair.unhashable, unhashable, so, empty));
     }
 
     // Implementations may use the cached hash as a quick inequality test. Recall that only
@@ -589,14 +590,13 @@ tear_down:
 
 static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = friend_types_init(type);
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *intstore_1 = yp_intstoreC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *items[4];
+    fixture_type_t    *type = fixture->type;
+    fixture_type_t    *x_types[] = x_types_init(type);
+    fixture_type_t    *friend_types[] = friend_types_init(type);
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *items[4];
     obj_array_fill(items, type->rand_items);
 
     // Basic union: items[0] only in so, items[1] in both, items[2] only in x.
@@ -675,9 +675,9 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
             ypObject *so = type->newN(0);
-            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+            ead(x, (*x_type)->newN(N(pair.hashable, pair.unhashable)),
                     assert_raises(yp_union(so, x), yp_TypeError));
-            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+            ead(x, (*x_type)->newN(N(pair.unhashable, pair.hashable)),
                     assert_raises(yp_union(so, x), yp_TypeError));
             assert_len(so, 0);
             yp_decrefN(N(so));
@@ -688,8 +688,8 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *so = type->newN(N(int_1));
-            ypObject *x = (*x_type)->newN(N(intstore_1));
+            ypObject *so = type->newN(N(pair.hashable));
+            ypObject *x = (*x_type)->newN(N(pair.unhashable));
             assert_raises(yp_union(so, x), yp_TypeError);
             yp_decrefN(N(so, x));
         }
@@ -772,19 +772,19 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(not_iterable, intstore_1, int_1));
+    yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
     return MUNIT_OK;
 }
 
 static MunitResult test_intersection(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = friend_types_init(type);
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *items[4];
+    fixture_type_t    *type = fixture->type;
+    fixture_type_t    *x_types[] = x_types_init(type);
+    fixture_type_t    *friend_types[] = friend_types_init(type);
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *items[4];
     obj_array_fill(items, type->rand_items);
 
     // Basic intersection: items[0] only in so, items[1] in both, items[2] only in x.
@@ -863,12 +863,11 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *intstore_1 = yp_intstoreC(1);
-            ypObject *so = type->newN(N(int_1));
-            ypObject *x = (*x_type)->newN(N(intstore_1));
+            ypObject *so = type->newN(N(pair.hashable));
+            ypObject *x = (*x_type)->newN(N(pair.unhashable));
             ypObject *result = yp_intersection(so, x);
-            assert_setlike(result, int_1);
-            yp_decrefN(N(intstore_1, so, x, result));
+            assert_setlike(result, pair.hashable);
+            yp_decrefN(N(so, x, result));
         }
     }
 
@@ -949,19 +948,19 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(not_iterable, int_1));
+    yp_decrefN(N(not_iterable, pair.hashable, pair.unhashable));
     return MUNIT_OK;
 }
 
 static MunitResult test_difference(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = friend_types_init(type);
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *items[4];
+    fixture_type_t    *type = fixture->type;
+    fixture_type_t    *x_types[] = x_types_init(type);
+    fixture_type_t    *friend_types[] = friend_types_init(type);
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *items[4];
     obj_array_fill(items, type->rand_items);
 
     // Basic difference: items[0] only in so, items[1] in both, items[2] only in x.
@@ -1040,12 +1039,11 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *intstore_1 = yp_intstoreC(1);
-            ypObject *so = type->newN(N(int_1));
-            ypObject *x = (*x_type)->newN(N(intstore_1));
+            ypObject *so = type->newN(N(pair.hashable));
+            ypObject *x = (*x_type)->newN(N(pair.unhashable));
             ypObject *result = yp_difference(so, x);
             assert_len(result, 0);
-            yp_decrefN(N(intstore_1, so, x, result));
+            yp_decrefN(N(so, x, result));
         }
     }
 
@@ -1126,20 +1124,19 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(not_iterable, int_1));
+    yp_decrefN(N(not_iterable, pair.hashable, pair.unhashable));
     return MUNIT_OK;
 }
 
 static MunitResult test_symmetric_difference(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = friend_types_init(type);
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *intstore_1 = yp_intstoreC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *items[4];
+    fixture_type_t    *type = fixture->type;
+    fixture_type_t    *x_types[] = x_types_init(type);
+    fixture_type_t    *friend_types[] = friend_types_init(type);
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *items[4];
     obj_array_fill(items, type->rand_items);
 
     // Basic symmetric_difference: items[0] only in so, items[1] in both, items[2] only in x.
@@ -1218,9 +1215,9 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
             ypObject *so = type->newN(0);
-            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+            ead(x, (*x_type)->newN(N(pair.hashable, pair.unhashable)),
                     assert_raises(yp_symmetric_difference(so, x), yp_TypeError));
-            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+            ead(x, (*x_type)->newN(N(pair.unhashable, pair.hashable)),
                     assert_raises(yp_symmetric_difference(so, x), yp_TypeError));
             yp_decrefN(N(so));
         }
@@ -1230,8 +1227,8 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *so = type->newN(N(int_1));
-            ypObject *x = (*x_type)->newN(N(intstore_1));
+            ypObject *so = type->newN(N(pair.hashable));
+            ypObject *x = (*x_type)->newN(N(pair.unhashable));
             assert_raises(yp_symmetric_difference(so, x), yp_TypeError);
             yp_decrefN(N(so, x));
         }
@@ -1313,19 +1310,18 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(not_iterable, intstore_1, int_1));
+    yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
     return MUNIT_OK;
 }
 
 static MunitResult test_update(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *intstore_1 = yp_intstoreC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *items[4];
+    fixture_type_t    *type = fixture->type;
+    fixture_type_t    *x_types[] = x_types_init(type);
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *items[4];
     obj_array_fill(items, type->rand_items);
 
     // Immutables don't support update.
@@ -1413,12 +1409,12 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
             ypObject *so = type->newN(0);
-            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+            ead(x, (*x_type)->newN(N(pair.unhashable, pair.hashable)),
                     assert_raises_exc(yp_update(so, x, &exc), yp_TypeError));
             assert_len(so, 0);
-            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+            ead(x, (*x_type)->newN(N(pair.hashable, pair.unhashable)),
                     assert_raises_exc(yp_update(so, x, &exc), yp_TypeError));
-            assert_setlike(so, int_1);  // Optimization: update adds while it iterates.
+            assert_setlike(so, pair.hashable);  // Optimization: update adds while it iterates.
             yp_decrefN(N(so));
         }
     }
@@ -1427,10 +1423,10 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *so = type->newN(N(int_1));
-            ypObject *x = (*x_type)->newN(N(intstore_1));
+            ypObject *so = type->newN(N(pair.hashable));
+            ypObject *x = (*x_type)->newN(N(pair.unhashable));
             assert_raises_exc(yp_update(so, x, &exc), yp_TypeError);
-            assert_setlike(so, int_1);
+            assert_setlike(so, pair.hashable);
             yp_decrefN(N(so, x));
         }
     }
@@ -1479,18 +1475,18 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(not_iterable, intstore_1, int_1));
+    yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
     return MUNIT_OK;
 }
 
 static MunitResult test_intersection_update(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *items[4];
+    fixture_type_t    *type = fixture->type;
+    fixture_type_t    *x_types[] = x_types_init(type);
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *items[4];
     obj_array_fill(items, type->rand_items);
 
     // Immutables don't support intersection_update.
@@ -1573,12 +1569,11 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *intstore_1 = yp_intstoreC(1);
-            ypObject *so = type->newN(N(int_1));
-            ypObject *x = (*x_type)->newN(N(intstore_1));
+            ypObject *so = type->newN(N(pair.hashable));
+            ypObject *x = (*x_type)->newN(N(pair.unhashable));
             assert_not_raises_exc(yp_intersection_update(so, x, &exc));
-            assert_setlike(so, int_1);
-            yp_decrefN(N(intstore_1, so, x));
+            assert_setlike(so, pair.hashable);
+            yp_decrefN(N(so, x));
         }
     }
 
@@ -1626,18 +1621,18 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(not_iterable, int_1));
+    yp_decrefN(N(not_iterable, pair.hashable, pair.unhashable));
     return MUNIT_OK;
 }
 
 static MunitResult test_difference_update(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *items[4];
+    fixture_type_t    *type = fixture->type;
+    fixture_type_t    *x_types[] = x_types_init(type);
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *items[4];
     obj_array_fill(items, type->rand_items);
 
     // Immutables don't support difference_update.
@@ -1720,12 +1715,11 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *intstore_1 = yp_intstoreC(1);
-            ypObject *so = type->newN(N(int_1));
-            ypObject *x = (*x_type)->newN(N(intstore_1));
+            ypObject *so = type->newN(N(pair.hashable));
+            ypObject *x = (*x_type)->newN(N(pair.unhashable));
             assert_not_raises_exc(yp_difference_update(so, x, &exc));
             assert_len(so, 0);
-            yp_decrefN(N(intstore_1, so, x));
+            yp_decrefN(N(so, x));
         }
     }
 
@@ -1773,20 +1767,19 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(not_iterable, int_1));
+    yp_decrefN(N(not_iterable, pair.hashable, pair.unhashable));
     return MUNIT_OK;
 }
 
 static MunitResult test_symmetric_difference_update(
         const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *intstore_1 = yp_intstoreC(1);
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
-    ypObject        *items[4];
+    fixture_type_t    *type = fixture->type;
+    fixture_type_t    *x_types[] = x_types_init(type);
+    fixture_type_t   **x_type;
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    ypObject          *items[4];
     obj_array_fill(items, type->rand_items);
 
     // Immutables don't support symmetric_difference_update.
@@ -1870,9 +1863,9 @@ static MunitResult test_symmetric_difference_update(
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
             ypObject *so = type->newN(0);
-            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+            ead(x, (*x_type)->newN(N(pair.hashable, pair.unhashable)),
                     assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError));
-            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+            ead(x, (*x_type)->newN(N(pair.unhashable, pair.hashable)),
                     assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError));
             assert_len(so, 0);
             yp_decrefN(N(so));
@@ -1883,10 +1876,10 @@ static MunitResult test_symmetric_difference_update(
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *so = type->newN(N(int_1));
-            ypObject *x = (*x_type)->newN(N(intstore_1));
+            ypObject *so = type->newN(N(pair.hashable));
+            ypObject *x = (*x_type)->newN(N(pair.unhashable));
             assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError);
-            assert_setlike(so, int_1);
+            assert_setlike(so, pair.hashable);
             yp_decrefN(N(so, x));
         }
     }
@@ -1936,7 +1929,7 @@ static MunitResult test_symmetric_difference_update(
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(not_iterable, intstore_1, int_1));
+    yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
     return MUNIT_OK;
 }
 
@@ -1994,12 +1987,11 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
 
     // Unhashable items should always cause TypeError, even if that item is already in so.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *so = type->newN(N(int_1));
-        assert_raises_exc(yp_push(so, intstore_1, &exc), yp_TypeError);
-        assert_setlike(so, int_1);
-        yp_decrefN(N(int_1, intstore_1, so));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *so = type->newN(N(pair.hashable));
+        assert_raises_exc(yp_push(so, pair.unhashable, &exc), yp_TypeError);
+        assert_setlike(so, pair.hashable);
+        yp_decrefN(N(pair.hashable, pair.unhashable, so));
     }
 
     // Exception passthrough.
@@ -2067,12 +2059,11 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
 
     // Unhashable items should always cause TypeError, even if that item is already in so.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *so = type->newN(N(int_1));
-        assert_raises_exc(yp_pushunique(so, intstore_1, &exc), yp_TypeError);
-        assert_setlike(so, int_1);
-        yp_decrefN(N(int_1, intstore_1, so));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *so = type->newN(N(pair.hashable));
+        assert_raises_exc(yp_pushunique(so, pair.unhashable, &exc), yp_TypeError);
+        assert_setlike(so, pair.hashable);
+        yp_decrefN(N(pair.hashable, pair.unhashable, so));
     }
 
     // Exception passthrough.
@@ -2151,12 +2142,11 @@ static MunitResult _test_remove(
 
     // An unhashable x should match the equal item in so.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *so = type->newN(N(int_1));
-        assert_not_raises_exc(any_remove(so, intstore_1, &exc));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *so = type->newN(N(pair.hashable));
+        assert_not_raises_exc(any_remove(so, pair.unhashable, &exc));
         assert_len(so, 0);
-        yp_decrefN(N(int_1, intstore_1, so));
+        yp_decrefN(N(pair.hashable, pair.unhashable, so));
     }
 
     // Remove an item from a set. The hash should equal a "clean" set. This was a bug from the

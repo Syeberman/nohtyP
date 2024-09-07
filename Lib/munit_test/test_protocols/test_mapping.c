@@ -32,15 +32,13 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     }
 
     // An unhashable x should match the equal key in mp.
-    // FIXME A function to return a pair of equal objects, one hashable one not.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *mp = type->newN(N(int_1));
-        assert_obj(yp_contains(mp, intstore_1), is, yp_True);
-        assert_obj(yp_in(intstore_1, mp), is, yp_True);
-        assert_obj(yp_not_in(intstore_1, mp), is, yp_False);
-        yp_decrefN(N(int_1, intstore_1, mp));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *mp = type->newN(N(pair.hashable));
+        assert_obj(yp_contains(mp, pair.unhashable), is, yp_True);
+        assert_obj(yp_in(pair.unhashable, mp), is, yp_True);
+        assert_obj(yp_not_in(pair.unhashable, mp), is, yp_False);
+        yp_decrefN(N(pair.hashable, pair.unhashable, mp));
     }
 
     obj_array_decref(keys);
@@ -91,11 +89,10 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
 
     // An unhashable key should match the equal key in mp.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *mp_int_1 = type->newK(K(int_1, values[0]));
-        ead(value, yp_getitem(mp_int_1, intstore_1), assert_obj(value, eq, values[0]));
-        yp_decrefN(N(int_1, intstore_1, mp_int_1));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *mp_pair = type->newK(K(pair.hashable, values[0]));
+        ead(value, yp_getitem(mp_pair, pair.unhashable), assert_obj(value, eq, values[0]));
+        yp_decrefN(N(pair.hashable, pair.unhashable, mp_pair));
     }
 
     // Some types store references to the given objects and, thus, return exactly those objects.
@@ -160,12 +157,11 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 
     // An unhashable key should match the equal key in mp.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *mp_int_1 = type->newK(K(int_1, values[0]));
-        ead(value, yp_getdefault(mp_int_1, intstore_1, values[2]),
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *mp_pair = type->newK(K(pair.hashable, values[0]));
+        ead(value, yp_getdefault(mp_pair, pair.unhashable, values[2]),
                 assert_obj(value, eq, values[0]));
-        yp_decrefN(N(int_1, intstore_1, mp_int_1));
+        yp_decrefN(N(pair.hashable, pair.unhashable, mp_pair));
     }
 
     // Some types store references to the given objects and, thus, return exactly those objects.
@@ -265,12 +261,11 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 
     // Unhashable keys should always cause TypeError, even if that key is already in mp.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *mp = type->newK(K(int_1, values[0]));
-        assert_raises_exc(yp_setitem(mp, intstore_1, values[2], &exc), yp_TypeError);
-        assert_mapping(mp, int_1, values[0]);
-        yp_decrefN(N(int_1, intstore_1, mp));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *mp = type->newK(K(pair.hashable, values[0]));
+        assert_raises_exc(yp_setitem(mp, pair.unhashable, values[2], &exc), yp_TypeError);
+        assert_mapping(mp, pair.hashable, values[0]);
+        yp_decrefN(N(pair.hashable, pair.unhashable, mp));
     }
 
     // Exception passthrough.
@@ -369,12 +364,11 @@ static MunitResult _test_delitem(
 
     // An unhashable key should match the equal key in mp.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *mp = type->newK(K(int_1, values[0]));
-        assert_not_raises_exc(any_delitem(mp, intstore_1, &exc));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *mp = type->newK(K(pair.hashable, values[0]));
+        assert_not_raises_exc(any_delitem(mp, pair.unhashable, &exc));
         assert_len(mp, 0);
-        yp_decrefN(N(int_1, intstore_1, mp));
+        yp_decrefN(N(pair.hashable, pair.unhashable, mp));
     }
 
     // Exception passthrough.
@@ -486,16 +480,15 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
 
     // An unhashable key should match the equal key in mp.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *int_2 = yp_intC(2);
-        ypObject *intstore_2 = yp_intstoreC(2);
-        ypObject *mp = type->newK(K(int_1, values[0], int_2, values[1]));
-        ead(value, yp_popvalue3(mp, intstore_1, values[3]), assert_obj(value, eq, values[0]));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *int_2 = yp_intC(2);
+        ypObject          *intstore_2 = yp_intstoreC(2);
+        ypObject          *mp = type->newK(K(pair.hashable, values[0], int_2, values[1]));
+        ead(value, yp_popvalue3(mp, pair.unhashable, values[3]), assert_obj(value, eq, values[0]));
         assert_mapping(mp, int_2, values[1]);
         ead(value, yp_popvalue2(mp, intstore_2), assert_obj(value, eq, values[1]));
         assert_len(mp, 0);
-        yp_decrefN(N(int_1, intstore_1, int_2, intstore_2, mp));
+        yp_decrefN(N(pair.hashable, pair.unhashable, int_2, intstore_2, mp));
     }
 
     // Some types store references to the given objects and, thus, return exactly those objects.
@@ -708,12 +701,11 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
 
     // Unhashable keys should always cause TypeError, even if that key is already in mp.
     {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
-        ypObject *mp = type->newK(K(int_1, values[0]));
-        assert_raises(yp_setdefault(mp, intstore_1, values[2]), yp_TypeError);
-        assert_mapping(mp, int_1, values[0]);
-        yp_decrefN(N(int_1, intstore_1, mp));
+        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        ypObject          *mp = type->newK(K(pair.hashable, values[0]));
+        assert_raises(yp_setdefault(mp, pair.unhashable, values[2]), yp_TypeError);
+        assert_mapping(mp, pair.hashable, values[0]);
+        yp_decrefN(N(pair.hashable, pair.unhashable, mp));
     }
 
     // Some types store references to the given objects and, thus, return exactly those objects.
@@ -743,10 +735,9 @@ tear_down:
 static MunitResult _test_updateK(fixture_type_t *type,
         void (*any_updateK)(ypObject *, ypObject **, int, ...), int test_unhashables)
 {
-    ypObject *int_1 = yp_intC(1);
-    ypObject *intstore_1 = yp_intstoreC(1);
-    ypObject *keys[6];
-    ypObject *values[6];
+    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    ypObject          *keys[6];
+    ypObject          *values[6];
     obj_array_fill(keys, type->rand_items);
     obj_array_fill(values, type->rand_values);
 
@@ -841,26 +832,29 @@ static MunitResult _test_updateK(fixture_type_t *type,
     if (test_unhashables) {
         ypObject *mp = type->newK(0);
         assert_raises_exc(
-                any_updateK(mp, &exc, K(intstore_1, values[1], int_1, values[2])), yp_TypeError);
+                any_updateK(mp, &exc, K(pair.unhashable, values[1], pair.hashable, values[2])),
+                yp_TypeError);
         assert_len(mp, 0);
         assert_raises_exc(
-                any_updateK(mp, &exc, K(int_1, values[1], intstore_1, values[2])), yp_TypeError);
-        assert_mapping(mp, int_1, values[1]);  // Optimization: updateK adds while it iterates.
+                any_updateK(mp, &exc, K(pair.hashable, values[1], pair.unhashable, values[2])),
+                yp_TypeError);
+        // Optimization: updateK adds while it iterates.
+        assert_mapping(mp, pair.hashable, values[1]);
         yp_decrefN(N(mp));
     }
 
     // Unhashable keys should always cause TypeError, even if that key is already in mp.
     if (test_unhashables) {
-        ypObject *mp = type->newK(K(int_1, values[0]));
-        assert_raises_exc(any_updateK(mp, &exc, K(intstore_1, values[2])), yp_TypeError);
-        assert_mapping(mp, int_1, values[0]);
+        ypObject *mp = type->newK(K(pair.hashable, values[0]));
+        assert_raises_exc(any_updateK(mp, &exc, K(pair.unhashable, values[2])), yp_TypeError);
+        assert_mapping(mp, pair.hashable, values[0]);
         yp_decrefN(N(mp));
     }
 
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
-    yp_decrefN(N(int_1, intstore_1));
+    yp_decrefN(N(pair.hashable, pair.unhashable));
     return MUNIT_OK;
 }
 

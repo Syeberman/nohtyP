@@ -941,6 +941,7 @@ extern fixture_types_t *fixture_types_not_string;
 extern fixture_types_t *fixture_types_not_setlike;
 extern fixture_types_t *fixture_types_not_mapping;
 extern fixture_types_t *fixture_types_immutable_not_str;
+extern fixture_types_t *fixture_types_immutable_paired;
 
 // Arrays of MunitParameterEnum values for "type" and similar parameters (i.e. the names of types).
 // Can't be included in fixture_types_t because the compiler requires this to be a constant.
@@ -962,6 +963,7 @@ extern char *param_values_types_not_string[];
 extern char *param_values_types_not_setlike[];
 extern char *param_values_types_not_mapping[];
 extern char *param_values_types_immutable_not_str[];
+extern char *param_values_types_immutable_paired[];
 
 // Returns the test fixture type that corresponds with the type of the object. object cannot be
 // invalidated or an exception.
@@ -971,6 +973,12 @@ extern fixture_type_t *fixture_type_fromobject(ypObject *object);
 
 extern char param_key_type[];
 
+
+// Returned by rand_obj_any_hashability_pair.
+typedef struct _hashability_pair_t {
+    ypObject *hashable;
+    ypObject *unhashable;
+} hashability_pair_t;
 
 // Returns a random object of any type.
 extern ypObject *rand_obj_any(void);
@@ -983,6 +991,9 @@ extern ypObject *rand_obj_any_hashable(void);
 
 // Returns a random hashable object of any type except str.
 extern ypObject *rand_obj_any_hashable_not_str(void);
+
+// Returns two random objects of any type that compare equal; one is hashable and the other is not.
+extern hashability_pair_t rand_obj_any_hashability_pair(void);
 
 // Returns a random object of any non-iterable type.
 extern ypObject *rand_obj_any_not_iterable(void);
