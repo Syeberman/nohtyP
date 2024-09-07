@@ -4,6 +4,8 @@
 // TODO Ensure yp_or/yp_orN/yp_anyN and yp_and/yp_andN/yp_allN properly handles exception
 // passthrough, even in cases where one of the arguments would be ignored.
 
+// TODO Test deepcopy/etc generally here. Specific tests can then be added lower (i.e.
+// test_collections can test with various items, knowing that items are stored in the object).
 
 // Ensures that yp_TypeError or similar is raised when a type doesn't support a protocol. This
 // doesn't deal with methods only supported on mutable or immutable types: mutability is not a

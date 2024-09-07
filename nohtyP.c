@@ -19776,6 +19776,11 @@ static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
 
 static ypObject *function_frozen_copy(ypObject *f) { return yp_incref(f); }
 
+static ypObject *function_frozen_deepcopy(ypObject *f, visitfunc copy_visitor, void *copy_memo)
+{
+    return yp_NotImplementedError;  // TODO Support deepcopy.
+}
+
 static ypObject *function_bool(ypObject *f) { return yp_True; }
 
 static ypObject *function_currenthash(
@@ -19838,8 +19843,8 @@ static ypTypeObject ypFunction_Type = {
         Immutable_freezefunc,      // tp_freeze
         function_frozen_copy,      // tp_unfrozen_copy
         function_frozen_copy,      // tp_frozen_copy
-        MethodError_traversefunc,  // tp_unfrozen_deepcopy
-        MethodError_traversefunc,  // tp_frozen_deepcopy
+        function_frozen_deepcopy,  // tp_unfrozen_deepcopy
+        function_frozen_deepcopy,  // tp_frozen_deepcopy
         MethodError_objproc,       // tp_invalidate
 
         // Boolean operations and comparisons

@@ -1,9 +1,6 @@
 
 #include "munit_test/unittest.h"
 
-// FIXME _ypDict_deepcopy
-// FIXME frozendict_eq where the hash has been cached (introduce _test_comparisons)
-
 // Mappings should accept themselves, their pairs, iterators, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
 // TODO "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
@@ -11,6 +8,12 @@
     {(type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list,   \
             fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
             fixture_type_dict_dirty, NULL}
+
+// Returns true iff type supports comparison operators (eq/etc) with other.
+static int type_iscomparable(fixture_type_t *type, fixture_type_t *other)
+{
+    return type->type == other->type || type->type == other->pair->type;
+}
 
 
 // The test_contains in test_collection checks for the behaviour shared amongst all collections;
@@ -45,8 +48,274 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
-// FIXME Here and everywhere, an "original object return" flag, with tests to ensure exact object
-// returned.
+// expected is the boolean expected to be returned.
+static MunitResult _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t *x_type,
+        ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject                          *expected)
+{
+    ypObject *keys[2];
+    ypObject *values[2];
+    ypObject *mp;
+    ypObject *empty = type->newK(0);
+    obj_array_fill(keys, type->rand_items);
+    obj_array_fill(values, type->rand_values);
+    mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+
+    ead(x, rand_obj(x_type), assert_obj(any_cmp(mp, x), is, expected));
+    ead(x, rand_obj(x_type), assert_obj(any_cmp(empty, x), is, expected));
+
+    if (x_type->is_collection) {
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1])),
+                assert_obj(any_cmp(mp, x), is, expected));
+        ead(x, new_itemsK(x_type, 0), assert_obj(any_cmp(mp, x), is, expected));
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1])),
+                assert_obj(any_cmp(empty, x), is, expected));
+        ead(x, new_itemsK(x_type, 0), assert_obj(any_cmp(empty, x), is, expected));
+    }
+
+    obj_array_decref(values);
+    obj_array_decref(keys);
+    yp_decrefN(N(mp, empty));
+    return MUNIT_OK;
+}
+
+static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
+        ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_same, ypObject *x_different)
+{
+    ypObject *keys[4];
+    ypObject *values[4];
+    obj_array_fill(keys, type->rand_items);
+    obj_array_fill(values, type->rand_values);
+
+    // Non-empty mp.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+
+        // x has the same items.
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1])),
+                assert_obj(any_cmp(mp, x), is, x_same));
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0], keys[1], values[1])),
+                assert_obj(any_cmp(mp, x), is, x_same));
+
+        // x has the same keys with different values.
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[3])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[0], values[2], keys[1], values[1])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[0], values[2], keys[1], values[3])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+
+        // x is empty.
+        ead(x, new_itemsK(x_type, 0), assert_obj(any_cmp(mp, x), is, x_different));
+
+        // x is is a proper subset and is not empty.
+        ead(x, new_itemsK(x_type, K(keys[0], values[0])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[1], values[1])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+
+        // x is a proper superset.
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1], keys[2], values[2])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x,
+                new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1], keys[2], values[2],
+                                           keys[3], values[3])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x,
+                new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0], keys[1], values[1],
+                                           keys[2], values[2])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x,
+                new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1], keys[2], values[2],
+                                           keys[2], values[2])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+
+        // x overlaps and contains additional items.
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[2], values[2])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[2], values[2], keys[3], values[3])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[1], values[1], keys[2], values[2])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[1], values[1], keys[2], values[2], keys[3], values[3])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0], keys[2], values[2])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[2], values[2], keys[2], values[2])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+
+        // x does not overlap and contains additional items.
+        ead(x, new_itemsK(x_type, K(keys[2], values[2])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[2], values[2], keys[3], values[3])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[2], values[2], keys[2], values[2])),
+                assert_obj(any_cmp(mp, x), is, x_different));
+
+        // x is mp.
+        assert_obj(any_cmp(mp, mp), is, x_same);
+
+        // Exception passthrough.
+        assert_isexception(any_cmp(mp, yp_SyntaxError), yp_SyntaxError);
+
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);  // mp unchanged.
+        yp_decref(mp);
+    }
+
+    // Empty mp.
+    {
+        ypObject *empty = type->newK(0);
+
+        // Non-empty x.
+        ead(x, new_itemsK(x_type, K(keys[0], values[0])),
+                assert_obj(any_cmp(empty, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1])),
+                assert_obj(any_cmp(empty, x), is, x_different));
+        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0])),
+                assert_obj(any_cmp(empty, x), is, x_different));
+
+        // Empty x.
+        ead(x, new_itemsK(x_type, 0), assert_obj(any_cmp(empty, x), is, x_same));
+
+        // x is mp.
+        assert_obj(any_cmp(empty, empty), is, x_same);
+
+        // Exception passthrough.
+        assert_isexception(any_cmp(empty, yp_SyntaxError), yp_SyntaxError);
+
+        assert_len(empty, 0);  // empty unchanged.
+        yp_decref(empty);
+    }
+
+    // Implementations may use the cached hash as a quick inequality test. Recall that only
+    // immutables can cache their hash, which occurs when yp_hashC is called. Also recall that all
+    // contained objects must be hashable, so we need a separate set of hashable values. Because the
+    // cached hash is an internal optimization, it should only be used with friendly types.
+    if (!type->is_mutable && !x_type->is_mutable && type_iscomparable(type, x_type)) {
+        yp_ssize_t i, j;
+        ypObject  *h_values[4];  // hashable values
+        ypObject  *mp;
+        ypObject  *empty = type->newK(0);
+        obj_array_fill(h_values, type->rand_items);  // use rand_items to get hashable values
+        mp = type->newK(K(keys[0], h_values[0], keys[1], h_values[1]));
+
+        // Run the tests twice: once where mp has not cached the hash, and once where it has.
+        for (i = 0; i < 2; i++) {
+            ypObject *x_is_same = new_itemsK(x_type, K(keys[0], h_values[0], keys[1], h_values[1]));
+            ypObject *x_ne_value =
+                    new_itemsK(x_type, K(keys[0], h_values[0], keys[1], h_values[3]));
+            ypObject *x_is_empty = new_itemsK(x_type, 0);
+            ypObject *x_is_subset = new_itemsK(x_type, K(keys[0], h_values[0]));
+            ypObject *x_is_superset = new_itemsK(
+                    x_type, K(keys[0], h_values[0], keys[1], h_values[1], keys[2], h_values[2]));
+            ypObject *x_is_overlapped =
+                    new_itemsK(x_type, K(keys[0], h_values[0], keys[2], h_values[2]));
+            ypObject *x_is_not_overlapped = new_itemsK(x_type, K(keys[2], h_values[2]));
+
+            // Run the tests twice: once where x has not cached the hash, and once where it has.
+            for (j = 0; j < 2; j++) {
+                assert_obj(any_cmp(mp, x_is_same), is, x_same);
+                assert_obj(any_cmp(mp, x_ne_value), is, x_different);
+                assert_obj(any_cmp(mp, x_is_empty), is, x_different);
+                assert_obj(any_cmp(mp, x_is_subset), is, x_different);
+                assert_obj(any_cmp(mp, x_is_superset), is, x_different);
+                assert_obj(any_cmp(mp, x_is_overlapped), is, x_different);
+                assert_obj(any_cmp(mp, x_is_not_overlapped), is, x_different);
+
+                assert_obj(any_cmp(empty, x_is_same), is, x_different);
+                assert_obj(any_cmp(empty, x_is_empty), is, x_same);
+
+                // Trigger the hash to be cached on "x" and try again.
+                assert_not_raises_exc(yp_hashC(x_is_same, &exc));
+                assert_not_raises_exc(yp_hashC(x_ne_value, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_empty, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_subset, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_superset, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_overlapped, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_not_overlapped, &exc));
+            }
+
+            assert_obj(any_cmp(mp, mp), is, x_same);
+            assert_obj(any_cmp(empty, empty), is, x_same);
+
+            // Trigger the hash to be cached on "mp" and try again.
+            assert_not_raises_exc(yp_hashC(mp, &exc));
+            assert_not_raises_exc(yp_hashC(empty, &exc));
+
+            yp_decrefN(N(x_is_same, x_ne_value, x_is_empty, x_is_subset, x_is_superset,
+                    x_is_overlapped, x_is_not_overlapped));
+        }
+
+        yp_decrefN(N(mp, empty));
+        obj_array_decref(h_values);
+    }
+
+    obj_array_decref(values);
+    obj_array_decref(keys);
+    return MUNIT_OK;
+}
+
+static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+    MunitResult      test_result;
+
+    // eq is only supported for friendly x. All others compare unequal.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (type_iscomparable(type, (*x_type))) {
+            test_result = _test_comparisons(type, (*x_type), yp_eq, /*x_same=*/yp_True,
+                    /*x_different=*/yp_False);
+        } else {
+            test_result = _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
+        }
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
+
+    // _test_comparisons_faulty_iter not called as eq doesn't support iterators.
+
+    // x is not an iterable.
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
+
+tear_down:
+    return test_result;
+}
+
+static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+    MunitResult      test_result;
+
+    // ne is only supported for friendly x. All others compare unequal.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (type_iscomparable(type, (*x_type))) {
+            test_result = _test_comparisons(type, (*x_type), yp_ne, /*x_same=*/yp_False,
+                    /*x_different=*/yp_True);
+        } else {
+            test_result = _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
+        }
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
+
+    // _test_comparisons_faulty_iter not called as ne doesn't support iterators.
+
+    // x is not an iterable.
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
+
+tear_down:
+    return test_result;
+}
+
 static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -1099,6 +1368,7 @@ static MunitParameterEnum test_mapping_params[] = {
         {param_key_type, param_values_types_mapping}, {NULL}};
 
 MunitTest test_mapping_tests[] = {TEST(test_contains, test_mapping_params),
+        TEST(test_eq, test_mapping_params), TEST(test_ne, test_mapping_params),
         TEST(test_getitem, test_mapping_params), TEST(test_getdefault, test_mapping_params),
         TEST(test_setitem, test_mapping_params), TEST(test_delitem, test_mapping_params),
         TEST(test_dropitem, test_mapping_params), TEST(test_popvalue, test_mapping_params),

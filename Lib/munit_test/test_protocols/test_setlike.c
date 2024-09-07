@@ -87,6 +87,13 @@ static MunitResult _test_comparisons_not_supported(fixture_type_t *type, fixture
     ead(x, rand_obj(x_type), assert_not_supported(any_cmp(so, x)));
     ead(x, rand_obj(x_type), assert_not_supported(any_cmp(empty, x)));
 
+    if (x_type->is_collection) {
+        ead(x, x_type->newN(N(items[0], items[1])), assert_not_supported(any_cmp(so, x)));
+        ead(x, x_type->newN(0), assert_not_supported(any_cmp(so, x)));
+        ead(x, x_type->newN(N(items[0], items[1])), assert_not_supported(any_cmp(empty, x)));
+        ead(x, x_type->newN(0), assert_not_supported(any_cmp(empty, x)));
+    }
+
 #undef assert_not_supported
 
     obj_array_decref(items);
