@@ -3516,6 +3516,7 @@ static ypObject *_yp_deepcopy_memo_setitem(void *_memo, ypObject *x, ypObject *x
 // maybe even those should be copied as well...or just those that contain other objects?
 // XXX This is contrary to in Python, where if immutables (tuple, frozenset, etc) contain the exact
 // same objects, it discards the copy and returns the original object (i.e. {1, 2, 3}).
+// TODO We are currently copying immortals; implement skipping the copying of immortals?
 static ypObject *_yp_deepcopy_visitor(ypObject *x, visitfunc visitor, void *_memo, int freeze)
 {
     yp_deepcopy_memo_t *memo = (yp_deepcopy_memo_t *)_memo;

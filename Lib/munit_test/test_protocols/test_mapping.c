@@ -10,7 +10,7 @@
             fixture_type_dict_dirty, NULL}
 
 // Returns true iff type supports comparison operators (eq/etc) with other.
-static int type_iscomparable(fixture_type_t *type, fixture_type_t *other)
+static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
 {
     return type->type == other->type || type->type == other->pair->type;
 }
@@ -155,6 +155,15 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
         // x is mp.
         assert_obj(any_cmp(mp, mp), is, x_same);
 
+        // x contains mp.
+        if (!x_type->hashable_items_only || object_is_hashable(mp)) {
+            ead(x, new_itemsK(x_type, K(mp, values[0])),
+                    assert_obj(any_cmp(mp, x), is, x_different));
+        } else {
+            assert_raises(new_itemsK(x_type, K(mp, values[0])), yp_TypeError);
+        }
+        ead(x, new_itemsK(x_type, K(keys[0], mp)), assert_obj(any_cmp(mp, x), is, x_different));
+
         // Exception passthrough.
         assert_isexception(any_cmp(mp, yp_SyntaxError), yp_SyntaxError);
 
@@ -180,6 +189,16 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
         // x is mp.
         assert_obj(any_cmp(empty, empty), is, x_same);
 
+        // x contains mp.
+        if (!x_type->hashable_items_only || !type->is_mutable) {
+            ead(x, new_itemsK(x_type, K(empty, values[0])),
+                    assert_obj(any_cmp(empty, x), is, x_different));
+        } else {
+            assert_raises(new_itemsK(x_type, K(empty, values[0])), yp_TypeError);
+        }
+        ead(x, new_itemsK(x_type, K(keys[0], empty)),
+                assert_obj(any_cmp(empty, x), is, x_different));
+
         // Exception passthrough.
         assert_isexception(any_cmp(empty, yp_SyntaxError), yp_SyntaxError);
 
@@ -191,7 +210,7 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
     // immutables can cache their hash, which occurs when yp_hashC is called. Also recall that all
     // contained objects must be hashable, so we need a separate set of hashable values. Because the
     // cached hash is an internal optimization, it should only be used with friendly types.
-    if (!type->is_mutable && !x_type->is_mutable && type_iscomparable(type, x_type)) {
+    if (!type->is_mutable && !x_type->is_mutable && type_is_comparable(type, x_type)) {
         yp_ssize_t i, j;
         ypObject  *h_values[4];  // hashable values
         ypObject  *mp;
@@ -262,7 +281,7 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
 
     // eq is only supported for friendly x. All others compare unequal.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if (type_iscomparable(type, (*x_type))) {
+        if (type_is_comparable(type, (*x_type))) {
             _test_comparisons(type, (*x_type), yp_eq, /*x_same=*/yp_True,
                     /*x_different=*/yp_False);
         } else {
@@ -288,7 +307,7 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
 
     // ne is only supported for friendly x. All others compare unequal.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if (type_iscomparable(type, (*x_type))) {
+        if (type_is_comparable(type, (*x_type))) {
             _test_comparisons(type, (*x_type), yp_ne, /*x_same=*/yp_False,
                     /*x_different=*/yp_True);
         } else {
@@ -340,7 +359,6 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     assert_raises(yp_getitem(empty, keys[0]), yp_KeyError);
 
     // key is mp.
-    // FIXME Similar tests everywhere.
     assert_raises(yp_getitem(mp, mp), yp_KeyError);
 
     // key is unhashable.
@@ -410,6 +428,10 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 
     // key is mp.
     ead(value, yp_getdefault(mp, mp, values[2]), assert_obj(value, eq, values[2]));
+
+    // default is mp.
+    ead(value, yp_getdefault(mp, keys[0], mp), assert_obj(value, eq, values[0]));
+    ead(value, yp_getdefault(mp, keys[2], mp), assert_obj(value, eq, mp));
 
     // key is unhashable.
     ead(value, yp_getdefault(mp, unhashable, values[2]), assert_obj(value, eq, values[2]));
@@ -500,7 +522,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(mp);
     }
 
-    // x is mp.
+    // value is mp.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_not_raises_exc(yp_setitem(mp, keys[0], mp, &exc));
@@ -727,6 +749,16 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
         yp_decref(mp);
     }
 
+    // default is mp.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        ead(value, yp_popvalue3(mp, keys[2], mp), assert_obj(value, eq, values[2]));
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        ead(value, yp_popvalue3(mp, keys[2], mp), assert_obj(value, eq, mp));
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decref(mp);
+    }
+
     // key is unhashable.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
@@ -933,7 +965,7 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
         yp_decref(mp);
     }
 
-    // x is mp; key in mp.
+    // value is mp; key in mp.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         ead(value, yp_setdefault(mp, keys[0], mp), assert_obj(value, eq, values[0]));
@@ -941,7 +973,7 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
         yp_decref(mp);
     }
 
-    // x is mp; key not in mp.
+    // value is mp; key not in mp.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         ead(value, yp_setdefault(mp, keys[2], mp), assert_obj(value, eq, mp));

@@ -60,6 +60,10 @@ static void _test_findC(fixture_type_t *type,
             any_findC5(string, empty, 1, 2, &exc), ==, forward ? 1 : 2);  // Empty, partial.
     assert_ssizeC_exc(any_findC5(string, empty, 2, 2, &exc), ==, 2);      // Empty, empty.
 
+    assert_ssizeC_exc(any_findC5(string, string, 0, 3, &exc), ==, 0);  // Self, exact.
+    assert_not_found_exc(any_findC5(string, string, 1, 2, &exc));      // Self, too-small.
+    assert_not_found_exc(any_findC5(string, string, 1, 1, &exc));      // Self, empty.
+
     // TODO That empty slice bug thing.
     // TODO !forward substrings?
     // TODO Anything else to add here?

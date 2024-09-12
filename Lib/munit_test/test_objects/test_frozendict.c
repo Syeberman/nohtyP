@@ -14,12 +14,6 @@
     {fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
             fixture_type_dict_dirty, NULL}
 
-// Returns true iff type can store unhashable objects.
-static int type_stores_unhashables(fixture_type_t *type)
-{
-    return !type->is_setlike && !type->is_mapping;
-}
-
 
 static void _test_newK(
         fixture_type_t *type, ypObject *(*any_newK)(int, ...), int test_exception_passthrough)
@@ -141,7 +135,7 @@ static void _test_new(
     // x contains an unhashable key.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (type_stores_unhashables(*x_type)) {
+        if (!(*x_type)->hashable_items_only) {
             ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
             ead(x, new_itemsK(*x_type, K(unhashable, values[0])),
                     assert_raises(any_new(x), yp_TypeError));
@@ -158,7 +152,7 @@ static void _test_new(
     // Unhashable key rejected even if equal to other hashable key.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (type_stores_unhashables(*x_type)) {
+        if (!(*x_type)->hashable_items_only) {
             ead(x, new_itemsK(*x_type, K(pair.hashable, values[0], pair.unhashable, values[1])),
                     assert_raises(any_new(x), yp_TypeError));
             ead(x, new_itemsK(*x_type, K(pair.unhashable, values[0], pair.hashable, values[1])),
@@ -592,7 +586,7 @@ static void _test_fromkeys(fixture_type_t *type, ypObject *(*any_fromkeys)(ypObj
     // x contains an unhashable key.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (type_stores_unhashables(*x_type)) {
+        if (!(*x_type)->hashable_items_only) {
             ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
             ead(x, (*x_type)->newN(N(unhashable)),
                     assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
@@ -607,7 +601,7 @@ static void _test_fromkeys(fixture_type_t *type, ypObject *(*any_fromkeys)(ypObj
     // Unhashable key rejected even if equal to other hashable key.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (type_stores_unhashables(*x_type)) {
+        if (!(*x_type)->hashable_items_only) {
             ead(x, (*x_type)->newN(N(pair.hashable, pair.unhashable)),
                     assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
             ead(x, (*x_type)->newN(N(pair.unhashable, pair.hashable)),

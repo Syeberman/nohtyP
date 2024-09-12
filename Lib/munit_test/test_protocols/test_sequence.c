@@ -77,13 +77,30 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(sq, x, result));
     }
 
-    // x can be sq.
+    // x is sq.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *result = yp_concat(sq, sq);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1], items[0], items[1]);
         yp_decrefN(N(sq, result));
+    }
+
+    // x contains sq.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (!(*x_type)->is_string) {
+            ypObject *sq = type->newN(N(items[0], items[1]));
+            ypObject *x = (*x_type)->newN(N(items[2], sq));
+            if (type->is_string) {
+                assert_raises(yp_concat(sq, x), yp_ValueError, yp_TypeError);
+            } else {
+                ypObject *result = yp_concat(sq, x);
+                assert_type_is(result, type->type);
+                assert_sequence(result, items[0], items[1], items[2], sq);
+                yp_decref(result);
+            }
+            yp_decrefN(N(sq, x));
+        }
     }
 
     // Duplicates: 0 is duplicated in sq, 1 in x, and 2 shared between them.
@@ -540,6 +557,9 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     // intstore.
     ead(zero, yp_getitem(sq, intstore_0), assert_obj(zero, eq, items[0]));
 
+    // Index is sq.
+    assert_raises(yp_getitem(sq, sq), yp_TypeError);
+
     // Some types store references to the given objects and, thus, return exactly those objects.
     if (type->original_object_return) {
         ead(zero, yp_getitem(sq, int_0), assert_obj(zero, is, items[0]));
@@ -614,6 +634,13 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 
     // intstore.
     ead(zero, yp_getdefault(sq, intstore_0, items[2]), assert_obj(zero, eq, items[0]));
+
+    // Index is sq.
+    assert_raises(yp_getdefault(sq, sq, items[2]), yp_TypeError);
+
+    // Default is sq.
+    ead(zero, yp_getdefault(sq, int_0, sq), assert_obj(zero, eq, items[0]));
+    ead(two, yp_getdefault(sq, int_2, sq), assert_obj(two, eq, sq));
 
     // Some types store references to the given objects and, thus, return exactly those objects.
     if (type->original_object_return) {
@@ -730,6 +757,25 @@ static void _test_findC(fixture_type_t *type,
     assert_not_found_exc(any_findC5(sq, items[2], 0, yp_SLICE_LAST, &exc));
     assert_not_found_exc(any_findC5(sq, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
 
+    // x is sq; sq not in sq. Recall `"abc" in "abc"` is True for strings.
+    if (type->is_string) {
+        assert_ssizeC_exc(any_findC(sq, sq, &exc), ==, 0);
+        assert_ssizeC_exc(any_findC5(sq, sq, 0, 3, &exc), ==, 0);
+    } else {
+        assert_not_found_exc(any_findC(sq, sq, &exc));
+        assert_not_found_exc(any_findC5(sq, sq, 0, 3, &exc));
+    }
+
+    // x is sq; sq contains sq.
+    if (!type->is_string && type->is_mutable) {
+        ypObject *sq_sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_insertC(sq_sq, 1, sq_sq, &exc));
+        assert_ssizeC_exc(any_findC(sq_sq, sq_sq, &exc), ==, 1);
+        assert_ssizeC_exc(any_findC5(sq_sq, sq_sq, 0, 3, &exc), ==, 1);
+        assert_not_raises_exc(yp_clear(sq_sq, &exc));  // nohtyP does not yet break circular refs.
+        yp_decrefN(N(sq_sq));
+    }
+
     // If duplicates, which one is found depends on the direction. Recall patterned sequences like
     // range don't store duplicates.
     if (!type->is_patterned) {
@@ -744,26 +790,20 @@ static void _test_findC(fixture_type_t *type,
         yp_decref(dups);
     }
 
-    if (type->is_string) {
-        // For strings, find looks for sub-sequences of items. This behaviour is tested more
-        // thoroughly in test_string.
-        ypObject *string = type->newN(N(items[0], items[1], items[2]));
-        ypObject *other_0_1 = type->newN(N(items[0], items[1]));
-
-        assert_ssizeC_exc(any_findC(string, other_0_1, &exc), ==, 0);
-        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 3, &exc), ==, 0);
-
-        assert_ssizeC_exc(any_findC(string, string, &exc), ==, 0);
-        assert_ssizeC_exc(any_findC5(string, string, 0, 3, &exc), ==, 0);
-
-        yp_decrefN(N(string, other_0_1));
-
-    } else {
-        // All other sequences inspect only one item at a time.
-        ypObject *seq = type->newN(N(items[0], items[1], items[2]));
-        assert_not_found_exc(any_findC(seq, seq, &exc));
-        assert_not_found_exc(any_findC5(seq, seq, 0, 3, &exc));
-        yp_decref(seq);
+    // For strings, find looks for sub-sequences of items; all other sequences inspect only one item
+    // at a time. This is tested more thoroughly in test_string.
+    {
+        ypObject *sq_0_1_2 = type->newN(N(items[0], items[1], items[2]));
+        ypObject *sq_0_1 = type->newN(N(items[0], items[1]));
+        assert_obj(sq_0_1, ne, items[2]);  // ensure sq_0_1 isn't actually an item in sq_0_1_2
+        if (type->is_string) {
+            assert_ssizeC_exc(any_findC(sq_0_1_2, sq_0_1, &exc), ==, 0);
+            assert_ssizeC_exc(any_findC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, 0);
+        } else {
+            assert_not_found_exc(any_findC(sq_0_1_2, sq_0_1, &exc));
+            assert_not_found_exc(any_findC5(sq_0_1_2, sq_0_1, 0, 3, &exc));
+        }
+        yp_decrefN(N(sq_0_1_2, sq_0_1));
     }
 
     // Exception passthrough.
@@ -889,6 +929,20 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     assert_ssizeC_exc(yp_countC5(sq, items[2], 0, yp_SLICE_LAST, &exc), ==, 0);
     assert_ssizeC_exc(yp_countC5(sq, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
 
+    // x is sq; sq not in sq. Recall `"abc" in "abc"` is True for strings.
+    assert_ssizeC_exc(yp_countC(sq, sq, &exc), ==, type->is_string ? 1 : 0);
+    assert_ssizeC_exc(yp_countC5(sq, sq, 0, 3, &exc), ==, type->is_string ? 1 : 0);
+
+    // x is sq, sq contains sq.
+    if (!type->is_string && type->is_mutable) {
+        ypObject *sq_sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_insertC(sq_sq, 1, sq_sq, &exc));
+        assert_ssizeC_exc(yp_countC(sq_sq, sq_sq, &exc), ==, 1);
+        assert_ssizeC_exc(yp_countC5(sq_sq, sq_sq, 0, 3, &exc), ==, 1);
+        assert_not_raises_exc(yp_clear(sq_sq, &exc));  // nohtyP does not yet break circular refs.
+        yp_decrefN(N(sq_sq));
+    }
+
     // Recall patterned sequences like range don't store duplicates.
     if (!type->is_patterned) {
         ypObject *dups = type->newN(N(items[2], items[2], items[2]));
@@ -904,26 +958,15 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
         yp_decref(dups);
     }
 
-    if (type->is_string) {
-        // For strings, count looks for non-overlapping sub-sequences of items. This behaviour is
-        // tested more thoroughly in test_string.
-        ypObject *string = type->newN(N(items[0], items[1], items[2]));
-        ypObject *other_0_1 = type->newN(N(items[0], items[1]));
-
-        assert_ssizeC_exc(yp_countC(string, other_0_1, &exc), ==, 1);
-        assert_ssizeC_exc(yp_countC5(string, other_0_1, 0, 3, &exc), ==, 1);
-
-        assert_ssizeC_exc(yp_countC(string, string, &exc), ==, 1);
-        assert_ssizeC_exc(yp_countC5(string, string, 0, 3, &exc), ==, 1);
-
-        yp_decrefN(N(string, other_0_1));
-
-    } else {
-        // All other sequences count only one item at a time.
-        ypObject *seq = type->newN(N(items[0], items[1], items[2]));
-        assert_ssizeC_exc(yp_countC(seq, seq, &exc), ==, 0);
-        assert_ssizeC_exc(yp_countC5(seq, seq, 0, 3, &exc), ==, 0);
-        yp_decref(seq);
+    // For strings, count looks for non-overlapping sub-sequences of items; all other sequences
+    // count only one item at a time. This is tested more thoroughly in test_string.
+    {
+        ypObject *sq_0_1_2 = type->newN(N(items[0], items[1], items[2]));
+        ypObject *sq_0_1 = type->newN(N(items[0], items[1]));
+        assert_obj(sq_0_1, ne, items[2]);  // ensure sq_0_1 isn't actually an item in sq_0_1_2
+        assert_ssizeC_exc(yp_countC(sq_0_1_2, sq_0_1, &exc), ==, type->is_string ? 1 : 0);
+        assert_ssizeC_exc(yp_countC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, type->is_string ? 1 : 0);
+        yp_decrefN(N(sq_0_1_2, sq_0_1));
     }
 
     // Exception passthrough.
@@ -1010,6 +1053,21 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
         assert_raises_exc(yp_setindexC(sq, yp_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
         assert_raises_exc(yp_setindexC(sq, yp_SLICE_LAST, items[3], &exc), yp_IndexError);
         assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
+    }
+
+    // x is sq. Recall strings are restrictive about the objects they accept.
+    // TODO Add similar tests to test_string, where sq is 0, 1, and 2 items.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->is_string) {
+            assert_raises_exc(yp_setindexC(sq, 0, sq, &exc), yp_ValueError, yp_TypeError);
+            assert_sequence(sq, items[0], items[1]);
+        } else {
+            assert_not_raises_exc(yp_setindexC(sq, 0, sq, &exc));
+            assert_sequence(sq, sq, items[1]);
+            assert_not_raises_exc(yp_clear(sq, &exc));  // nohtyP does not yet break circular refs.
+        }
         yp_decref(sq);
     }
 
@@ -1233,7 +1291,7 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(N(sq, empty, two, three_four));
     }
 
-    // x can be sq.
+    // x is sq.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_setsliceC6(sq, 0, 0, 1, sq, &exc));
@@ -1245,6 +1303,24 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         assert_not_raises_exc(yp_setsliceC6(sq, -1, -6, -1, sq, &exc));
         assert_sequence(sq, items[1], items[0], items[1], items[0], items[0]);
         yp_decref(sq);
+    }
+
+    // x contains sq.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (!(*x_type)->is_string) {
+            ypObject *sq = type->newN(N(items[0], items[1]));
+            ypObject *x = (*x_type)->newN(N(sq, items[2]));
+            if (type->is_string) {
+                assert_raises_exc(yp_setsliceC6(sq, 0, 1, 1, x, &exc), yp_ValueError, yp_TypeError);
+                assert_sequence(sq, items[0], items[1]);
+            } else {
+                assert_not_raises_exc(yp_setsliceC6(sq, 0, 1, 1, x, &exc));
+                assert_sequence(sq, sq, items[2], items[1]);
+                assert_not_raises_exc(
+                        yp_clear(sq, &exc));  // nohtyP does not yet break circular refs.
+            }
+            yp_decrefN(N(sq, x));
+        }
     }
 
     // Duplicates: 0 is duplicated in sq, 1 in x, and 2 shared between them.
@@ -1305,6 +1381,7 @@ tear_down:
     return MUNIT_OK;
 }
 
+// FIXME Share tests with test_setindexC/etc. And the others too.
 static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -1378,14 +1455,27 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(empty);
     }
 
-    // FIXME value is sq (and elsewhere)
-
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         assert_raises_exc(yp_setitem(sq, int_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
         assert_raises_exc(yp_setitem(sq, int_SLICE_LAST, items[3], &exc), yp_IndexError);
         assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
+    }
+
+    // x is sq. Recall strings are restrictive about the objects they accept.
+    // TODO Add similar tests to test_string, where sq is 0, 1, and 2 items.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->is_string) {
+            assert_raises_exc(yp_setitem(sq, int_0, sq, &exc), yp_ValueError, yp_TypeError);
+            assert_sequence(sq, items[0], items[1]);
+        } else {
+            assert_not_raises_exc(yp_setitem(sq, int_0, sq, &exc));
+            assert_sequence(sq, sq, items[1]);
+            assert_not_raises_exc(yp_clear(sq, &exc));  // nohtyP does not yet break circular refs.
+        }
         yp_decref(sq);
     }
 
@@ -1397,11 +1487,19 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
-    // intstore
+    // intstore.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_setitem(sq, intstore_0, items[2], &exc));
         assert_sequence(sq, items[2], items[1]);
+        yp_decref(sq);
+    }
+
+    // Index is sq.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setitem(sq, sq, items[2], &exc), yp_TypeError);
+        assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
 
@@ -1738,8 +1836,6 @@ static void _test_delitem(
         yp_decref(empty);
     }
 
-    // FIXME index is sq
-
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
@@ -1754,6 +1850,14 @@ static void _test_delitem(
         ypObject *sq = type->newN(N(items[0], items[1], items[2]));
         assert_not_raises_exc(any_delitem(sq, intstore_0, &exc));
         assert_sequence(sq, items[1], items[2]);
+        yp_decref(sq);
+    }
+
+    // Index is sq.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_raises_exc(any_delitem(sq, sq, &exc), yp_TypeError);
+        assert_sequence(sq, items[0], items[1], items[2]);
         yp_decref(sq);
     }
 
@@ -1814,6 +1918,21 @@ static void _test_appendC(
         ypObject *sq = type->newN(0);
         assert_not_raises_exc(any_append(sq, items[2], &exc));
         assert_sequence(sq, items[2]);
+        yp_decref(sq);
+    }
+
+    // x is sq. Recall strings are restrictive about the objects they accept.
+    // TODO Add similar tests to test_string, where sq is 0, 1, and 2 items.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->is_string) {
+            assert_raises_exc(any_append(sq, sq, &exc), yp_ValueError, yp_TypeError);
+            assert_sequence(sq, items[0], items[1]);
+        } else {
+            assert_not_raises_exc(any_append(sq, sq, &exc));
+            assert_sequence(sq, items[0], items[1], sq);
+            assert_not_raises_exc(yp_clear(sq, &exc));  // nohtyP does not yet break circular refs.
+        }
         yp_decref(sq);
     }
 
@@ -1904,12 +2023,30 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(sq, x));
     }
 
-    // x can be sq.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+    // x is sq.
+    {
         ypObject *sq = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_extend(sq, sq, &exc));
         assert_sequence(sq, items[0], items[1], items[0], items[1]);
         yp_decref(sq);
+    }
+
+    // x contains sq.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (!(*x_type)->is_string) {
+            ypObject *sq = type->newN(N(items[0], items[1]));
+            ypObject *x = (*x_type)->newN(N(sq, items[2]));
+            if (type->is_string) {
+                assert_raises_exc(yp_extend(sq, x, &exc), yp_ValueError, yp_TypeError);
+                assert_sequence(sq, items[0], items[1]);
+            } else {
+                assert_not_raises_exc(yp_extend(sq, x, &exc));
+                assert_sequence(sq, items[0], items[1], sq, items[2]);
+                assert_not_raises_exc(
+                        yp_clear(sq, &exc));  // nohtyP does not yet break circular refs.
+            }
+            yp_decrefN(N(sq, x));
+        }
     }
 
     // Duplicates: 0 is duplicated in sq, 1 in x, and 2 shared between them.
@@ -2117,6 +2254,21 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
         ypObject *sq = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_insertC(sq, yp_SLICE_LAST, items[2], &exc));
         assert_sequence(sq, items[0], items[1], items[2]);
+        yp_decref(sq);
+    }
+
+    // x is sq. Recall strings are restrictive about the objects they accept.
+    // TODO Add similar tests to test_string, where sq is 0, 1, and 2 items.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->is_string) {
+            assert_raises_exc(yp_insertC(sq, 0, sq, &exc), yp_ValueError, yp_TypeError);
+            assert_sequence(sq, items[0], items[1]);
+        } else {
+            assert_not_raises_exc(yp_insertC(sq, 0, sq, &exc));
+            assert_sequence(sq, sq, items[0], items[1]);
+            assert_not_raises_exc(yp_clear(sq, &exc));  // nohtyP does not yet break circular refs.
+        }
         yp_decref(sq);
     }
 
@@ -2347,6 +2499,23 @@ static void _test_remove(
         yp_decref(sq);
     }
 
+    // x is sq. Recall `"abc" in "abc"` is True for strings.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->is_string) {
+            assert_not_raises_exc(any_remove(sq, sq, &exc));
+            assert_len(sq, 0);
+        } else {
+            assert_not_raises_exc(yp_append(sq, sq, &exc));
+            assert_sequence(sq, items[0], items[1], sq);
+            assert_not_raises_exc(any_remove(sq, sq, &exc));
+            assert_sequence(sq, items[0], items[1]);
+            assert_not_found_exc(any_remove(sq, sq, &exc));
+            assert_sequence(sq, items[0], items[1]);
+        }
+        yp_decref(sq);
+    }
+
     // If duplicates, the first one is the one that's removed. (There is no yp_rremove, yet.)
     {
         ypObject *dups = type->newN(N(items[0], items[2], items[1], items[2]));
@@ -2355,26 +2524,20 @@ static void _test_remove(
         yp_decref(dups);
     }
 
-    if (type->is_string) {
-        // For strings, remove looks for sub-sequences of items. This behaviour is tested more
-        // thoroughly in test_string.
-        ypObject *string = type->newN(N(items[0], items[1], items[2]));
-        ypObject *other_0_1 = type->newN(N(items[0], items[1]));
-
-        assert_not_raises_exc(any_remove(string, other_0_1, &exc));
-        assert_sequence(string, items[2]);
-
-        assert_not_raises_exc(any_remove(string, string, &exc));
-        assert_len(string, 0);
-
-        yp_decrefN(N(string, other_0_1));
-
-    } else {
-        // All other sequences inspect only one item at a time.
-        ypObject *seq = type->newN(N(items[0], items[1], items[2]));
-        assert_not_found_exc(any_remove(seq, seq, &exc));
-        assert_sequence(seq, items[0], items[1], items[2]);
-        yp_decref(seq);
+    // For strings, remove looks for sub-sequences of items; all other sequences inspect only one
+    // item at a time. This is tested more thoroughly in test_string.
+    {
+        ypObject *sq_0_1_2 = type->newN(N(items[0], items[1], items[2]));
+        ypObject *sq_0_1 = type->newN(N(items[0], items[1]));
+        assert_obj(sq_0_1, ne, items[2]);  // ensure sq_0_1 isn't actually an item in sq_0_1_2
+        if (type->is_string) {
+            assert_not_raises_exc(any_remove(sq_0_1_2, sq_0_1, &exc));
+            assert_sequence(sq_0_1_2, items[2]);
+        } else {
+            assert_not_found_exc(any_remove(sq_0_1_2, sq_0_1, &exc));
+            assert_sequence(sq_0_1_2, items[0], items[1], items[2]);
+        }
+        yp_decrefN(N(sq_0_1_2, sq_0_1));
     }
 
     // Exception passthrough.

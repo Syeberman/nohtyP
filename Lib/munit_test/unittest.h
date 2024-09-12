@@ -882,6 +882,7 @@ typedef struct _fixture_type_t {
     int is_callable;
     int is_patterned;            // i.e. range doesn't store values, it stores a pattern
     int original_object_return;  // A collection that *always* returns the object that was stored
+    int hashable_items_only;     // A collection that *requires* items to be hashable
 } fixture_type_t;
 
 // TODO Versions of each of these that build as the mutable type and then freezes, to test that
@@ -968,7 +969,11 @@ extern char *param_values_types_immutable_paired[];
 // Returns the test fixture type that corresponds with the type of the object. object cannot be
 // invalidated or an exception.
 // TODO Support invalidated and exception types?
-extern fixture_type_t *fixture_type_fromobject(ypObject *object);
+extern fixture_type_t *fixture_type_from_object(ypObject *object);
+
+// Returns true iff calling yp_hashC on object succeeds. Will assert on an unexpected exception.
+// Recall that calling yp_hashC successfully may cache the hash in object.
+extern int object_is_hashable(ypObject *object);
 
 
 extern char param_key_type[];

@@ -1205,6 +1205,13 @@ static void _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_decrefN(N(f, one, one_two));
     }
 
+    // f in arguments
+    {
+        define_function(f, capture_code, ({str_a}));
+        ead(capt, any_callN(f, N(f)), assert_captured(capt, f, f));
+        yp_decref(f);
+    }
+
     // More than ypFunction_MAX_ARGS_ON_STACK parameters
     {
         // params has ypFunction_MAX_ARGS_ON_STACK + 1 elements. Note params contains new refs.
@@ -2301,6 +2308,14 @@ static void _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         yp_decrefN(N(f, zero, one, one_two));
     }
 
+    // f in arguments
+    {
+        define_function(f, capture_code, ({str_a}));
+        assert_raises(any_callK(f, K(f, f)), yp_TypeError);
+        ead(capt, any_callK(f, K(str_a, f)), assert_captured(capt, f, f));
+        yp_decref(f);
+    }
+
     // Keyword argument names can be any string, including non-identifiers
     {
         define_function(f, capture_code, ({str_star_star_kwargs}));
@@ -2644,6 +2659,15 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         ypObject *call_kwargs = yp_tupleN(N(call_kwargs0));
         assert_raises(yp_call_stars(f, yp_tuple_empty, call_kwargs), yp_TypeError);
         yp_decrefN(N(f, call_kwargs0, call_kwargs));
+    }
+
+    // f is args or kwargs
+    {
+        define_function(f, capture_code, ({str_a}));
+        assert_raises(yp_call_stars(f, f, yp_frozendict_empty), yp_TypeError);
+        assert_raises(yp_call_stars(f, yp_tuple_empty, f), yp_TypeError);
+        assert_raises(yp_call_stars(f, f, f), yp_TypeError);
+        yp_decrefN(N(f));
     }
 
     // Ensure the args input to yp_call_stars is not modified.
