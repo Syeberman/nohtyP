@@ -11,7 +11,7 @@
 // Shared tests for yp_findC5, yp_indexC5, yp_rfindC5, yp_rindexC5, etc. The _test_findC in
 // test_sequence checks for the behaviour shared amongst all sequences; this _test_findC considers
 // the behaviour unique to strings, namely substring matching.
-static MunitResult _test_findC(fixture_type_t *type,
+static void _test_findC(fixture_type_t *type,
         yp_ssize_t (*any_findC)(ypObject *, ypObject *, ypObject **),
         yp_ssize_t (*any_findC5)(ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, ypObject **),
         int forward, int raises)
@@ -68,27 +68,30 @@ static MunitResult _test_findC(fixture_type_t *type,
 
     obj_array_decref(items);
     yp_decrefN(N(string, empty, other_0_1, other_1_2, other_0_2, other_1_0));
-    return MUNIT_OK;
 }
 
 static MunitResult test_findC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_findC(fixture->type, yp_findC, yp_findC5, /*forward=*/TRUE, /*raises=*/FALSE);
+    _test_findC(fixture->type, yp_findC, yp_findC5, /*forward=*/TRUE, /*raises=*/FALSE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_indexC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_findC(fixture->type, yp_indexC, yp_indexC5, /*forward=*/TRUE, /*raises=*/TRUE);
+    _test_findC(fixture->type, yp_indexC, yp_indexC5, /*forward=*/TRUE, /*raises=*/TRUE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_rfindC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_findC(fixture->type, yp_rfindC, yp_rfindC5, /*forward=*/FALSE, /*raises=*/FALSE);
+    _test_findC(fixture->type, yp_rfindC, yp_rfindC5, /*forward=*/FALSE, /*raises=*/FALSE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_findC(fixture->type, yp_rindexC, yp_rindexC5, /*forward=*/FALSE, /*raises=*/TRUE);
+    _test_findC(fixture->type, yp_rindexC, yp_rindexC5, /*forward=*/FALSE, /*raises=*/TRUE);
+    return MUNIT_OK;
 }
 
 // TODO test_countC, for non-overlapping substrings.

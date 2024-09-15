@@ -634,7 +634,7 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 }
 
 // Shared tests for yp_findC5, yp_indexC5, yp_rfindC5, yp_rindexC5, etc.
-static MunitResult _test_findC(fixture_type_t *type,
+static void _test_findC(fixture_type_t *type,
         yp_ssize_t (*any_findC)(ypObject *, ypObject *, ypObject **),
         yp_ssize_t (*any_findC5)(ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, ypObject **),
         int forward, int raises)
@@ -780,27 +780,30 @@ static MunitResult _test_findC(fixture_type_t *type,
 
     obj_array_decref(items);
     yp_decrefN(N(sq, empty));
-    return MUNIT_OK;
 }
 
 static MunitResult test_findC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_findC(fixture->type, yp_findC, yp_findC5, /*forward=*/TRUE, /*raises=*/FALSE);
+    _test_findC(fixture->type, yp_findC, yp_findC5, /*forward=*/TRUE, /*raises=*/FALSE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_indexC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_findC(fixture->type, yp_indexC, yp_indexC5, /*forward=*/TRUE, /*raises=*/TRUE);
+    _test_findC(fixture->type, yp_indexC, yp_indexC5, /*forward=*/TRUE, /*raises=*/TRUE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_rfindC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_findC(fixture->type, yp_rfindC, yp_rfindC5, /*forward=*/FALSE, /*raises=*/FALSE);
+    _test_findC(fixture->type, yp_rfindC, yp_rfindC5, /*forward=*/FALSE, /*raises=*/FALSE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_findC(fixture->type, yp_rindexC, yp_rindexC5, /*forward=*/FALSE, /*raises=*/TRUE);
+    _test_findC(fixture->type, yp_rindexC, yp_rindexC5, /*forward=*/FALSE, /*raises=*/TRUE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture)
@@ -1418,7 +1421,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-static MunitResult _test_delindexC(fixture_type_t *type,
+static void _test_delindexC(fixture_type_t *type,
         void (*any_delindexC)(ypObject *, yp_ssize_t, ypObject **), int raises)
 {
     ypObject *items[4];
@@ -1505,17 +1508,18 @@ static MunitResult _test_delindexC(fixture_type_t *type,
 
 tear_down:
     obj_array_decref(items);
-    return MUNIT_OK;
 }
 
 static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_delindexC(fixture->type, yp_delindexC, /*raises=*/TRUE);
+    _test_delindexC(fixture->type, yp_delindexC, /*raises=*/TRUE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_dropindexC(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_delindexC(fixture->type, yp_dropindexC, /*raises=*/FALSE);
+    _test_delindexC(fixture->type, yp_dropindexC, /*raises=*/FALSE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixture)
@@ -1651,7 +1655,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-static MunitResult _test_delitem(
+static void _test_delitem(
         fixture_type_t *type, void (*any_delitem)(ypObject *, ypObject *, ypObject **), int raises)
 {
     ypObject *int_0 = yp_intC(0);
@@ -1767,21 +1771,22 @@ tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
             int_SLICE_LAST, intstore_0));
-    return MUNIT_OK;
 }
 
 static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_delitem(fixture->type, yp_delitem, /*raises=*/TRUE);
+    _test_delitem(fixture->type, yp_delitem, /*raises=*/TRUE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_dropitem(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_delitem(fixture->type, yp_dropitem, /*raises=*/FALSE);
+    _test_delitem(fixture->type, yp_dropitem, /*raises=*/FALSE);
+    return MUNIT_OK;
 }
 
 // Shared tests for yp_append, yp_push. (These are the same operation on sequences.)
-static MunitResult _test_appendC(
+static void _test_appendC(
         fixture_type_t *type, void (*any_append)(ypObject *, ypObject *, ypObject **))
 {
     ypObject *items[3];
@@ -1830,17 +1835,18 @@ static MunitResult _test_appendC(
 
 tear_down:
     obj_array_decref(items);
-    return MUNIT_OK;
 }
 
 static MunitResult test_append(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_appendC(fixture->type, yp_append);
+    _test_appendC(fixture->type, yp_append);
+    return MUNIT_OK;
 }
 
 static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_appendC(fixture->type, yp_push);
+    _test_appendC(fixture->type, yp_push);
+    return MUNIT_OK;
 }
 
 static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture)
@@ -2289,7 +2295,7 @@ tear_down:
 }
 
 // Shared tests for yp_remove, yp_discard.
-static MunitResult _test_remove(
+static void _test_remove(
         fixture_type_t *type, void (*any_remove)(ypObject *, ypObject *, ypObject **), int raises)
 {
     ypObject *items[3];
@@ -2383,17 +2389,18 @@ static MunitResult _test_remove(
 
 tear_down:
     obj_array_decref(items);
-    return MUNIT_OK;
 }
 
 static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_remove(fixture->type, yp_remove, /*raises=*/TRUE);
+    _test_remove(fixture->type, yp_remove, /*raises=*/TRUE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_discard(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_remove(fixture->type, yp_discard, /*raises=*/FALSE);
+    _test_remove(fixture->type, yp_discard, /*raises=*/FALSE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_reverse(const MunitParameter params[], fixture_t *fixture)

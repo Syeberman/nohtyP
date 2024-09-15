@@ -483,7 +483,7 @@ static MunitResult test_new_immortal(const MunitParameter params[], fixture_t *f
 }
 
 // Tests common to test_callN, test_call_stars, and callN_to_call_arrayX.
-static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
+static void _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 {
     ypObject *defs[] = obj_array_init(5, rand_obj_any());
     ypObject *args[] = obj_array_init(33, rand_obj_any());
@@ -1356,11 +1356,10 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
     obj_array_decref(defs);
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
-    return MUNIT_OK;
 }
 
 // Tests common to test_callK (not yet implemented) and test_call_stars.
-static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
+static void _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
 {
     ypObject *defs[] = obj_array_init(5, rand_obj_any());
     ypObject *args[] = obj_array_init(33, rand_obj_any());
@@ -2504,20 +2503,17 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_c, str_slash, str_star, str_star_args, str_star_star_kwargs,
             non_string));
-    return MUNIT_OK;
 }
 
 static MunitResult test_callN(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject   *str_a = yp_str_frombytesC2(-1, "a");
-    MunitResult test_result;
+    ypObject *str_a = yp_str_frombytesC2(-1, "a");
 
-    test_result = _test_callN(yp_callN);
-    if (test_result != MUNIT_OK) goto tear_down;
+    // Shared tests.
+    _test_callN(yp_callN);
 
-tear_down:
     yp_decrefN(N(str_a));
-    return test_result;
+    return MUNIT_OK;
 }
 
 // Accepts the yp_callN signature and instead calls yp_call_stars with a tuple. For use in
@@ -2581,24 +2577,19 @@ static ypObject *callK_to_call_stars_frozendict(ypObject *c, int n, ...)
 
 static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject   *defs[] = obj_array_init(2, rand_obj_any());
-    ypObject   *args[] = obj_array_init(2, rand_obj_any());
-    ypObject   *str_a = yp_str_frombytesC2(-1, "a");
-    ypObject   *str_b = yp_str_frombytesC2(-1, "b");
-    ypObject   *str_slash = yp_str_frombytesC2(-1, "/");
-    ypObject   *str_star = yp_str_frombytesC2(-1, "*");
-    ypObject   *str_star_args = yp_str_frombytesC2(-1, "*args");
-    ypObject   *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
-    MunitResult test_result;
+    ypObject *defs[] = obj_array_init(2, rand_obj_any());
+    ypObject *args[] = obj_array_init(2, rand_obj_any());
+    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject *str_star = yp_str_frombytesC2(-1, "*");
+    ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
 
-    test_result = _test_callN(callN_to_call_stars_tuple);
-    if (test_result != MUNIT_OK) goto tear_down;
-
-    test_result = _test_callN(callN_to_call_stars_iter);
-    if (test_result != MUNIT_OK) goto tear_down;
-
-    test_result = _test_callK(callK_to_call_stars_frozendict);
-    if (test_result != MUNIT_OK) goto tear_down;
+    // Shared tests.
+    _test_callN(callN_to_call_stars_tuple);
+    _test_callN(callN_to_call_stars_iter);
+    _test_callK(callK_to_call_stars_frozendict);
 
     // def f(a) cannot be called like f(0, a=0).
     {
@@ -2747,11 +2738,10 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
                 call_args, call_kwargs));
     }
 
-tear_down:
     obj_array_decref(defs);
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
-    return test_result;
+    return MUNIT_OK;
 }
 
 // Accepts the yp_callN signature and instead calls yp_call_arrayX. For use in _test_callN. n must
@@ -2776,14 +2766,13 @@ static ypObject *callN_to_call_arrayX(ypObject *c, int n, ...)
 
 static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject   *args[] = obj_array_init(2, rand_obj_any());
-    ypObject   *str_a = yp_str_frombytesC2(-1, "a");
-    ypObject   *str_b = yp_str_frombytesC2(-1, "b");
-    ypObject   *str_slash = yp_str_frombytesC2(-1, "/");
-    MunitResult test_result;
+    ypObject *args[] = obj_array_init(2, rand_obj_any());
+    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject *str_slash = yp_str_frombytesC2(-1, "/");
 
-    test_result = _test_callN(callN_to_call_arrayX);
-    if (test_result != MUNIT_OK) goto tear_down;
+    // Shared tests.
+    _test_callN(callN_to_call_arrayX);
 
     // Optimization: The array can sometimes be used directly as argarray. Based on Python's
     // vectorcall optimization.
@@ -2822,10 +2811,9 @@ static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fi
     // n must be >0.
     assert_raises(yp_call_arrayX(0, NULL), yp_TypeError);
 
-tear_down:
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash));
-    return test_result;
+    return MUNIT_OK;
 }
 
 static MunitResult test_copy(const MunitParameter params[], fixture_t *fixture)

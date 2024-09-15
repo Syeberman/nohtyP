@@ -49,8 +49,8 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
 }
 
 // expected is the boolean expected to be returned.
-static MunitResult _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t *x_type,
-        ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject                          *expected)
+static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t *x_type,
+        ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject                   *expected)
 {
     ypObject *keys[2];
     ypObject *values[2];
@@ -75,10 +75,9 @@ static MunitResult _test_comparisons_not_supported(fixture_type_t *type, fixture
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(mp, empty));
-    return MUNIT_OK;
 }
 
-static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
+static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
         ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_same, ypObject *x_different)
 {
     ypObject *keys[4];
@@ -253,7 +252,6 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
 
     obj_array_decref(values);
     obj_array_decref(keys);
-    return MUNIT_OK;
 }
 
 static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
@@ -261,29 +259,25 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    MunitResult      test_result;
 
     // eq is only supported for friendly x. All others compare unequal.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         if (type_iscomparable(type, (*x_type))) {
-            test_result = _test_comparisons(type, (*x_type), yp_eq, /*x_same=*/yp_True,
+            _test_comparisons(type, (*x_type), yp_eq, /*x_same=*/yp_True,
                     /*x_different=*/yp_False);
         } else {
-            test_result = _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
+            _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
         }
-        if (test_result != MUNIT_OK) goto tear_down;
     }
 
     // _test_comparisons_faulty_iter not called as eq doesn't support iterators.
 
     // x is not an iterable.
     for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
-        test_result = _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
-        if (test_result != MUNIT_OK) goto tear_down;
+        _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
     }
 
-tear_down:
-    return test_result;
+    return MUNIT_OK;
 }
 
 static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
@@ -291,29 +285,25 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    MunitResult      test_result;
 
     // ne is only supported for friendly x. All others compare unequal.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         if (type_iscomparable(type, (*x_type))) {
-            test_result = _test_comparisons(type, (*x_type), yp_ne, /*x_same=*/yp_False,
+            _test_comparisons(type, (*x_type), yp_ne, /*x_same=*/yp_False,
                     /*x_different=*/yp_True);
         } else {
-            test_result = _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
+            _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
         }
-        if (test_result != MUNIT_OK) goto tear_down;
     }
 
     // _test_comparisons_faulty_iter not called as ne doesn't support iterators.
 
     // x is not an iterable.
     for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
-        test_result = _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
-        if (test_result != MUNIT_OK) goto tear_down;
+        _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
     }
 
-tear_down:
-    return test_result;
+    return MUNIT_OK;
 }
 
 static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixture)
@@ -552,7 +542,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-static MunitResult _test_delitem(
+static void _test_delitem(
         fixture_type_t *type, void (*any_delitem)(ypObject *, ypObject *, ypObject **), int raises)
 {
     ypObject *keys[3];
@@ -653,17 +643,18 @@ static MunitResult _test_delitem(
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
-    return MUNIT_OK;
 }
 
 static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_delitem(fixture->type, yp_delitem, /*raises=*/TRUE);
+    _test_delitem(fixture->type, yp_delitem, /*raises=*/TRUE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_dropitem(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_delitem(fixture->type, yp_dropitem, /*raises=*/FALSE);
+    _test_delitem(fixture->type, yp_dropitem, /*raises=*/FALSE);
+    return MUNIT_OK;
 }
 
 static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixture)
@@ -1001,7 +992,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-static MunitResult _test_updateK(fixture_type_t *type,
+static void _test_updateK(fixture_type_t *type,
         void (*any_updateK)(ypObject *, ypObject **, int, ...), int test_unhashables)
 {
     hashability_pair_t pair = rand_obj_any_hashability_pair();
@@ -1124,7 +1115,6 @@ tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(pair.hashable, pair.unhashable));
-    return MUNIT_OK;
 }
 
 static void updateK_to_updateKV(ypObject *mapping, ypObject **exc, int n, ...)
@@ -1138,17 +1128,14 @@ static void updateK_to_updateKV(ypObject *mapping, ypObject **exc, int n, ...)
 static MunitResult test_updateK(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    MunitResult     test_result;
     ypObject       *keys[6];
     ypObject       *values[6];
     obj_array_fill(keys, type->rand_items);
     obj_array_fill(values, type->rand_values);
 
-    test_result = _test_updateK(type, yp_updateK, /*test_unhashables=*/TRUE);
-    if (test_result != MUNIT_OK) goto tear_down;
-
-    test_result = _test_updateK(type, updateK_to_updateKV, /*test_unhashables=*/TRUE);
-    if (test_result != MUNIT_OK) goto tear_down;
+    // Shared tests.
+    _test_updateK(type, yp_updateK, /*test_unhashables=*/TRUE);
+    _test_updateK(type, updateK_to_updateKV, /*test_unhashables=*/TRUE);
 
     // Remaining tests only apply to mutable objects.
     if (!type->is_mutable) goto tear_down;
@@ -1186,7 +1173,7 @@ static MunitResult test_updateK(const MunitParameter params[], fixture_t *fixtur
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
-    return test_result;
+    return MUNIT_OK;
 }
 
 static void updateK_to_update_fromiter(ypObject *mapping, ypObject **exc, int n, ...)
@@ -1271,7 +1258,6 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    MunitResult      test_result;
     ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *keys[6];
     ypObject        *values[6];
@@ -1296,8 +1282,9 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
             assert_ptr((*x_type), ==, fixture_type_dict);
             updateK = updateK_to_update_fromdict;
         }
-        test_result = _test_updateK(type, updateK, /*test_unhashables=*/FALSE);
-        if (test_result != MUNIT_OK) goto tear_down;
+
+        // Shared tests.
+        _test_updateK(type, updateK, /*test_unhashables=*/FALSE);
     }
 
     // Remaining tests only apply to mutable objects.
@@ -1361,7 +1348,7 @@ tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(not_iterable));
-    return test_result;
+    return MUNIT_OK;
 }
 
 static MunitParameterEnum test_mapping_params[] = {

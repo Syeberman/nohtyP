@@ -21,7 +21,7 @@ static int type_stores_unhashables(fixture_type_t *type)
 }
 
 
-static MunitResult _test_newK(
+static void _test_newK(
         fixture_type_t *type, ypObject *(*any_newK)(int, ...), int test_exception_passthrough)
 {
     hashability_pair_t pair = rand_obj_any_hashability_pair();
@@ -95,10 +95,9 @@ static MunitResult _test_newK(
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(pair.unhashable, pair.hashable));
-    return MUNIT_OK;
 }
 
-static MunitResult _test_new(
+static void _test_new(
         fixture_type_t *type, ypObject *(*any_new)(ypObject *), int test_exception_passthrough)
 {
     fixture_type_t    *x_types[] = x_types_init();
@@ -206,7 +205,6 @@ static MunitResult _test_new(
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
-    return MUNIT_OK;
 }
 
 static ypObject *newK_to_frozendictKV(int n, ...)
@@ -236,7 +234,6 @@ static MunitResult test_newK(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     ypObject *(*newK)(int, ...);
     ypObject *(*newK_to_newKV)(int, ...);
-    MunitResult test_result;
 
     if (type->type == yp_t_frozendict) {
         newK = yp_frozendictK;
@@ -247,11 +244,9 @@ static MunitResult test_newK(const MunitParameter params[], fixture_t *fixture)
         newK_to_newKV = newK_to_dictKV;
     }
 
-    test_result = _test_newK(type, newK, /*test_exception_passthrough=*/TRUE);
-    if (test_result != MUNIT_OK) return test_result;
-
-    test_result = _test_newK(type, newK_to_newKV, /*test_exception_passthrough=*/TRUE);
-    if (test_result != MUNIT_OK) return test_result;
+    // Shared tests.
+    _test_newK(type, newK, /*test_exception_passthrough=*/TRUE);
+    _test_newK(type, newK_to_newKV, /*test_exception_passthrough=*/TRUE);
 
     return MUNIT_OK;
 }
@@ -291,7 +286,6 @@ static MunitResult test_new(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     ypObject *(*newK_to_new)(int, ...);
     ypObject *(*new_)(ypObject *);
-    MunitResult test_result;
 
     if (type->type == yp_t_frozendict) {
         newK_to_new = newK_to_frozendict;
@@ -302,11 +296,9 @@ static MunitResult test_new(const MunitParameter params[], fixture_t *fixture)
         new_ = yp_dict;
     }
 
-    test_result = _test_newK(type, newK_to_new, /*test_exception_passthrough=*/FALSE);
-    if (test_result != MUNIT_OK) return test_result;
-
-    test_result = _test_new(type, new_, /*test_exception_passthrough=*/TRUE);
-    if (test_result != MUNIT_OK) return test_result;
+    // Shared tests.
+    _test_newK(type, newK_to_new, /*test_exception_passthrough=*/FALSE);
+    _test_new(type, new_, /*test_exception_passthrough=*/TRUE);
 
     return MUNIT_OK;
 }
@@ -358,12 +350,11 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     fixture_type_t **x_type;
     ypObject *(*newK_to_call_args_type)(int, ...);
     ypObject *(*new_to_call_args_type)(ypObject *);
-    MunitResult test_result;
-    ypObject   *str_rand = rand_obj(fixture_type_str);
-    ypObject   *str_cls = yp_str_frombytesC2(-1, "cls");
-    ypObject   *str_object = yp_str_frombytesC2(-1, "object");
-    ypObject   *keys[4];
-    ypObject   *values[4];
+    ypObject *str_rand = rand_obj(fixture_type_str);
+    ypObject *str_cls = yp_str_frombytesC2(-1, "cls");
+    ypObject *str_object = yp_str_frombytesC2(-1, "object");
+    ypObject *keys[4];
+    ypObject *values[4];
     obj_array_fill(keys, type->rand_items);
     obj_array_fill(values, type->rand_values);
 
@@ -376,11 +367,9 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         new_to_call_args_type = new_to_call_args_t_dict;
     }
 
-    test_result = _test_newK(type, newK_to_call_args_type, /*test_exception_passthrough=*/FALSE);
-    if (test_result != MUNIT_OK) goto tear_down;
-
-    test_result = _test_new(type, new_to_call_args_type, /*test_exception_passthrough=*/TRUE);
-    if (test_result != MUNIT_OK) goto tear_down;
+    // Shared tests.
+    _test_newK(type, newK_to_call_args_type, /*test_exception_passthrough=*/FALSE);
+    _test_new(type, new_to_call_args_type, /*test_exception_passthrough=*/TRUE);
 
     // Zero arguments.
     {
@@ -482,15 +471,14 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     // Exception passthrough.
     assert_isexception(yp_callN(type->type, N(yp_SyntaxError)), yp_SyntaxError);
 
-tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(str_object, str_cls, str_rand));
     return MUNIT_OK;
 }
 
-static MunitResult _test_fromkeysN(fixture_type_t *type,
-        ypObject *(*any_fromkeysN)(ypObject *, int, ...), int test_exception_passthrough)
+static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypObject *, int, ...),
+        int                                 test_exception_passthrough)
 {
     hashability_pair_t pair = rand_obj_any_hashability_pair();
     ypObject          *keys[4];
@@ -560,11 +548,10 @@ static MunitResult _test_fromkeysN(fixture_type_t *type,
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(pair.unhashable, pair.hashable));
-    return MUNIT_OK;
 }
 
-static MunitResult _test_fromkeys(fixture_type_t *type,
-        ypObject *(*any_fromkeys)(ypObject *, ypObject *), int test_exception_passthrough)
+static void _test_fromkeys(fixture_type_t *type, ypObject *(*any_fromkeys)(ypObject *, ypObject *),
+        int                                test_exception_passthrough)
 {
     fixture_type_t    *x_types[] = x_types_init();
     fixture_type_t   **x_type;
@@ -655,7 +642,6 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
-    return MUNIT_OK;
 }
 
 static ypObject *fromkeysN_to_frozendict_fromkeysNV(ypObject *value, int n, ...)
@@ -685,7 +671,6 @@ static MunitResult test_fromkeysN(const MunitParameter params[], fixture_t *fixt
     fixture_type_t *type = fixture->type;
     ypObject *(*fromkeysN)(ypObject *, int, ...);
     ypObject *(*fromkeysN_to_fromkeysNV)(ypObject *, int, ...);
-    MunitResult test_result;
 
     if (type->type == yp_t_frozendict) {
         fromkeysN = yp_frozendict_fromkeysN;
@@ -696,12 +681,9 @@ static MunitResult test_fromkeysN(const MunitParameter params[], fixture_t *fixt
         fromkeysN_to_fromkeysNV = fromkeysN_to_dict_fromkeysNV;
     }
 
-    test_result = _test_fromkeysN(type, fromkeysN, /*test_exception_passthrough=*/TRUE);
-    if (test_result != MUNIT_OK) return test_result;
-
-    test_result =
-            _test_fromkeysN(type, fromkeysN_to_fromkeysNV, /*test_exception_passthrough=*/TRUE);
-    if (test_result != MUNIT_OK) return test_result;
+    // Shared tests.
+    _test_fromkeysN(type, fromkeysN, /*test_exception_passthrough=*/TRUE);
+    _test_fromkeysN(type, fromkeysN_to_fromkeysNV, /*test_exception_passthrough=*/TRUE);
 
     return MUNIT_OK;
 }
@@ -741,7 +723,6 @@ static MunitResult test_fromkeys(const MunitParameter params[], fixture_t *fixtu
     fixture_type_t *type = fixture->type;
     ypObject *(*fromkeysN_to_fromkeys)(ypObject *, int, ...);
     ypObject *(*fromkeys)(ypObject *, ypObject *);
-    MunitResult test_result;
 
     if (type->type == yp_t_frozendict) {
         fromkeysN_to_fromkeys = fromkeysN_to_frozendict_fromkeys;
@@ -752,11 +733,9 @@ static MunitResult test_fromkeys(const MunitParameter params[], fixture_t *fixtu
         fromkeys = yp_dict_fromkeys;
     }
 
-    test_result = _test_fromkeysN(type, fromkeysN_to_fromkeys, /*test_exception_passthrough=*/TRUE);
-    if (test_result != MUNIT_OK) return test_result;
-
-    test_result = _test_fromkeys(type, fromkeys, /*test_exception_passthrough=*/TRUE);
-    if (test_result != MUNIT_OK) return test_result;
+    // Shared tests.
+    _test_fromkeysN(type, fromkeysN_to_fromkeys, /*test_exception_passthrough=*/TRUE);
+    _test_fromkeys(type, fromkeys, /*test_exception_passthrough=*/TRUE);
 
     return MUNIT_OK;
 }
