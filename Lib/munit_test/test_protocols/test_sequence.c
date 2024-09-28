@@ -280,55 +280,60 @@ tear_down:
     return MUNIT_OK;
 }
 
-static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixture)
+static void _test_getindexC(
+        fixture_type_t *type, ypObject *(*any_getindexC)(ypObject *, yp_ssize_t))
 {
-    fixture_type_t *type = fixture->type;
-    ypObject       *items[2];
-    ypObject       *sq;
-    ypObject       *empty = type->newN(0);
+    ypObject *items[2];
+    ypObject *sq;
+    ypObject *empty = type->newN(0);
     obj_array_fill(items, type->rand_items);
     sq = type->newN(N(items[0], items[1]));
 
     // Basic index.
-    ead(zero, yp_getindexC(sq, 0), assert_obj(zero, eq, items[0]));
-    ead(one, yp_getindexC(sq, 1), assert_obj(one, eq, items[1]));
+    ead(zero, any_getindexC(sq, 0), assert_obj(zero, eq, items[0]));
+    ead(one, any_getindexC(sq, 1), assert_obj(one, eq, items[1]));
 
     // Negative index.
-    ead(neg_one, yp_getindexC(sq, -1), assert_obj(neg_one, eq, items[1]));
-    ead(neg_two, yp_getindexC(sq, -2), assert_obj(neg_two, eq, items[0]));
+    ead(neg_one, any_getindexC(sq, -1), assert_obj(neg_one, eq, items[1]));
+    ead(neg_two, any_getindexC(sq, -2), assert_obj(neg_two, eq, items[0]));
 
     // Out of bounds.
-    assert_raises(yp_getindexC(sq, 2), yp_IndexError);
-    assert_raises(yp_getindexC(sq, -3), yp_IndexError);
+    assert_raises(any_getindexC(sq, 2), yp_IndexError);
+    assert_raises(any_getindexC(sq, -3), yp_IndexError);
 
     // Previously-deleted index.
     if (type->is_mutable) {
         ypObject *sq_delitem = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_delindexC(sq_delitem, 1, &exc));
         assert_sequence(sq_delitem, items[0]);
-        assert_raises(yp_getindexC(sq_delitem, 1), yp_IndexError);
+        assert_raises(any_getindexC(sq_delitem, 1), yp_IndexError);
         assert_sequence(sq_delitem, items[0]);
         yp_decrefN(N(sq_delitem));
     }
 
     // Empty sq.
-    assert_raises(yp_getindexC(empty, 0), yp_IndexError);
-    assert_raises(yp_getindexC(empty, -1), yp_IndexError);
+    assert_raises(any_getindexC(empty, 0), yp_IndexError);
+    assert_raises(any_getindexC(empty, -1), yp_IndexError);
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
-    assert_raises(yp_getindexC(sq, yp_SLICE_DEFAULT), yp_IndexError);
-    assert_raises(yp_getindexC(sq, yp_SLICE_LAST), yp_IndexError);
+    assert_raises(any_getindexC(sq, yp_SLICE_DEFAULT), yp_IndexError);
+    assert_raises(any_getindexC(sq, yp_SLICE_LAST), yp_IndexError);
 
     // Some types store references to the given objects and, thus, return exactly those objects.
     if (type->original_object_return) {
-        ead(zero, yp_getindexC(sq, 0), assert_obj(zero, is, items[0]));
-        ead(one, yp_getindexC(sq, 1), assert_obj(one, is, items[1]));
+        ead(zero, any_getindexC(sq, 0), assert_obj(zero, is, items[0]));
+        ead(one, any_getindexC(sq, 1), assert_obj(one, is, items[1]));
     }
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
     obj_array_decref(items);
     yp_decrefN(N(sq, empty));
+}
+
+static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixture)
+{
+    _test_getindexC(fixture->type, yp_getindexC);
     return MUNIT_OK;
 }
 
@@ -506,17 +511,17 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     return MUNIT_OK;
 }
 
+static ypObject *getindexC_to_getitem(ypObject *sq, yp_ssize_t i)
+{
+    ypObject *int_i = yp_intC(i);
+    ypObject *result = yp_getitem(sq, int_i);
+    yp_decref(int_i);
+    return result;
+}
+
 static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *int_0 = yp_intC(0);
-    ypObject       *int_1 = yp_intC(1);
-    ypObject       *int_2 = yp_intC(2);
-    ypObject       *int_neg_1 = yp_intC(-1);
-    ypObject       *int_neg_2 = yp_intC(-2);
-    ypObject       *int_neg_3 = yp_intC(-3);
-    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
-    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
     ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[2];
     ypObject       *sq;
@@ -524,47 +529,14 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     obj_array_fill(items, type->rand_items);
     sq = type->newN(N(items[0], items[1]));
 
-    // Basic index.
-    ead(zero, yp_getitem(sq, int_0), assert_obj(zero, eq, items[0]));
-    ead(one, yp_getitem(sq, int_1), assert_obj(one, eq, items[1]));
-
-    // Negative index.
-    ead(neg_one, yp_getitem(sq, int_neg_1), assert_obj(neg_one, eq, items[1]));
-    ead(neg_two, yp_getitem(sq, int_neg_2), assert_obj(neg_two, eq, items[0]));
-
-    // Out of bounds.
-    assert_raises(yp_getitem(sq, int_2), yp_IndexError);
-    assert_raises(yp_getitem(sq, int_neg_3), yp_IndexError);
-
-    // Previously-deleted index.
-    if (type->is_mutable) {
-        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_delitem(sq_delitem, int_1, &exc));
-        assert_sequence(sq_delitem, items[0]);
-        assert_raises(yp_getitem(sq_delitem, int_1), yp_IndexError);
-        assert_sequence(sq_delitem, items[0]);
-        yp_decrefN(N(sq_delitem));
-    }
-
-    // Empty sq.
-    assert_raises(yp_getitem(empty, int_0), yp_IndexError);
-    assert_raises(yp_getitem(empty, int_neg_1), yp_IndexError);
-
-    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
-    assert_raises(yp_getitem(sq, int_SLICE_DEFAULT), yp_IndexError);
-    assert_raises(yp_getitem(sq, int_SLICE_LAST), yp_IndexError);
+    // Shared tests.
+    _test_getindexC(type, getindexC_to_getitem);
 
     // intstore.
     ead(zero, yp_getitem(sq, intstore_0), assert_obj(zero, eq, items[0]));
 
     // Index is sq.
     assert_raises(yp_getitem(sq, sq), yp_TypeError);
-
-    // Some types store references to the given objects and, thus, return exactly those objects.
-    if (type->original_object_return) {
-        ead(zero, yp_getitem(sq, int_0), assert_obj(zero, is, items[0]));
-        ead(one, yp_getitem(sq, int_1), assert_obj(one, is, items[1]));
-    }
 
     // Exception passthrough.
     assert_isexception(yp_getitem(sq, yp_SyntaxError), yp_SyntaxError);
@@ -573,8 +545,7 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
     obj_array_decref(items);
-    yp_decrefN(N(sq, empty, int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
-            int_SLICE_LAST, intstore_0));
+    yp_decrefN(N(sq, empty, intstore_0));
     return MUNIT_OK;
 }
 
@@ -984,16 +955,16 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     return MUNIT_OK;
 }
 
-static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixture)
+static void _test_setindexC(fixture_type_t *type,
+        void (*any_setindexC)(ypObject *, yp_ssize_t, ypObject *, ypObject **))
 {
-    fixture_type_t *type = fixture->type;
-    ypObject       *items[4];
+    ypObject *items[4];
     obj_array_fill(items, type->rand_items);
 
     // Immutables don't support setindex.
     if (!type->is_mutable) {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setindexC(sq, 0, items[2], &exc), yp_TypeError);
+        assert_raises_exc(any_setindexC(sq, 0, items[2], &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
@@ -1002,9 +973,9 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // Basic index.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_setindexC(sq, 0, items[2], &exc));
+        assert_not_raises_exc(any_setindexC(sq, 0, items[2], &exc));
         assert_sequence(sq, items[2], items[1]);
-        assert_not_raises_exc(yp_setindexC(sq, 1, items[3], &exc));
+        assert_not_raises_exc(any_setindexC(sq, 1, items[3], &exc));
         assert_sequence(sq, items[2], items[3]);
         yp_decref(sq);
     }
@@ -1012,9 +983,9 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // Negative index.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_setindexC(sq, -1, items[2], &exc));
+        assert_not_raises_exc(any_setindexC(sq, -1, items[2], &exc));
         assert_sequence(sq, items[0], items[2]);
-        assert_not_raises_exc(yp_setindexC(sq, -2, items[3], &exc));
+        assert_not_raises_exc(any_setindexC(sq, -2, items[3], &exc));
         assert_sequence(sq, items[3], items[2]);
         yp_decref(sq);
     }
@@ -1022,8 +993,8 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // Out of bounds.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setindexC(sq, 2, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setindexC(sq, -3, items[3], &exc), yp_IndexError);
+        assert_raises_exc(any_setindexC(sq, 2, items[2], &exc), yp_IndexError);
+        assert_raises_exc(any_setindexC(sq, -3, items[3], &exc), yp_IndexError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1033,7 +1004,7 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
         ypObject *sq_delitem = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_delindexC(sq_delitem, 1, &exc));
         assert_sequence(sq_delitem, items[0]);
-        assert_raises_exc(yp_setindexC(sq_delitem, 1, items[2], &exc), yp_IndexError);
+        assert_raises_exc(any_setindexC(sq_delitem, 1, items[2], &exc), yp_IndexError);
         assert_sequence(sq_delitem, items[0]);
         yp_decrefN(N(sq_delitem));
     }
@@ -1041,8 +1012,8 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // Empty sq.
     {
         ypObject *empty = type->newN(0);
-        assert_raises_exc(yp_setindexC(empty, 0, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setindexC(empty, -1, items[3], &exc), yp_IndexError);
+        assert_raises_exc(any_setindexC(empty, 0, items[2], &exc), yp_IndexError);
+        assert_raises_exc(any_setindexC(empty, -1, items[3], &exc), yp_IndexError);
         assert_len(empty, 0);
         yp_decref(empty);
     }
@@ -1050,8 +1021,8 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setindexC(sq, yp_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setindexC(sq, yp_SLICE_LAST, items[3], &exc), yp_IndexError);
+        assert_raises_exc(any_setindexC(sq, yp_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
+        assert_raises_exc(any_setindexC(sq, yp_SLICE_LAST, items[3], &exc), yp_IndexError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1061,10 +1032,10 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         if (type->is_string) {
-            assert_raises_exc(yp_setindexC(sq, 0, sq, &exc), yp_ValueError, yp_TypeError);
+            assert_raises_exc(any_setindexC(sq, 0, sq, &exc), yp_ValueError, yp_TypeError);
             assert_sequence(sq, items[0], items[1]);
         } else {
-            assert_not_raises_exc(yp_setindexC(sq, 0, sq, &exc));
+            assert_not_raises_exc(any_setindexC(sq, 0, sq, &exc));
             assert_sequence(sq, sq, items[1]);
             assert_not_raises_exc(yp_clear(sq, &exc));  // nohtyP does not yet break circular refs.
         }
@@ -1074,7 +1045,7 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // Duplicates: 0 is duplicated in sq, 1 shared between them.
     {
         ypObject *sq = type->newN(N(items[0], items[0], items[1], items[2]));
-        assert_not_raises_exc(yp_setindexC(sq, 3, items[1], &exc));
+        assert_not_raises_exc(any_setindexC(sq, 3, items[1], &exc));
         assert_sequence(sq, items[0], items[0], items[1], items[1]);
         yp_decref(sq);
     }
@@ -1082,13 +1053,18 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_setindexC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_setindexC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
 
 tear_down:
     obj_array_decref(items);
+}
+
+static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixture)
+{
+    _test_setindexC(fixture->type, yp_setindexC);
     return MUNIT_OK;
 }
 
@@ -1381,111 +1357,25 @@ tear_down:
     return MUNIT_OK;
 }
 
-// FIXME Share tests with test_setindexC/etc. And the others too.
+static void setindexC_to_setitem(ypObject *sq, yp_ssize_t i, ypObject *x, ypObject **exc)
+{
+    ypObject *int_i = yp_intC(i);
+    yp_setitem(sq, int_i, x, exc);
+    yp_decref(int_i);
+}
+
 static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *int_0 = yp_intC(0);
-    ypObject       *int_1 = yp_intC(1);
-    ypObject       *int_2 = yp_intC(2);
-    ypObject       *int_3 = yp_intC(3);
-    ypObject       *int_neg_1 = yp_intC(-1);
-    ypObject       *int_neg_2 = yp_intC(-2);
-    ypObject       *int_neg_3 = yp_intC(-3);
-    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
-    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
     ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[4];
     obj_array_fill(items, type->rand_items);
 
-    // Immutables don't support setitem.
-    if (!type->is_mutable) {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setitem(sq, int_0, items[2], &exc), yp_TypeError);
-        assert_sequence(sq, items[0], items[1]);
-        yp_decref(sq);
-        goto tear_down;  // Skip remaining tests.
-    }
+    // Shared tests.
+    _test_setindexC(fixture->type, yp_setindexC);
 
-    // Basic index.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_setitem(sq, int_0, items[2], &exc));
-        assert_sequence(sq, items[2], items[1]);
-        assert_not_raises_exc(yp_setitem(sq, int_1, items[3], &exc));
-        assert_sequence(sq, items[2], items[3]);
-        yp_decref(sq);
-    }
-
-    // Negative index.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_setitem(sq, int_neg_1, items[2], &exc));
-        assert_sequence(sq, items[0], items[2]);
-        assert_not_raises_exc(yp_setitem(sq, int_neg_2, items[3], &exc));
-        assert_sequence(sq, items[3], items[2]);
-        yp_decref(sq);
-    }
-
-    // Out of bounds.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setitem(sq, int_2, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setitem(sq, int_neg_3, items[3], &exc), yp_IndexError);
-        assert_sequence(sq, items[0], items[1]);
-        yp_decref(sq);
-    }
-
-    // Previously-deleted index.
-    {
-        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_delitem(sq_delitem, int_1, &exc));
-        assert_sequence(sq_delitem, items[0]);
-        assert_raises_exc(yp_setitem(sq_delitem, int_1, items[2], &exc), yp_IndexError);
-        assert_sequence(sq_delitem, items[0]);
-        yp_decrefN(N(sq_delitem));
-    }
-
-    // Empty sq.
-    {
-        ypObject *empty = type->newN(0);
-        assert_raises_exc(yp_setitem(empty, int_0, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setitem(empty, int_neg_1, items[3], &exc), yp_IndexError);
-        assert_len(empty, 0);
-        yp_decref(empty);
-    }
-
-    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setitem(sq, int_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setitem(sq, int_SLICE_LAST, items[3], &exc), yp_IndexError);
-        assert_sequence(sq, items[0], items[1]);
-        yp_decref(sq);
-    }
-
-    // x is sq. Recall strings are restrictive about the objects they accept.
-    // TODO Add similar tests to test_string, where sq is 0, 1, and 2 items.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        if (type->is_string) {
-            assert_raises_exc(yp_setitem(sq, int_0, sq, &exc), yp_ValueError, yp_TypeError);
-            assert_sequence(sq, items[0], items[1]);
-        } else {
-            assert_not_raises_exc(yp_setitem(sq, int_0, sq, &exc));
-            assert_sequence(sq, sq, items[1]);
-            assert_not_raises_exc(yp_clear(sq, &exc));  // nohtyP does not yet break circular refs.
-        }
-        yp_decref(sq);
-    }
-
-    // Duplicates: 0 is duplicated in sq, 1 shared between them.
-    {
-        ypObject *sq = type->newN(N(items[0], items[0], items[1], items[2]));
-        assert_not_raises_exc(yp_setitem(sq, int_3, items[1], &exc));
-        assert_sequence(sq, items[0], items[0], items[1], items[1]);
-        yp_decref(sq);
-    }
+    // Remaining tests only apply to mutable objects.
+    if (!type->is_mutable) goto tear_down;
 
     // intstore.
     {
@@ -1507,15 +1397,13 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         assert_isexception_exc(yp_setitem(sq, yp_SyntaxError, items[2], &exc), yp_SyntaxError);
-        assert_isexception_exc(yp_setitem(sq, int_0, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(int_0, int_1, int_2, int_3, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
-            int_SLICE_LAST, intstore_0));
+    yp_decrefN(N(intstore_0));
     return MUNIT_OK;
 }
 
@@ -1577,7 +1465,7 @@ static void _test_delindexC(fixture_type_t *type,
     // Previously-deleted index.
     {
         ypObject *sq_delitem = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(any_delindexC(sq_delitem, 1, &exc));
+        assert_not_raises_exc(yp_delindexC(sq_delitem, 1, &exc));
         assert_sequence(sq_delitem, items[0]);
         assert_not_found_exc(any_delindexC(sq_delitem, 1, &exc));
         assert_sequence(sq_delitem, items[0]);
@@ -1753,97 +1641,19 @@ tear_down:
     return MUNIT_OK;
 }
 
-static void _test_delitem(
-        fixture_type_t *type, void (*any_delitem)(ypObject *, ypObject *, ypObject **), int raises)
+static void _test_delitem(fixture_type_t *type,
+        void (*any_delindexC)(ypObject *, yp_ssize_t, ypObject **),
+        void (*any_delitem)(ypObject *, ypObject *, ypObject **), int raises)
 {
-    ypObject *int_0 = yp_intC(0);
-    ypObject *int_1 = yp_intC(1);
-    ypObject *int_2 = yp_intC(2);
-    ypObject *int_neg_1 = yp_intC(-1);
-    ypObject *int_neg_2 = yp_intC(-2);
-    ypObject *int_neg_3 = yp_intC(-3);
-    ypObject *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
-    ypObject *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
     ypObject *intstore_0 = yp_intstoreC(0);
     ypObject *items[4];
     obj_array_fill(items, type->rand_items);
 
-    // Immutables don't support delitem.
-    if (!type->is_mutable) {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(any_delitem(sq, int_0, &exc), yp_TypeError);
-        assert_sequence(sq, items[0], items[1]);
-        yp_decref(sq);
-        goto tear_down;  // Skip remaining tests.
-    }
+    // Shared tests.
+    _test_delindexC(type, any_delindexC, raises);
 
-#define assert_not_found_exc(expression)            \
-    do {                                            \
-        ypObject *exc = yp_None;                    \
-        (expression);                               \
-        if (raises) {                               \
-            assert_isexception(exc, yp_IndexError); \
-        } else {                                    \
-            assert_obj(exc, is, yp_None);           \
-        }                                           \
-    } while (0)
-
-    // Basic index.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
-        assert_not_raises_exc(any_delitem(sq, int_0, &exc));
-        assert_sequence(sq, items[1], items[2]);
-        assert_not_raises_exc(any_delitem(sq, int_1, &exc));
-        assert_sequence(sq, items[1]);
-        yp_decref(sq);
-    }
-
-    // Negative index.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
-        assert_not_raises_exc(any_delitem(sq, int_neg_1, &exc));
-        assert_sequence(sq, items[0], items[1]);
-        assert_not_raises_exc(any_delitem(sq, int_neg_2, &exc));
-        assert_sequence(sq, items[1]);
-        yp_decref(sq);
-    }
-
-    // Out of bounds.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_not_found_exc(any_delitem(sq, int_2, &exc));
-        assert_not_found_exc(any_delitem(sq, int_neg_3, &exc));
-        assert_sequence(sq, items[0], items[1]);
-        yp_decref(sq);
-    }
-
-    // Previously-deleted index.
-    {
-        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(any_delitem(sq_delitem, int_1, &exc));
-        assert_sequence(sq_delitem, items[0]);
-        assert_not_found_exc(any_delitem(sq_delitem, int_1, &exc));
-        assert_sequence(sq_delitem, items[0]);
-        yp_decrefN(N(sq_delitem));
-    }
-
-    // Empty sq.
-    {
-        ypObject *empty = type->newN(0);
-        assert_not_found_exc(any_delitem(empty, int_0, &exc));
-        assert_not_found_exc(any_delitem(empty, int_neg_1, &exc));
-        assert_len(empty, 0);
-        yp_decref(empty);
-    }
-
-    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_not_found_exc(any_delitem(sq, int_SLICE_DEFAULT, &exc));
-        assert_not_found_exc(any_delitem(sq, int_SLICE_LAST, &exc));
-        assert_sequence(sq, items[0], items[1]);
-        yp_decref(sq);
-    }
+    // Remaining tests only apply to mutable objects.
+    if (!type->is_mutable) goto tear_down;
 
     // intstore.
     {
@@ -1869,23 +1679,34 @@ static void _test_delitem(
         yp_decref(sq);
     }
 
-#undef assert_not_found_exc
-
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
-            int_SLICE_LAST, intstore_0));
+    yp_decrefN(N(intstore_0));
+}
+
+static void delindexC_to_delitem(ypObject *sq, yp_ssize_t i, ypObject **exc)
+{
+    ypObject *int_i = yp_intC(i);
+    yp_delitem(sq, int_i, exc);
+    yp_decref(int_i);
 }
 
 static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixture)
 {
-    _test_delitem(fixture->type, yp_delitem, /*raises=*/TRUE);
+    _test_delitem(fixture->type, delindexC_to_delitem, yp_delitem, /*raises=*/TRUE);
     return MUNIT_OK;
+}
+
+static void dropindexC_to_dropitem(ypObject *sq, yp_ssize_t i, ypObject **exc)
+{
+    ypObject *int_i = yp_intC(i);
+    yp_dropitem(sq, int_i, exc);
+    yp_decref(int_i);
 }
 
 static MunitResult test_dropitem(const MunitParameter params[], fixture_t *fixture)
 {
-    _test_delitem(fixture->type, yp_dropitem, /*raises=*/FALSE);
+    _test_delitem(fixture->type, dropindexC_to_dropitem, yp_dropitem, /*raises=*/FALSE);
     return MUNIT_OK;
 }
 

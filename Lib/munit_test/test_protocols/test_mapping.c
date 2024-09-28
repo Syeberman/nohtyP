@@ -611,7 +611,7 @@ static void _test_delitem(
     // Previously-deleted key.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_not_raises_exc(any_delitem(mp, keys[1], &exc));
+        assert_not_raises_exc(yp_delitem(mp, keys[1], &exc));
         assert_mapping(mp, keys[0], values[0]);
         assert_not_found_exc(any_delitem(mp, keys[1], &exc));
         assert_mapping(mp, keys[0], values[0]);
