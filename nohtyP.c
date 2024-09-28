@@ -3113,7 +3113,7 @@ static ypTypeObject ypIter_Type = {
 
 // Public functions
 
-// FIXME FIXME Compare against Python's __length_hint__ now that it's official.
+// FIXME Compare against Python's __length_hint__ now that it's official.
 yp_ssize_t yp_length_hintC(ypObject *i, ypObject **exc)
 {
     yp_ssize_t length_hint;

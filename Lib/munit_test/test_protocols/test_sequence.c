@@ -18,6 +18,28 @@ typedef struct _slice_args_t {
 } slice_args_t;
 
 
+// The test_contains in test_collection checks for the behaviour shared amongst all collections;
+// this test_contains considers the behaviour unique to sequences.
+static MunitResult test_contains(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Previously-deleted item.
+    if (type->is_mutable) {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_delindexC(sq, 0, &exc));
+        assert_obj(yp_contains(sq, items[0]), is, yp_False);
+        assert_obj(yp_in(items[0], sq), is, yp_False);
+        assert_obj(yp_not_in(items[0], sq), is, yp_True);
+        yp_decrefN(N(sq));
+    }
+
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
 static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
@@ -2490,22 +2512,22 @@ tear_down:
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
 
-MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
-        TEST(test_repeatC, test_sequence_params), TEST(test_getindexC, test_sequence_params),
-        TEST(test_getsliceC, test_sequence_params), TEST(test_getitem, test_sequence_params),
-        TEST(test_getdefault, test_sequence_params), TEST(test_findC, test_sequence_params),
-        TEST(test_indexC, test_sequence_params), TEST(test_rfindC, test_sequence_params),
-        TEST(test_rindexC, test_sequence_params), TEST(test_countC, test_sequence_params),
-        TEST(test_setindexC, test_sequence_params), TEST(test_setsliceC, test_sequence_params),
-        TEST(test_setitem, test_sequence_params), TEST(test_delindexC, test_sequence_params),
-        TEST(test_dropindexC, test_sequence_params), TEST(test_delsliceC, test_sequence_params),
-        TEST(test_delitem, test_sequence_params), TEST(test_dropitem, test_sequence_params),
-        TEST(test_append, test_sequence_params), TEST(test_push, test_sequence_params),
-        TEST(test_extend, test_sequence_params), TEST(test_irepeatC, test_sequence_params),
-        TEST(test_insertC, test_sequence_params), TEST(test_popindexC, test_sequence_params),
-        TEST(test_pop, test_sequence_params), TEST(test_remove, test_sequence_params),
-        TEST(test_discard, test_sequence_params), TEST(test_reverse, test_sequence_params),
-        TEST(test_sort, test_sequence_params), {NULL}};
+MunitTest test_sequence_tests[] = {TEST(test_contains, test_sequence_params),
+        TEST(test_concat, test_sequence_params), TEST(test_repeatC, test_sequence_params),
+        TEST(test_getindexC, test_sequence_params), TEST(test_getsliceC, test_sequence_params),
+        TEST(test_getitem, test_sequence_params), TEST(test_getdefault, test_sequence_params),
+        TEST(test_findC, test_sequence_params), TEST(test_indexC, test_sequence_params),
+        TEST(test_rfindC, test_sequence_params), TEST(test_rindexC, test_sequence_params),
+        TEST(test_countC, test_sequence_params), TEST(test_setindexC, test_sequence_params),
+        TEST(test_setsliceC, test_sequence_params), TEST(test_setitem, test_sequence_params),
+        TEST(test_delindexC, test_sequence_params), TEST(test_dropindexC, test_sequence_params),
+        TEST(test_delsliceC, test_sequence_params), TEST(test_delitem, test_sequence_params),
+        TEST(test_dropitem, test_sequence_params), TEST(test_append, test_sequence_params),
+        TEST(test_push, test_sequence_params), TEST(test_extend, test_sequence_params),
+        TEST(test_irepeatC, test_sequence_params), TEST(test_insertC, test_sequence_params),
+        TEST(test_popindexC, test_sequence_params), TEST(test_pop, test_sequence_params),
+        TEST(test_remove, test_sequence_params), TEST(test_discard, test_sequence_params),
+        TEST(test_reverse, test_sequence_params), TEST(test_sort, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}

@@ -24,6 +24,16 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     ypObject       *keys[2];
     obj_array_fill(keys, type->rand_items);
 
+    // Previously-deleted key.
+    if (type->is_mutable) {
+        ypObject *self = type->newN(N(keys[0], keys[1]));
+        assert_not_raises_exc(yp_delitem(self, keys[0], &exc));
+        assert_obj(yp_contains(self, keys[0]), is, yp_False);
+        assert_obj(yp_in(keys[0], self), is, yp_False);
+        assert_obj(yp_not_in(keys[0], self), is, yp_True);
+        yp_decrefN(N(self));
+    }
+
     // Item is unhashable.
     {
         ypObject *mp = type->newN(N(keys[0], keys[1]));

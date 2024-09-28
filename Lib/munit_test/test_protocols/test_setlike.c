@@ -33,6 +33,16 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     ypObject       *items[4];
     obj_array_fill(items, type->rand_items);
 
+    // Previously-deleted item.
+    if (type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_remove(so, items[1], &exc));
+        assert_obj(yp_contains(so, items[1]), is, yp_False);
+        assert_obj(yp_in(items[1], so), is, yp_False);
+        assert_obj(yp_not_in(items[1], so), is, yp_True);
+        yp_decrefN(N(so));
+    }
+
     // Item is unhashable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
@@ -1366,7 +1376,16 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(so, x));
     }
 
-    // FIXME previously-delete (and elsewhere)
+    // Previously-deleted item.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1]));
+        assert_not_raises_exc(yp_remove(so, items[1], &exc));
+        assert_setlike(so, items[0]);
+        assert_not_raises_exc(yp_update(so, x, &exc));
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+    }
 
     // so is empty.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
@@ -1540,6 +1559,17 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
         yp_decrefN(N(so, x));
     }
 
+    // Previously-deleted item.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_remove(so, items[0], &exc));
+        assert_setlike(so, items[1]);
+        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+        assert_setlike(so, items[1]);
+        yp_decrefN(N(so, x));
+    }
+
     // so is empty.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(0);
@@ -1694,6 +1724,17 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
         ypObject *x = (*x_type)->newN(N(items[1], items[2]));
         assert_not_raises_exc(yp_difference_update(so, x, &exc));
         assert_setlike(so, items[0]);
+        yp_decrefN(N(so, x));
+    }
+
+    // Previously-deleted item.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_remove(so, items[1], &exc));
+        assert_setlike(so, items[0]);
+        assert_not_raises_exc(yp_difference_update(so, x, &exc));
+        assert_len(so, 0);
         yp_decrefN(N(so, x));
     }
 
@@ -1852,6 +1893,17 @@ static MunitResult test_symmetric_difference_update(
         ypObject *x = (*x_type)->newN(N(items[1], items[2]));
         assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
         assert_setlike(so, items[0], items[2]);
+        yp_decrefN(N(so, x));
+    }
+
+    // Previously-deleted item.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[2]));
+        assert_not_raises_exc(yp_remove(so, items[1], &exc));
+        assert_setlike(so, items[0]);
+        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
+        assert_setlike(so, items[0], items[1], items[2]);
         yp_decrefN(N(so, x));
     }
 
@@ -2031,6 +2083,16 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(so));
     }
 
+    // Previously-deleted item.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_remove(so, items[1], &exc));
+        assert_setlike(so, items[0]);
+        assert_not_raises_exc(yp_push(so, items[1], &exc));
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
     // so is empty.
     {
         ypObject *so = type->newN(0);
@@ -2107,6 +2169,16 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_raises_exc(yp_pushunique(so, items[1], &exc), yp_KeyError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // Previously-deleted item.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_remove(so, items[1], &exc));
+        assert_setlike(so, items[0]);
+        assert_not_raises_exc(yp_pushunique(so, items[1], &exc));
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -2199,6 +2271,16 @@ static void _test_remove(
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_found_exc(any_remove(so, items[2], &exc));
         assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // Previously-deleted item.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_remove(so, items[1], &exc));
+        assert_setlike(so, items[0]);
+        assert_not_found_exc(any_remove(so, items[1], &exc));
+        assert_setlike(so, items[0]);
         yp_decrefN(N(so));
     }
 

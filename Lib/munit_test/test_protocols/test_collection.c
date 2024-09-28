@@ -40,6 +40,16 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
         yp_decrefN(N(self));
     }
 
+    // Previously-deleted item.
+    if (type->is_mutable) {
+        ypObject *self = type->newN(N(items[0]));
+        assert_not_raises_exc(yp_clear(self, &exc));
+        assert_obj(yp_contains(self, items[0]), is, yp_False);
+        assert_obj(yp_in(items[0], self), is, yp_False);
+        assert_obj(yp_not_in(items[0], self), is, yp_True);
+        yp_decrefN(N(self));
+    }
+
     // self is empty.
     {
         ypObject *self = type->newN(0);
