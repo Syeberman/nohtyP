@@ -756,7 +756,9 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
     do {                                                                                          \
         yp_ssize_t _ypmt_FLT_ITR_len = yp_lenC_not_raises(iter_supplier);                         \
         ypObject  *_ypmt_FLT_ITR_expected[] = {yp_SyntaxError};                                   \
-        assert_ssizeC(_ypmt_FLT_ITR_len, >, 1);                                                   \
+        if (_ypmt_FLT_ITR_len < 2) {                                                              \
+            munit_error("iter_supplier must contain at least two entries");                       \
+        }                                                                                         \
         /* x is an iterator that fails at the start. */                                           \
         _faulty_iter_test_raises(setup, iter_name,                                                \
                 new_faulty_iter(iter_supplier, 0, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,  \

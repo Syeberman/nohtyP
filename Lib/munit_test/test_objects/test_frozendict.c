@@ -351,8 +351,16 @@ static ypObject *new_to_call_args_t_dict(ypObject *iterable)
     return yp_callN(yp_t_dict, 1, iterable);
 }
 
-// FIXME call t_frozendict/t_dict with a bad iterator (exception handling)...and can we make
-// _ypDict_update_fromdict fail? (frozendict_func_new_code coverage)
+// For faulty_iter_tests in test_call_type, the faulty iterator needs to be inside an args tuple.
+static ypObject *test_call_type_faulty_iter_helper(
+        ypObject *type, ypObject *iterable, ypObject *kwargs)
+{
+    ypObject *args = yp_tupleN(N(iterable));
+    ypObject *result = yp_call_stars(type, args, kwargs);
+    yp_decref(args);
+    return result;
+}
+
 static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
@@ -476,6 +484,17 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
                 yp_callN(type->type, N(yp_frozendict_empty, yp_frozendict_empty)), yp_TypeError);
         assert_raises(yp_call_stars(type->type, args_two, yp_frozendict_empty), yp_TypeError);
         yp_decrefN(N(args_two));
+    }
+
+    // Iterator exceptions and bad length hints when merged with keyword arguments.
+    {
+        ypObject *kwargs = yp_frozendictK(K(str_rand, values[2]));
+        faulty_iter_tests(ypObject * mp, x,
+                new_itemsK(fixture_type_tuple, K(keys[0], values[0], keys[1], values[1])),
+                mp = test_call_type_faulty_iter_helper(type->type, x, kwargs),
+                assert_mapping(mp, keys[0], values[0], keys[1], values[1], str_rand, values[2]),
+                yp_decref(mp));
+        yp_decref(kwargs);
     }
 
     // Exception passthrough.
