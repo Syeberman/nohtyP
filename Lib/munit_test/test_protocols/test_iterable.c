@@ -20,17 +20,17 @@
 
 
 // TODO More test cases are needed here.
-static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixture)
+static void _test_miniiter(
+        fixture_type_t *type, ypObject *(*any_miniiter)(ypObject *, yp_uint64_t *))
 {
-    fixture_type_t *type = fixture->type;
-    ypObject       *items[2];
+    ypObject *items[2];
     obj_array_fill(items, type->rand_items);
 
     // miniiters created with a specific number of items should have exact length hints.
     {
         yp_uint64_t mi_state;
         ypObject   *x = type->newN(N(items[0], items[1]));
-        ypObject   *mi = yp_miniiter(x, &mi_state);
+        ypObject   *mi = any_miniiter(x, &mi_state);
 
         assert_ssizeC_exc(yp_miniiter_length_hintC(mi, &mi_state, &exc), ==, 2);
         ead(next, yp_miniiter_next(mi, &mi_state), assert_not_raises(next));
@@ -44,6 +44,80 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     }
 
     obj_array_decref(items);
+}
+
+static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixture)
+{
+    _test_miniiter(fixture->type, yp_miniiter);
+    return MUNIT_OK;
+}
+
+static MunitResult test_miniiter_keys(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[2];
+    obj_array_fill(items, type->rand_items);
+
+    // Only mapping types support yp_miniiter_keys.
+    if (!type->is_mapping) {
+        yp_uint64_t mi_state;
+        ypObject   *x = type->newN(N(items[0], items[1]));
+        assert_raises(yp_miniiter_keys(x, &mi_state), yp_MethodError);
+        yp_decref(x);
+        goto tear_down;
+    }
+
+    // Shared tests.
+    _test_miniiter(fixture->type, yp_miniiter_keys);
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_miniiter_values(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[2];
+    obj_array_fill(items, type->rand_items);
+
+    // Only mapping types support yp_miniiter_values.
+    if (!type->is_mapping) {
+        yp_uint64_t mi_state;
+        ypObject   *x = type->newN(N(items[0], items[1]));
+        assert_raises(yp_miniiter_values(x, &mi_state), yp_MethodError);
+        yp_decref(x);
+        goto tear_down;
+    }
+
+    // Shared tests.
+    _test_miniiter(fixture->type, yp_miniiter_values);
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_miniiter_items(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[2];
+    obj_array_fill(items, type->rand_items);
+
+    // Only mapping types support yp_miniiter_items.
+    if (!type->is_mapping) {
+        yp_uint64_t mi_state;
+        ypObject   *x = type->newN(N(items[0], items[1]));
+        assert_raises(yp_miniiter_items(x, &mi_state), yp_MethodError);
+        yp_decref(x);
+        goto tear_down;
+    }
+
+    // Shared tests.
+    _test_miniiter(fixture->type, yp_miniiter_items);
+
+tear_down:
+    obj_array_decref(items);
     return MUNIT_OK;
 }
 
@@ -51,6 +125,9 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
 static MunitParameterEnum test_iterable_params[] = {
         {param_key_type, param_values_types_iterable}, {NULL}};
 
-MunitTest test_iterable_tests[] = {TEST(test_miniiter, test_iterable_params), {NULL}};
+MunitTest test_iterable_tests[] = {TEST(test_miniiter, test_iterable_params),
+        TEST(test_miniiter_keys, test_iterable_params),
+        TEST(test_miniiter_values, test_iterable_params),
+        TEST(test_miniiter_items, test_iterable_params), {NULL}};
 
 extern void test_iterable_initialize(void) {}

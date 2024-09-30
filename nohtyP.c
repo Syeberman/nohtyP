@@ -17580,7 +17580,7 @@ static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *de
     result = _ypSet_lookkey_bycurrenthash(keyset, key, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the there's no existing value, return defval, otherwise return the value
+    // If there's no existing value, return defval, otherwise return the value
     value = *ypDict_VALUE_ENTRY(mp, key_loc);
     if (value == NULL) {
         if (defval == NULL) return yp_KeyError;

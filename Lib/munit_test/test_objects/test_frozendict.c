@@ -14,6 +14,20 @@
     {fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
             fixture_type_dict_dirty, NULL}
 
+// A copy of ypDictMiState from nohtyP.c.
+typedef struct {
+    yp_uint32_t keys : 1;
+    yp_uint32_t itemsleft : 31;
+    yp_uint32_t values : 1;
+    yp_uint32_t index : 31;
+} ypDictMiState;
+
+// Defines an mi_state for use with frozendicts/dicts, which can be accessed by the variable name,
+// declared as "const yp_uint64_t".
+#define frozendict_mi_state(name, keys, values, itemsleft, index)                  \
+    ypDictMiState     _##name##_struct = {(keys), (itemsleft), (values), (index)}; \
+    const yp_uint64_t name = *((yp_uint64_t *)&_##name##_struct)
+
 
 static void _test_newK(
         fixture_type_t *type, ypObject *(*any_newK)(int, ...), int test_exception_passthrough)
@@ -337,6 +351,8 @@ static ypObject *new_to_call_args_t_dict(ypObject *iterable)
     return yp_callN(yp_t_dict, 1, iterable);
 }
 
+// FIXME call t_frozendict/t_dict with a bad iterator (exception handling)...and can we make
+// _ypDict_update_fromdict fail? (frozendict_func_new_code coverage)
 static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
@@ -734,6 +750,103 @@ static MunitResult test_fromkeys(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
+// frozendict- and dict-specific miniiter tests; see test_iterable for more tests.
+static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    frozendict_mi_state(k_itemsleft_255_index_255, 1, 0, 255, 255);
+    frozendict_mi_state(kv_itemsleft_2_index_0, 1, 1, 2, 0);
+    frozendict_mi_state(k_itemsleft_2_index_0, 1, 0, 2, 0);
+    frozendict_mi_state(v_itemsleft_2_index_0, 0, 1, 2, 0);
+    frozendict_mi_state(nokv_itemsleft_2_index_0, 0, 0, 2, 0);  // keys=0, values=0
+    frozendict_mi_state(k_itemsleft_1_index_0, 1, 0, 1, 0);
+    frozendict_mi_state(k_itemsleft_0_index_0, 1, 0, 0, 0);
+    ypObject *keys[4];
+    ypObject *values[4];
+    obj_array_fill(keys, type->rand_items);
+    obj_array_fill(values, type->rand_values);
+
+    // Corrupted states.
+    {
+        yp_uint64_t mi_state;
+        yp_ssize_t  i;
+        yp_uint64_t bad_states[] = {0uLL, (yp_uint64_t)-1, k_itemsleft_255_index_255};
+        ypObject   *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject   *mi = yp_miniiter(mp, &mi_state);
+        munit_assert_uint64(mi_state, ==, k_itemsleft_2_index_0);
+
+        for (i = 0; i < yp_lengthof_array(bad_states); i++) {
+            mi_state = bad_states[i];
+            assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
+            munit_assert_uint64(mi_state, ==, bad_states[i]);  // unchanged
+
+            assert_ssizeC_exc(yp_miniiter_length_hintC(mi, &mi_state, &exc), ==, 0);
+            munit_assert_uint64(mi_state, ==, bad_states[i]);  // unchanged
+        }
+
+        yp_decrefN(N(mp, mi));
+    }
+
+    // Trigger the `index >= ypDict_ALLOCLEN(mp)` case in the loop of *_next. itemsleft usually
+    // terminates iteration, but if itemsleft is corrupted, or if an entry is removed from mp, then
+    // we need to ensure we stop at alloclen.
+    {
+        yp_uint64_t mi_state;
+        ypObject   *mp = type->newK(0);
+        ypObject   *mi = yp_miniiter(mp, &mi_state);
+        munit_assert_uint64(mi_state, ==, k_itemsleft_0_index_0);
+
+        mi_state = k_itemsleft_1_index_0;
+        assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
+        // itemsleft set to zero to exhaust the iterator
+        munit_assert_uint64(mi_state, ==, k_itemsleft_0_index_0);
+
+        yp_decrefN(N(mp, mi));
+    }
+
+    // yp_miniiter_next requires keys=1 and/or values=1.
+    {
+        yp_uint64_t mi_state;
+        ypObject   *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject   *mi = yp_miniiter(mp, &mi_state);
+        munit_assert_uint64(mi_state, ==, k_itemsleft_2_index_0);
+
+        mi_state = nokv_itemsleft_2_index_0;
+        assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
+        // mi_state is changed because the check for `keys || values` is after the index is yielded.
+        munit_assert_uint32(((ypDictMiState *)&mi_state)->keys, ==, 0);
+        munit_assert_uint32(((ypDictMiState *)&mi_state)->values, ==, 0);
+        munit_assert_uint32(((ypDictMiState *)&mi_state)->itemsleft, ==, 1);
+        munit_assert_uint32(((ypDictMiState *)&mi_state)->index, >, 0);
+
+        yp_decrefN(N(mp, mi));
+    }
+
+    // yp_miniiter_items_next requires keys=1 and values=1.
+    {
+        yp_uint64_t mi_state;
+        yp_ssize_t  i;
+        yp_uint64_t bad_states[] = {
+                k_itemsleft_2_index_0, v_itemsleft_2_index_0, nokv_itemsleft_2_index_0};
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *mi = yp_miniiter_items(mp, &mi_state);
+        munit_assert_uint64(mi_state, ==, kv_itemsleft_2_index_0);
+
+        for (i = 0; i < yp_lengthof_array(bad_states); i++) {
+            ypObject *value = NULL;
+            mi_state = bad_states[i];
+            assert_raises_exc(yp_miniiter_items_next(mi, &mi_state, &exc, &value), yp_TypeError);
+            assert_isexception(value, yp_TypeError);
+            munit_assert_uint64(mi_state, ==, bad_states[i]);  // unchanged
+        }
+        yp_decrefN(N(mp, mi));
+    }
+
+    obj_array_decref(values);
+    obj_array_decref(keys);
+    return MUNIT_OK;
+}
+
 
 char *param_values_test_frozendict[] = {
         "frozendict", "dict", "frozendict_dirty", "dict_dirty", NULL};
@@ -744,7 +857,7 @@ static MunitParameterEnum test_frozendict_params[] = {
 MunitTest test_frozendict_tests[] = {TEST(test_newK, test_frozendict_params),
         TEST(test_new, test_frozendict_params), TEST(test_call_type, test_frozendict_params),
         TEST(test_fromkeysN, test_frozendict_params), TEST(test_fromkeys, test_frozendict_params),
-        {NULL}};
+        TEST(test_miniiter, test_frozendict_params), {NULL}};
 
 
 extern void test_frozendict_initialize(void) {}

@@ -13,6 +13,18 @@
     {fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
             fixture_type_set_dirty, NULL}
 
+// A copy of ypSetMiState from nohtyP.c, for use with frozenset_mi_state.
+typedef struct {
+    yp_uint32_t keysleft;
+    yp_uint32_t index;
+} ypSetMiState;
+
+// Defines an mi_state for use with frozensets/sets, which can be accessed by the variable name,
+// declared as "const yp_uint64_t".
+#define frozenset_mi_state(name, keysleft, index)               \
+    ypSetMiState      _##name##_struct = {(keysleft), (index)}; \
+    const yp_uint64_t name = *((yp_uint64_t *)&_##name##_struct)
+
 
 static void _test_newN(
         fixture_type_t *type, ypObject *(*any_newN)(int, ...), int test_exception_passthrough)
@@ -375,16 +387,21 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[2];
+    frozenset_mi_state(keysleft_255_index_255, 255, 255);
+    frozenset_mi_state(keysleft_2_index_0, 2, 0);
+    frozenset_mi_state(keysleft_1_index_0, 1, 0);
+    frozenset_mi_state(keysleft_0_index_0, 0, 0);
+    ypObject *items[2];
     obj_array_fill(items, type->rand_items);
 
     // Corrupted states.
     {
+        yp_uint64_t bad_states[] = {0uLL, (yp_uint64_t)-1, keysleft_255_index_255};
         yp_uint64_t mi_state;
         yp_ssize_t  i;
-        yp_uint64_t bad_states[] = {0uLL, (yp_uint64_t)-1, 0x000000FF000000FFuLL};
         ypObject   *so = type->newN(N(items[0], items[1]));
         ypObject   *mi = yp_miniiter(so, &mi_state);
+        munit_assert_uint64(mi_state, ==, keysleft_2_index_0);
 
         for (i = 0; i < yp_lengthof_array(bad_states); i++) {
             mi_state = bad_states[i];
@@ -405,11 +422,12 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
         yp_uint64_t mi_state;
         ypObject   *so = type->newN(0);
         ypObject   *mi = yp_miniiter(so, &mi_state);
-        munit_assert_uint64(mi_state, ==, 0uLL);
+        munit_assert_uint64(mi_state, ==, keysleft_0_index_0);
 
-        mi_state = 0x0000000000000001uLL;  // index=0, keysleft=1
+        mi_state = keysleft_1_index_0;
         assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
-        munit_assert_uint64(mi_state, ==, 0uLL);  // keysleft set to zero to exhaust the iterator
+        // keysleft is set to zero to exhaust the iterator.
+        munit_assert_uint64(mi_state, ==, keysleft_0_index_0);
 
         yp_decrefN(N(so, mi));
     }
