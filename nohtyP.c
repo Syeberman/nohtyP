@@ -3350,6 +3350,18 @@ ypObject *yp_iter2(ypObject *callable, ypObject *sentinel)
 }
 
 
+// Iter constructors for filter.
+
+ypObject *yp_filter(ypObject *function, ypObject *iterable) { return yp_NotImplementedError; }
+ypObject *yp_filterfalse(ypObject *function, ypObject *iterable) { return yp_NotImplementedError; }
+
+
+// Iter constructors for zip.
+
+ypObject *yp_zipN(int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_zipNV(int n, va_list args) { return yp_NotImplementedError; }
+
+
 // Generic Mini Iterator Methods for Sequences
 
 yp_STATIC_ASSERT(yp_sizeof(yp_uint64_t) >= yp_sizeof(yp_ssize_t), ssize_fits_uint64);
@@ -3780,6 +3792,23 @@ _ypBool_PUBLIC_CMP_FUNCTION(eq, eq, ypBool_FROM_C(x == y));
 _ypBool_PUBLIC_CMP_FUNCTION(ne, ne, ypBool_FROM_C(x != y));
 _ypBool_PUBLIC_CMP_FUNCTION(ge, le, yp_TypeError);
 _ypBool_PUBLIC_CMP_FUNCTION(gt, lt, yp_TypeError);
+
+ypObject *yp_max_keyN(ypObject *key, int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_max_keyNV(ypObject *key, int n, va_list args) { return yp_NotImplementedError; }
+ypObject *yp_min_keyN(ypObject *key, int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_min_keyNV(ypObject *key, int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_maxN(int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_maxNV(int n, va_list args) { return yp_NotImplementedError; }
+ypObject *yp_minN(int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_minNV(int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_max_key(ypObject *iterable, ypObject *key) { return yp_NotImplementedError; }
+ypObject *yp_min_key(ypObject *iterable, ypObject *key) { return yp_NotImplementedError; }
+
+ypObject *yp_max(ypObject *iterable) { return yp_NotImplementedError; }
+ypObject *yp_min(ypObject *iterable) { return yp_NotImplementedError; }
+
 
 // XXX Remember, an immutable container may hold mutable objects; yp_hashC must fail in that case
 // TODO Need to decide whether to keep pre-computed hash in ypObject and, if so, if we can remove
@@ -5574,6 +5603,16 @@ void yp_divmod(ypObject *x, ypObject *y, ypObject **div, ypObject **mod)
     }
 }
 
+ypObject *yp_pow3(ypObject *x, ypObject *y, ypObject *z) { return yp_NotImplementedError; }
+void      yp_ipow4(ypObject *x, ypObject *y, ypObject *z, ypObject **exc)
+{
+    return_yp_EXC_ERR(exc, yp_NotImplementedError);
+}
+void yp_ipowC4(ypObject *x, yp_int_t y, yp_int_t z, ypObject **exc)
+{
+    return_yp_EXC_ERR(exc, yp_NotImplementedError);
+}
+
 static void iunaryoperation(ypObject *x, ypObject **exc, unaryLfunc intop, unaryLFfunc floatop)
 {
     int       x_type = ypObject_TYPE_CODE(x);
@@ -5643,6 +5682,11 @@ static const yp_uint8_t _BitLengthTable[32] = {
     5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5
 };
 // clang-format on
+
+ypObject *yp_sumN(int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_sumNV(int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_sum(ypObject *iterable) { return yp_NotImplementedError; }
 
 // XXX Adapted from Python 2.7's bits_in_ulong
 yp_int_t yp_bit_lengthC(ypObject *x, ypObject **exc)
@@ -6310,6 +6354,15 @@ yp_float_t yp_asfloatC(ypObject *x, ypObject **exc)
     return_yp_CEXC_BAD_TYPE(0.0, exc, x);
 }
 
+yp_float32_t yp_asfloat32C(ypObject *x, ypObject **exc)
+{
+    return_yp_CEXC_ERR(0.0, exc, yp_NotImplementedError);
+}
+yp_float64_t yp_asfloat64C(ypObject *x, ypObject **exc)
+{
+    return_yp_CEXC_ERR(0.0, exc, yp_NotImplementedError);
+}
+
 yp_float_t yp_asfloatL(yp_int_t x, ypObject **exc)
 {
     // TODO Implement this as Python does
@@ -6354,6 +6407,8 @@ static yp_int_t yp_asint_exactLF(yp_float_t x, ypObject **exc)
     }
     return_yp_CEXC_ERR(0, exc, yp_OverflowError);
 }
+
+ypObject *yp_roundC(ypObject *x, int ndigits) { return yp_NotImplementedError; }
 
 #pragma endregion float
 
@@ -12030,10 +12085,15 @@ ypObject *yp_joinNV(ypObject *s, int n, va_list args)
     return result;
 }
 
-void yp_partition(ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2);
+void yp_partition(ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2)
+{
+    *part0 = *part1 = *part2 = yp_NotImplementedError;
+}
 
-void yp_rpartition(
-        ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2);
+void yp_rpartition(ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2)
+{
+    *part0 = *part1 = *part2 = yp_NotImplementedError;
+}
 
 ypObject *yp_splitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit)
 {
@@ -12053,6 +12113,17 @@ ypObject *yp_rsplitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit)
 ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
 {
     _ypStringLib_REDIRECT1(s, splitlines, (s, keepends));
+}
+
+ypObject *yp_formatN(ypObject *s, int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_formatNV(ypObject *s, int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_formatK(ypObject *s, int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_formatKV(ypObject *s, int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_format(ypObject *s, ypObject *sequence, ypObject *mapping)
+{
+    return yp_NotImplementedError;
 }
 
 #pragma endregion string_methods
@@ -19941,6 +20012,13 @@ ypObject *yp_functionC(yp_function_decl_t *declaration)
     }
 
     return newF;
+}
+
+ypObject *yp_function_stateCX(ypObject *function, yp_ssize_t *size, void **state)
+{
+    *size = 0;
+    *state = NULL;
+    return yp_NotImplementedError;
 }
 
 // FIXME A convenience function to decref all objects in yp_function_decl_t/yp_def_generator_t/etc,

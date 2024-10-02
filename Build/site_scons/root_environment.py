@@ -19,7 +19,7 @@ with open(_mscommonLog_path, "w"):
 os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath(_mscommonLog_path)
 
 
-# XXX Reported to Scons: https://pairlist4.pair.net/pipermail/scons-users/2024-April/009346.html
+# XXX Reported to Scons: https://github.com/SCons/scons/issues/4516
 def adjusted_libversionflags(*args, **kwargs):
     """__libversionflags sometimes returns None, which is treated as an unknown variable, which then
     causes a build failure as we disallow unknown variables below. Convert None to '' to bypass

@@ -34,18 +34,18 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         // yp_iter2 is tested elsewhere.
         assert_raises_exc(yp_unpackN(self, 1, &exc), yp_TypeError);
         // TODO yp_unpackNV?
-        // TODO assert_raises(yp_filter(yp_None, self), yp_TypeError);
-        // TODO assert_raises(yp_filterfalse(yp_None, self), yp_TypeError);
-        // TODO assert_raises(yp_max_key(self, yp_None), yp_TypeError);
-        // TODO assert_raises(yp_min_key(self, yp_None), yp_TypeError);
-        // TODO assert_raises(yp_max(self), yp_TypeError);
-        // TODO assert_raises(yp_min(self), yp_TypeError);
+        assert_raises(yp_filter(yp_None, self), yp_NotImplementedError);
+        assert_raises(yp_filterfalse(yp_None, self), yp_NotImplementedError);
+        assert_raises(yp_max_key(self, yp_None), yp_NotImplementedError);
+        assert_raises(yp_min_key(self, yp_None), yp_NotImplementedError);
+        assert_raises(yp_max(self), yp_NotImplementedError);
+        assert_raises(yp_min(self), yp_NotImplementedError);
         assert_raises(yp_reversed(self), yp_TypeError);
         assert_raises(yp_sorted3(self, yp_None, yp_False), yp_TypeError);
         assert_raises(yp_sorted(self), yp_TypeError);
-        // TODO assert_raises(yp_zipN(1, self), yp_TypeError);
+        assert_raises(yp_zipN(1, self), yp_NotImplementedError);
         // TODO yp_zipNV?
-        // TODO assert_raises(yp_sum(self), yp_TypeError);
+        assert_raises(yp_sum(self), yp_NotImplementedError);
     }
 
     if (type != fixture_type_iter) {
@@ -198,20 +198,22 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises(yp_strip(self), yp_MethodError);
         assert_raises(yp_joinN(self, 0), yp_MethodError);
         assert_raises(yp_joinNV(self, 0, NULL), yp_MethodError);
-        // TODO {
-        //     ypObject *part1 = NULL;
-        //     ypObject *part2 = NULL;
-        //     assert_raises_exc(yp_partition(self, self, &exc, &part1, &part2), yp_MethodError);
-        //     assert_isexception(part1, yp_MethodError);
-        //     assert_isexception(part2, yp_MethodError);
-        // }
-        // TODO {
-        //     ypObject *part1 = NULL;
-        //     ypObject *part2 = NULL;
-        //     assert_raises_exc(yp_rpartition(self, self, &exc, &part1, &part2), yp_MethodError);
-        //     assert_isexception(part1, yp_MethodError);
-        //     assert_isexception(part2, yp_MethodError);
-        // }
+        {
+            ypObject *part1 = NULL;
+            ypObject *part2 = NULL;
+            assert_raises_exc(
+                    yp_partition(self, self, &exc, &part1, &part2), yp_NotImplementedError);
+            assert_isexception(part1, yp_NotImplementedError);
+            assert_isexception(part2, yp_NotImplementedError);
+        }
+        {
+            ypObject *part1 = NULL;
+            ypObject *part2 = NULL;
+            assert_raises_exc(
+                    yp_rpartition(self, self, &exc, &part1, &part2), yp_NotImplementedError);
+            assert_isexception(part1, yp_NotImplementedError);
+            assert_isexception(part2, yp_NotImplementedError);
+        }
         assert_raises(yp_splitC3(self, yp_None, 0), yp_MethodError);
         assert_raises(yp_split2(self, yp_None), yp_MethodError);
         assert_raises(yp_split(self), yp_MethodError);
@@ -221,11 +223,11 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises(yp_encode(self), yp_MethodError);
         assert_raises(yp_decode3(self, yp_s_utf_8, yp_s_strict), yp_MethodError);
         assert_raises(yp_decode(self), yp_MethodError);
-        // TODO assert_raises(yp_formatN(self, 0), yp_MethodError);
-        // TODO assert_raises(yp_formatNV(self, 0, NULL), yp_MethodError);
-        // TODO assert_raises(yp_formatK(self, 0), yp_MethodError);
-        // TODO assert_raises(yp_formatKV(self, 0, NULL), yp_MethodError);
-        // TODO assert_raises(yp_format(self, yp_tuple_empty, yp_frozendict_empty), yp_MethodError);
+        assert_raises(yp_formatN(self, 0), yp_NotImplementedError);
+        assert_raises(yp_formatNV(self, 0, NULL), yp_NotImplementedError);
+        assert_raises(yp_formatK(self, 0), yp_NotImplementedError);
+        assert_raises(yp_formatKV(self, 0, NULL), yp_NotImplementedError);
+        assert_raises(yp_format(self, yp_tuple_empty, yp_frozendict_empty), yp_NotImplementedError);
     }
 
     if (!type->is_callable) {
@@ -247,8 +249,8 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_intC_raises_exc(yp_asint64C(self, &exc), ==, 0, yp_TypeError);
         assert_intC_raises_exc((yp_int_t)yp_asuint64C(self, &exc), ==, 0, yp_TypeError);
         assert_floatC_raises_exc(yp_asfloatC(self, &exc), ==, 0.0, yp_TypeError);
-        // TODO assert_floatC_raises_exc(yp_asfloat32C(self, &exc), ==, 0.0, yp_TypeError);
-        // TODO assert_floatC_raises_exc(yp_asfloat64C(self, &exc), ==, 0.0, yp_TypeError);
+        assert_floatC_raises_exc(yp_asfloat32C(self, &exc), ==, 0.0, yp_NotImplementedError);
+        assert_floatC_raises_exc(yp_asfloat64C(self, &exc), ==, 0.0, yp_NotImplementedError);
         assert_intC_raises_exc(yp_asssizeC(self, &exc), ==, 0, yp_TypeError);
         assert_intC_raises_exc(yp_ashashC(self, &exc), ==, 0, yp_TypeError);
     }
@@ -266,7 +268,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
             assert_isexception(mod, yp_TypeError);
         }
         assert_raises(yp_pow(self, self), yp_TypeError);
-        // TODO assert_raises(yp_pow3(self, self, self), yp_TypeError);
+        assert_raises(yp_pow3(self, self, self), yp_NotImplementedError);
         assert_raises(yp_neg(self), yp_TypeError);
         assert_raises(yp_pos(self), yp_TypeError);
         assert_raises(yp_abs(self), yp_TypeError);
@@ -284,7 +286,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises_exc(yp_ifloordiv(self, self, &exc), yp_TypeError);
         assert_raises_exc(yp_imod(self, self, &exc), yp_TypeError);
         assert_raises_exc(yp_ipow(self, self, &exc), yp_TypeError);
-        // TODO assert_raises_exc(yp_ipow4(self, self, self, &exc), yp_TypeError);
+        assert_raises_exc(yp_ipow4(self, self, self, &exc), yp_NotImplementedError);
         assert_raises_exc(yp_ineg(self, &exc), yp_TypeError);
         assert_raises_exc(yp_ipos(self, &exc), yp_TypeError);
         assert_raises_exc(yp_iabs(self, &exc), yp_TypeError);
@@ -302,7 +304,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises_exc(yp_ifloordivC(self, 0, &exc), yp_TypeError);
         assert_raises_exc(yp_imodC(self, 0, &exc), yp_TypeError);
         assert_raises_exc(yp_ipowC(self, 0, &exc), yp_TypeError);
-        // TODO assert_raises_exc(yp_ipowC4(self, 0, 0, &exc), yp_TypeError);
+        assert_raises_exc(yp_ipowC4(self, 0, 0, &exc), yp_NotImplementedError);
         assert_raises_exc(yp_ilshiftC(self, 0, &exc), yp_TypeError);
         assert_raises_exc(yp_irshiftC(self, 0, &exc), yp_TypeError);
         assert_raises_exc(yp_iampC(self, 0, &exc), yp_TypeError);
@@ -319,11 +321,11 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
 
         // yp_asintC et al. are tested elsewhere.
 
-        // TODO assert_raises(yp_roundC(self, 0), yp_TypeError);
-        // TODO assert_raises(yp_sumN(2, self, self), yp_TypeError);
+        assert_raises(yp_roundC(self, 0), yp_NotImplementedError);
+        assert_raises(yp_sumN(2, self, self), yp_NotImplementedError);
         // TODO yp_sumNV?
-        // TODO ead(iterable, yp_listN(N(self, self)), assert_raises(yp_sum(iterable),
-        // yp_TypeError));
+        ead(iterable, yp_listN(N(self, self)),
+                assert_raises(yp_sum(iterable), yp_NotImplementedError));
     }
 
     if (type != fixture_type_int && type != fixture_type_intstore) {
@@ -366,13 +368,13 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_ssizeC(size, ==, 0);
         assert_ptr(state, ==, NULL);
     }
-    // TODO if (type != fixture_type_function) {
-    //     yp_ssize_t size = -1;
-    //     void      *state = (void *)-1;
-    //     assert_raises(yp_function_stateCX(self, &size, &state), yp_TypeError);
-    //     assert_ssizeC(size, ==, 0);
-    //     assert_ptr(state, ==, NULL);
-    // }
+    if (type != fixture_type_function) {
+        yp_ssize_t size = -1;
+        void      *state = (void *)-1;
+        assert_raises(yp_function_stateCX(self, &size, &state), yp_NotImplementedError);
+        assert_ssizeC(size, ==, 0);
+        assert_ptr(state, ==, NULL);
+    }
     if (type != fixture_type_bytes && type != fixture_type_bytearray) {
         yp_ssize_t        len = -1;
         const yp_uint8_t *bytes = (yp_uint8_t *)-1;
