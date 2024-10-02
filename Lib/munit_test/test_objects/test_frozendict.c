@@ -14,19 +14,32 @@
     {fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
             fixture_type_dict_dirty, NULL}
 
-// A copy of ypDictMiState from nohtyP.c.
-typedef struct {
-    yp_uint32_t keys : 1;
-    yp_uint32_t itemsleft : 31;
-    yp_uint32_t values : 1;
-    yp_uint32_t index : 31;
+// A copy of ypDictMiState from nohtyP.c, as a union with yp_uint64_t to maintain strict aliasing.
+typedef union {
+    struct {
+        yp_uint32_t keys : 1;
+        yp_uint32_t itemsleft : 31;
+        yp_uint32_t values : 1;
+        yp_uint32_t index : 31;
+    } as_struct;
+    yp_uint64_t as_int;
 } ypDictMiState;
 
 // Defines an mi_state for use with frozendicts/dicts, which can be accessed by the variable name,
 // declared as "const yp_uint64_t".
-#define frozendict_mi_state(name, keys, values, itemsleft, index)                  \
-    ypDictMiState     _##name##_struct = {(keys), (itemsleft), (values), (index)}; \
-    const yp_uint64_t name = *((yp_uint64_t *)&_##name##_struct)
+#define define_frozendict_mi_state(name, keys, values, itemsleft, index)             \
+    ypDictMiState     _##name##_struct = {{(keys), (itemsleft), (values), (index)}}; \
+    const yp_uint64_t name = (_##name##_struct.as_int)
+
+// Extracts keys from mi_state.
+#define frozendict_mi_state_keys(mi_state) (((ypDictMiState *)(&(mi_state)))->as_struct.keys)
+// Extracts values from mi_state.
+#define frozendict_mi_state_values(mi_state) (((ypDictMiState *)(&(mi_state)))->as_struct.values)
+// Extracts itemsleft from mi_state.
+#define frozendict_mi_state_itemsleft(mi_state) \
+    (((ypDictMiState *)(&(mi_state)))->as_struct.itemsleft)
+// Extracts index from mi_state.
+#define frozendict_mi_state_index(mi_state) (((ypDictMiState *)(&(mi_state)))->as_struct.index)
 
 
 static void _test_newK(
@@ -773,13 +786,13 @@ static MunitResult test_fromkeys(const MunitParameter params[], fixture_t *fixtu
 static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    frozendict_mi_state(k_itemsleft_255_index_255, 1, 0, 255, 255);
-    frozendict_mi_state(kv_itemsleft_2_index_0, 1, 1, 2, 0);
-    frozendict_mi_state(k_itemsleft_2_index_0, 1, 0, 2, 0);
-    frozendict_mi_state(v_itemsleft_2_index_0, 0, 1, 2, 0);
-    frozendict_mi_state(nokv_itemsleft_2_index_0, 0, 0, 2, 0);  // keys=0, values=0
-    frozendict_mi_state(k_itemsleft_1_index_0, 1, 0, 1, 0);
-    frozendict_mi_state(k_itemsleft_0_index_0, 1, 0, 0, 0);
+    define_frozendict_mi_state(k_itemsleft_255_index_255, 1, 0, 255, 255);
+    define_frozendict_mi_state(kv_itemsleft_2_index_0, 1, 1, 2, 0);
+    define_frozendict_mi_state(k_itemsleft_2_index_0, 1, 0, 2, 0);
+    define_frozendict_mi_state(v_itemsleft_2_index_0, 0, 1, 2, 0);
+    define_frozendict_mi_state(nokv_itemsleft_2_index_0, 0, 0, 2, 0);  // keys=0, values=0
+    define_frozendict_mi_state(k_itemsleft_1_index_0, 1, 0, 1, 0);
+    define_frozendict_mi_state(k_itemsleft_0_index_0, 1, 0, 0, 0);
     ypObject *keys[4];
     ypObject *values[4];
     obj_array_fill(keys, type->rand_items);
@@ -833,10 +846,10 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
         mi_state = nokv_itemsleft_2_index_0;
         assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
         // mi_state is changed because the check for `keys || values` is after the index is yielded.
-        munit_assert_uint32(((ypDictMiState *)&mi_state)->keys, ==, 0);
-        munit_assert_uint32(((ypDictMiState *)&mi_state)->values, ==, 0);
-        munit_assert_uint32(((ypDictMiState *)&mi_state)->itemsleft, ==, 1);
-        munit_assert_uint32(((ypDictMiState *)&mi_state)->index, >, 0);
+        munit_assert_uint32(frozendict_mi_state_keys(mi_state), ==, 0);
+        munit_assert_uint32(frozendict_mi_state_values(mi_state), ==, 0);
+        munit_assert_uint32(frozendict_mi_state_itemsleft(mi_state), ==, 1);
+        munit_assert_uint32(frozendict_mi_state_index(mi_state), >, 0);
 
         yp_decrefN(N(mp, mi));
     }

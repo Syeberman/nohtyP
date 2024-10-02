@@ -13,17 +13,20 @@
     {fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
             fixture_type_set_dirty, NULL}
 
-// A copy of ypSetMiState from nohtyP.c, for use with frozenset_mi_state.
-typedef struct {
-    yp_uint32_t keysleft;
-    yp_uint32_t index;
+// A copy of ypSetMiState from nohtyP.c, as a union with yp_uint64_t to maintain strict aliasing.
+typedef union {
+    struct {
+        yp_uint32_t keysleft;
+        yp_uint32_t index;
+    } as_struct;
+    yp_uint64_t as_int;
 } ypSetMiState;
 
 // Defines an mi_state for use with frozensets/sets, which can be accessed by the variable name,
 // declared as "const yp_uint64_t".
-#define frozenset_mi_state(name, keysleft, index)               \
-    ypSetMiState      _##name##_struct = {(keysleft), (index)}; \
-    const yp_uint64_t name = *((yp_uint64_t *)&_##name##_struct)
+#define define_frozenset_mi_state(name, keysleft, index)          \
+    ypSetMiState      _##name##_struct = {{(keysleft), (index)}}; \
+    const yp_uint64_t name = (_##name##_struct.as_int)
 
 
 static void _test_newN(
@@ -387,10 +390,10 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    frozenset_mi_state(keysleft_255_index_255, 255, 255);
-    frozenset_mi_state(keysleft_2_index_0, 2, 0);
-    frozenset_mi_state(keysleft_1_index_0, 1, 0);
-    frozenset_mi_state(keysleft_0_index_0, 0, 0);
+    define_frozenset_mi_state(keysleft_255_index_255, 255, 255);
+    define_frozenset_mi_state(keysleft_2_index_0, 2, 0);
+    define_frozenset_mi_state(keysleft_1_index_0, 1, 0);
+    define_frozenset_mi_state(keysleft_0_index_0, 0, 0);
     ypObject *items[2];
     obj_array_fill(items, type->rand_items);
 
