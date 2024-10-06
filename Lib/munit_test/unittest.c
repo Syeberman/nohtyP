@@ -169,7 +169,7 @@ static void rand_ascii(yp_ssize_t len, yp_uint8_t *source)
 // coerced to pointers.
 #define rand_choice_array(array) rand_choice(yp_lengthof_array(array), (array))
 
-static fixture_type_t *rand_choice_fixture_type(fixture_types_t *types)
+static fixture_type_t *rand_choice_fixture_types(fixture_types_t *types)
 {
     return rand_choice(types->len, types->types);
 }
@@ -185,7 +185,7 @@ static ypObject *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 {
     rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/TRUE};
     assert_ssizeC(sub_memo.depth, >=, 0);
-    return rand_choice_fixture_type(fixture_types_immutable)->_new_rand(&sub_memo);
+    return rand_choice_fixture_types(fixture_types_immutable)->_new_rand(&sub_memo);
 }
 
 // "Any" may be limited by memo (i.e. we might only return hashable types).
@@ -196,7 +196,7 @@ static ypObject *rand_obj_any1(const rand_obj_supplier_memo_t *memo)
     } else {
         rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/FALSE};
         assert_ssizeC(sub_memo.depth, >=, 0);
-        return rand_choice_fixture_type(fixture_types_all)->_new_rand(&sub_memo);
+        return rand_choice_fixture_types(fixture_types_all)->_new_rand(&sub_memo);
     }
 }
 
@@ -235,35 +235,35 @@ extern ypObject *rand_obj(fixture_type_t *type)
 
 extern ypObject *rand_obj_any_not_iterable(void)
 {
-    return rand_obj(rand_choice_fixture_type(fixture_types_not_iterable));
+    return rand_obj(rand_choice_fixture_types(fixture_types_not_iterable));
 }
 
 extern ypObject *rand_obj_any_hashable_not_str(void)
 {
-    return rand_obj_hashable(rand_choice_fixture_type(fixture_types_immutable_not_str));
+    return rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable_not_str));
 }
 
 extern hashability_pair_t rand_obj_any_hashability_pair(void)
 {
     hashability_pair_t pair;
-    pair.hashable = rand_obj_hashable(rand_choice_fixture_type(fixture_types_immutable_paired));
+    pair.hashable = rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable_paired));
     assert_not_raises(pair.unhashable = yp_unfrozen_copy(pair.hashable));
     return pair;
 }
 
 extern ypObject *rand_obj_any_mutable(void)
 {
-    return rand_obj(rand_choice_fixture_type(fixture_types_mutable));
+    return rand_obj(rand_choice_fixture_types(fixture_types_mutable));
 }
 
 extern ypObject *rand_obj_any_hashable(void)
 {
-    return rand_obj_hashable(rand_choice_fixture_type(fixture_types_immutable));
+    return rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable));
 }
 
 extern ypObject *rand_obj_any(void)
 {
-    return rand_obj(rand_choice_fixture_type(fixture_types_all));
+    return rand_obj(rand_choice_fixture_types(fixture_types_all));
 }
 
 static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
@@ -364,18 +364,18 @@ extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...)
 }
 
 
-typedef struct _rand_iter_state {
+typedef struct _rand_iter_state_t {
     yp_ssize_t               n;
     rand_obj_supplier_t      supplier;
     rand_obj_supplier_memo_t supplier_memo;
-} rand_iter_state;
+} rand_iter_state_t;
 
-static yp_state_decl_t rand_iter_state_decl = {yp_sizeof(rand_iter_state)};
+static yp_state_decl_t rand_iter_state_decl = {yp_sizeof(rand_iter_state_t)};
 
 static ypObject *rand_iter_func(ypObject *g, ypObject *value)
 {
-    rand_iter_state *state;
-    yp_ssize_t       size;
+    rand_iter_state_t *state;
+    yp_ssize_t         size;
     if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
@@ -389,7 +389,7 @@ static ypObject *new_rand_iter3(
         yp_ssize_t n, rand_obj_supplier_t supplier, const rand_obj_supplier_memo_t *supplier_memo)
 {
     ypObject           *result;
-    rand_iter_state     state = {n, supplier};
+    rand_iter_state_t   state = {n, supplier};
     yp_generator_decl_t decl = {rand_iter_func, n, &state, &rand_iter_state_decl};
     state.supplier_memo = *supplier_memo;
 
@@ -398,19 +398,19 @@ static ypObject *new_rand_iter3(
     return result;
 }
 
-typedef struct _faulty_iter_state {
+typedef struct _faulty_iter_state_t {
     ypObject  *supplier;   // Sub-iterator supplying values to yield until n reaches zero.
     yp_ssize_t n;          // Raise exception when this reaches zero.
     ypObject  *exception;  // Exception to raise.
-} faulty_iter_state;
+} faulty_iter_state_t;
 
-static yp_state_decl_t faulty_iter_state_decl = {yp_sizeof(faulty_iter_state), 2,
-        {yp_offsetof(faulty_iter_state, supplier), yp_offsetof(faulty_iter_state, exception)}};
+static yp_state_decl_t faulty_iter_state_decl = {yp_sizeof(faulty_iter_state_t), 2,
+        {yp_offsetof(faulty_iter_state_t, supplier), yp_offsetof(faulty_iter_state_t, exception)}};
 
 static ypObject *faulty_iter_func(ypObject *g, ypObject *value)
 {
-    faulty_iter_state *state;
-    yp_ssize_t         size;
+    faulty_iter_state_t *state;
+    yp_ssize_t           size;
     if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
@@ -424,7 +424,7 @@ extern ypObject *new_faulty_iter(
         ypObject *supplier, yp_ssize_t n, ypObject *exception, yp_ssize_t length_hint)
 {
     ypObject           *result;
-    faulty_iter_state   state = {yp_iter(supplier) /*new ref*/, n, exception};
+    faulty_iter_state_t state = {yp_iter(supplier) /*new ref*/, n, exception};
     yp_generator_decl_t decl = {faulty_iter_func, length_hint, &state, &faulty_iter_state_decl};
     assert_not_exception(state.supplier);
     assert_isexception(exception, yp_BaseException);
@@ -439,7 +439,7 @@ extern ypObject *new_faulty_iter(
 // Returns a random type object, except invalidated and exception objects.
 static ypObject *new_rand_type(const rand_obj_supplier_memo_t *memo)
 {
-    return rand_choice_fixture_type(fixture_types_all)->type;
+    return rand_choice_fixture_types(fixture_types_all)->type;
 }
 
 static fixture_type_t fixture_type_type_struct = {

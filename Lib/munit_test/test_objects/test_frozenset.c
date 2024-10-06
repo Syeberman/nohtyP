@@ -337,6 +337,7 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     ypObject *(*new_to_call_type)(ypObject *);
     ypObject *str_iterable = yp_str_frombytesC2(-1, "iterable");
     ypObject *str_cls = yp_str_frombytesC2(-1, "cls");
+    ypObject *str_rand = rand_obj(fixture_type_str);
 
     if (type->type == yp_t_frozenset) {
         newN_to_call_type = newN_to_call_t_frozenset;
@@ -369,20 +370,22 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         ypObject *args_two = yp_tupleN(N(yp_frozenset_empty, yp_frozenset_empty));
         ypObject *kwargs_iterable = yp_frozendictK(K(str_iterable, yp_frozenset_empty));
         ypObject *kwargs_cls = yp_frozendictK(K(str_cls, type->type));
+        ypObject *kwargs_rand = yp_frozendictK(K(str_rand, yp_frozenset_empty));
 
         assert_raises(
                 yp_callN(type->type, N(yp_frozenset_empty, yp_frozenset_empty)), yp_TypeError);
         assert_raises(yp_call_stars(type->type, args_two, yp_frozendict_empty), yp_TypeError);
         assert_raises(yp_call_stars(type->type, yp_tuple_empty, kwargs_iterable), yp_TypeError);
         assert_raises(yp_call_stars(type->type, yp_tuple_empty, kwargs_cls), yp_TypeError);
+        assert_raises(yp_call_stars(type->type, yp_tuple_empty, kwargs_rand), yp_TypeError);
 
-        yp_decrefN(N(kwargs_cls, kwargs_iterable, args_two));
+        yp_decrefN(N(kwargs_rand, kwargs_cls, kwargs_iterable, args_two));
     }
 
     // Exception passthrough.
     assert_isexception(yp_callN(type->type, N(yp_SyntaxError)), yp_SyntaxError);
 
-    yp_decrefN(N(str_iterable, str_cls));
+    yp_decrefN(N(str_iterable, str_cls, str_rand));
     return MUNIT_OK;
 }
 
