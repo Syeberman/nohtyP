@@ -556,9 +556,9 @@ ypAPI ypObject *yp_send(ypObject *iterator, ypObject *value);
 // Equivalent to yp_send(iterator, yp_None). Typically used on iterators that ignore the value.
 ypAPI ypObject *yp_next(ypObject *iterator);
 
-// Similar to yp_next, but when the iterator is exhausted a new reference to defval is returned.
-// defval _can_ be an exception: if it is, then exhaustion is treated as an error.
-ypAPI ypObject *yp_next2(ypObject *iterator, ypObject *defval);
+// Similar to yp_next, but when the iterator is exhausted a new reference to default_ is returned.
+// default_ _can_ be an exception: if it is, then exhaustion is treated as an error.
+ypAPI ypObject *yp_next2(ypObject *iterator, ypObject *default_);
 
 // "Sends" an exception into iterator and returns a new reference to the next yielded value, or an
 // exception. The iterator may ignore the exception, or it may return it or any other exception. If
@@ -634,9 +634,9 @@ ypAPI ypObject *yp_getsliceC4(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp
 // Equivalent to yp_getindexC(sequence, yp_asssizeC(i, exc)).
 ypAPI ypObject *yp_getitem(ypObject *sequence, ypObject *i);
 
-// Similar to yp_getitem, but returns a new reference to defval if i is out of bounds. defval _can_
-// be an exception: if it is, then that exception is raised on out of bounds.
-ypAPI ypObject *yp_getdefault(ypObject *sequence, ypObject *i, ypObject *defval);
+// Similar to yp_getitem, but returns a new reference to default_ if i is out of bounds. default_
+// _can_ be an exception: if it is, then that exception is raised on out of bounds.
+ypAPI ypObject *yp_getdefault(ypObject *sequence, ypObject *i, ypObject *default_);
 
 // Returns the lowest index in sequence where x is found, such that x is contained in the slice
 // sequence[i:j], or -1 if x is not found. Returns -1 and sets *exc on error; *exc is _not_ set if x
@@ -873,10 +873,10 @@ ypAPI ypObject *const yp_frozenset_empty;
 // not in the map.
 ypAPI ypObject *yp_getitem(ypObject *mapping, ypObject *key);
 
-// Similar to yp_getitem, but returns a new reference to defval if key is not in the map. defval
+// Similar to yp_getitem, but returns a new reference to default_ if key is not in the map. default_
 // _can_ be an exception: if it is, then that exception is raised on a missing key. The
-// Python-equivalent "default" for defval is yp_None.
-ypAPI ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *defval);
+// Python-equivalent "default" for default_ is yp_None.
+ypAPI ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *default_);
 
 // Returns a new reference to an iterator that yields mapping's (key, value) pairs as 2-tuples.
 ypAPI ypObject *yp_iter_items(ypObject *mapping);
@@ -899,10 +899,10 @@ ypAPI void yp_delitem(ypObject *mapping, ypObject *key, ypObject **exc);
 ypAPI void yp_dropitem(ypObject *mapping, ypObject *key, ypObject **exc);
 
 // If key is in mapping, remove it and return a new reference to its value, else return a new
-// reference to defval. defval _can_ be an exception: if it is, then that exception is raised on a
-// missing key. The Python-equivalent "default" of defval is yp_KeyError. Note that yp_push and
+// reference to default_. default_ _can_ be an exception: if it is, then that exception is raised on
+// a missing key. The Python-equivalent "default" of default_ is yp_KeyError. Note that yp_push and
 // yp_pop are not applicable for mapping objects.
-ypAPI ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *defval);
+ypAPI ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_);
 
 // Equivalent to yp_popvalue3(mapping, key, yp_KeyError).
 ypAPI ypObject *yp_popvalue2(ypObject *mapping, ypObject *key);
@@ -912,10 +912,10 @@ ypAPI ypObject *yp_popvalue2(ypObject *mapping, ypObject *key);
 // exception.
 ypAPI void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value);
 
-// Similar to yp_getitem, but returns a new reference to defval _and_ adds it to mapping if key is
-// not in the map. defval cannot be an exception. The Python-equivalent "default" for defval is
+// Similar to yp_getitem, but returns a new reference to default_ _and_ adds it to mapping if key is
+// not in the map. default_ cannot be an exception. The Python-equivalent "default" for default_ is
 // yp_None.
-ypAPI ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval);
+ypAPI ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *default_);
 
 // Add the given n (key, value) pairs (for a total of 2*n objects) to mapping, overwriting existing
 // keys. If a given key is seen more than once, the last value is retained. Sets *exc on error. Note

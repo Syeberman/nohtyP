@@ -400,7 +400,7 @@ typedef struct {
 typedef struct {
     objobjproc      tp_concat;
     objssizeproc    tp_repeat;
-    objssizeobjproc tp_getindex;  // if defval is NULL, raise exception if missing
+    objssizeobjproc tp_getindex;  // if default_ is NULL, raise exception if missing
     objsliceproc    tp_getslice;
     findfunc        tp_find;
     countfunc       tp_count;
@@ -530,7 +530,7 @@ typedef struct {
     objproc       tp_clear;  // delete references to contained objects
     objproc       tp_pop;
     objobjintproc tp_remove;
-    objobjobjproc tp_getdefault;  // if defval is NULL, raise exception if missing
+    objobjobjproc tp_getdefault;  // if default_ is NULL, raise exception if missing
     objobjobjproc tp_setitem;
     objobjintproc tp_delitem;
     objobjproc    tp_update;
@@ -734,6 +734,7 @@ static ypObject *Immutable_freezefunc(ypObject *x)
 #define MIN4(a, b, c, d) MIN(MIN(a, b), MIN(c, d))
 
 // Returns val, clamped to be no less than min and no more than max.
+// FIXME Exclusive end?
 #define yp_CLAMP(val, min, max) ((val) < (min) ? (min) : (val) > (max) ? (max) : (val))
 
 // Functions that return nohtyP objects return the error object to "raise" it. Use this as
@@ -3769,7 +3770,7 @@ ypObject *yp_all(ypObject *iterable)
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
 // TODO Here and elsewhere, the singleton NotImplemented should be used
 // TODO Comparison functions have the possibility of recursion; trap (also, add tests)
-#define _ypBool_PUBLIC_CMP_FUNCTION(name, reflection, defval)                         \
+#define _ypBool_PUBLIC_CMP_FUNCTION(name, reflection, default_)                       \
     ypObject *yp_##name(ypObject *x, ypObject *y)                                     \
     {                                                                                 \
         ypTypeObject *type = ypObject_TYPE(x);                                        \
@@ -3782,7 +3783,7 @@ ypObject *yp_all(ypObject *iterable)
         yp_ASSERT(result == yp_True || result == yp_False || yp_isexceptionC(result), \
                 "tp_" #reflection " must return yp_True, yp_False, or an exception"); \
         if (result != yp_ComparisonNotImplemented) return result;                     \
-        return (defval);                                                              \
+        return (default_);                                                            \
     }
 // Recall that tp_lt/etc for exceptions and invalidateds will return the correct exception, so
 // yp_TypeError is correct to use here (rather than yp_BAD_TYPE).
@@ -6589,13 +6590,13 @@ static void _ypSlice_delslice_memmove(void *array, yp_ssize_t length, yp_ssize_t
     }
 }
 
-static ypObject *_ypSequence_getdefault(ypObject *x, ypObject *key, ypObject *defval)
+static ypObject *_ypSequence_getdefault(ypObject *x, ypObject *key, ypObject *default_)
 {
     ypObject     *exc = yp_None;
     ypTypeObject *type = ypObject_TYPE(x);
     yp_ssize_t    index = yp_index_asssizeC(key, &exc);
     if (yp_isexceptionC(exc)) return exc;
-    return type->tp_as_sequence->tp_getindex(x, index, defval);
+    return type->tp_as_sequence->tp_getindex(x, index, default_);
 }
 
 static ypObject *_ypSequence_setitem(ypObject *x, ypObject *key, ypObject *value)
@@ -9967,11 +9968,11 @@ static ypObject *bytes_concat(ypObject *b, ypObject *iterable)
 }
 
 // TODO Do we want a special-case for yp_intC that goes direct to the prealloc array?
-static ypObject *bytes_getindex(ypObject *b, yp_ssize_t i, ypObject *defval)
+static ypObject *bytes_getindex(ypObject *b, yp_ssize_t i, ypObject *default_)
 {
     if (!ypSequence_AdjustIndexC(ypBytes_LEN(b), &i)) {
-        if (defval == NULL) return yp_IndexError;
-        return yp_incref(defval);
+        if (default_ == NULL) return yp_IndexError;
+        return yp_incref(default_);
     }
     return yp_intC(ypBytes_DATA(b)[i]);
 }
@@ -10934,11 +10935,11 @@ static ypObject *str_concat(ypObject *s, ypObject *iterable)
     }
 }
 
-static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
+static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *default_)
 {
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
-        if (defval == NULL) return yp_IndexError;
-        return yp_incref(defval);
+        if (default_ == NULL) return yp_IndexError;
+        return yp_incref(default_);
     }
     return yp_chrC(ypStr_ENC(s)->getindexX(ypStr_DATA(s), i));
 }
@@ -12793,11 +12794,11 @@ static ypObject *tuple_repeat(ypObject *sq, yp_ssize_t factor)
     return newSq;
 }
 
-static ypObject *tuple_getindex(ypObject *sq, yp_ssize_t i, ypObject *defval)
+static ypObject *tuple_getindex(ypObject *sq, yp_ssize_t i, ypObject *default_)
 {
     if (!ypSequence_AdjustIndexC(ypTuple_LEN(sq), &i)) {
-        if (defval == NULL) return yp_IndexError;
-        return yp_incref(defval);
+        if (default_ == NULL) return yp_IndexError;
+        return yp_incref(default_);
     }
     return yp_incref(ypTuple_ARRAY(sq)[i]);
 }
@@ -17635,8 +17636,8 @@ static ypObject *dict_clear(ypObject *mp)
     return yp_None;
 }
 
-// A defval of NULL means to raise an error if key is not in dict
-static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *defval)
+// A default_ of NULL means to raise an error if key is not in dict
+static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *default_)
 {
     ypObject       *keyset = ypDict_KEYSET(mp);
     ypSet_KeyEntry *key_loc;
@@ -17651,11 +17652,11 @@ static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *de
     result = _ypSet_lookkey_bycurrenthash(keyset, key, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If there's no existing value, return defval, otherwise return the value
+    // If there's no existing value, return default_, otherwise return the value
     value = *ypDict_VALUE_ENTRY(mp, key_loc);
     if (value == NULL) {
-        if (defval == NULL) return yp_KeyError;
-        return yp_incref(defval);
+        if (default_ == NULL) return yp_KeyError;
+        return yp_incref(default_);
     } else {
         return yp_incref(value);
     }
@@ -17682,10 +17683,10 @@ static ypObject *dict_delitem(ypObject *mp, ypObject *key, int raise_on_missing)
     return yp_None;
 }
 
-static ypObject *dict_popvalue(ypObject *mp, ypObject *key, ypObject *defval)
+static ypObject *dict_popvalue(ypObject *mp, ypObject *key, ypObject *default_)
 {
     ypObject *result = _ypDict_pop(mp, key);
-    if (result == ypSet_dummy) return yp_incref(defval);
+    if (result == ypSet_dummy) return yp_incref(default_);
     return result;
 }
 
@@ -17722,7 +17723,7 @@ static ypObject *dict_popitem(ypObject *mp, ypObject **key, ypObject **value)
     return yp_None;
 }
 
-static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *defval)
+static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *default_)
 {
     yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
@@ -17733,26 +17734,26 @@ static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *defval)
 
     // Look for the appropriate entry in the hash table.
     hash = yp_hashC(key, &exc);
-    if (yp_isexceptionC(exc)) return exc;        // returns if key is an exception
-    if (yp_isexceptionC(defval)) return defval;  // returns if defval is an exception
+    if (yp_isexceptionC(exc)) return exc;            // returns if key is an exception
+    if (yp_isexceptionC(default_)) return default_;  // returns if default_ is an exception
     result = _ypSet_lookkey(keyset, key, hash, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the there's no existing value, add and return defval, otherwise return the value
+    // If the there's no existing value, add and return default_, otherwise return the value
     value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
     if (*value_loc == NULL) {
         if (ypSet_ENTRY_USED(key_loc)) {
-            *value_loc = yp_incref(defval);
+            *value_loc = yp_incref(default_);
             ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
         } else {
             yp_ssize_t spaceleft = _ypSet_space_remaining(keyset);
             // _ypDict_push_newkey may resize mp, and may update key_loc and spaceleft.
             // TODO Overallocate
-            result = _ypDict_push_newkey(mp, &key_loc, key, hash, defval, &spaceleft, 0);
+            result = _ypDict_push_newkey(mp, &key_loc, key, hash, default_, &spaceleft, 0);
             // value_loc is no longer valid
             if (yp_isexceptionC(result)) return result;
         }
-        return yp_incref(defval);
+        return yp_incref(default_);
     } else {
         return yp_incref(*value_loc);
     }
@@ -18525,11 +18526,11 @@ static ypObject *range_frozen_deepcopy(ypObject *r, visitfunc copy_visitor, void
 static ypObject *range_bool(ypObject *r) { return ypBool_FROM_C(ypRange_LEN(r)); }
 
 // XXX Using ypSequence_AdjustIndexC assumes we don't have ranges longer than yp_SSIZE_T_MAX
-static ypObject *range_getindex(ypObject *r, yp_ssize_t i, ypObject *defval)
+static ypObject *range_getindex(ypObject *r, yp_ssize_t i, ypObject *default_)
 {
     if (!ypSequence_AdjustIndexC(ypRange_LEN(r), &i)) {
-        if (defval == NULL) return yp_IndexError;
-        return yp_incref(defval);
+        if (default_ == NULL) return yp_IndexError;
+        return yp_incref(default_);
     }
     return yp_intC(ypRange_GET_INDEX(r, i));
 }
@@ -20107,11 +20108,11 @@ ypObject *yp_send(ypObject *iterator, ypObject *value)
 
 ypObject *yp_next(ypObject *iterator) { return _yp_send(iterator, yp_None); }
 
-ypObject *yp_next2(ypObject *iterator, ypObject *defval)
+ypObject *yp_next2(ypObject *iterator, ypObject *default_)
 {
     ypObject *result = _yp_send(iterator, yp_None);
     if (yp_isexceptionC2(result, yp_StopIteration)) {
-        result = yp_incref(defval);
+        result = yp_incref(default_);
     }
     return result;
 }
@@ -20406,9 +20407,9 @@ void yp_dropitem(ypObject *mapping, ypObject *key, ypObject **exc)
     _yp_REDIRECT_EXC1(mapping, tp_delitem, (mapping, key, /*raise_on_missing=*/FALSE), exc);
 }
 
-ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *defval)
+ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *default_)
 {
-    _yp_REDIRECT1(mapping, tp_getdefault, (mapping, key, defval));
+    _yp_REDIRECT1(mapping, tp_getdefault, (mapping, key, default_));
 }
 
 ypObject *yp_iter_items(ypObject *mapping)
@@ -20421,9 +20422,9 @@ ypObject *yp_iter_keys(ypObject *mapping)
     _yp_REDIRECT2(mapping, tp_as_mapping, tp_iter_keys, (mapping));
 }
 
-ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *defval)
+ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_)
 {
-    _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, defval));
+    _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, default_));
 }
 
 ypObject *yp_popvalue2(ypObject *mapping, ypObject *key)
@@ -20440,10 +20441,10 @@ void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value)
     }
 }
 
-ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval)
+ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *default_)
 {
     ypTypeObject *type = ypObject_TYPE(mapping);
-    ypObject     *result = type->tp_as_mapping->tp_setdefault(mapping, key, defval);
+    ypObject     *result = type->tp_as_mapping->tp_setdefault(mapping, key, default_);
     return result;
 }
 
