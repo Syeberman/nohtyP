@@ -734,7 +734,6 @@ static ypObject *Immutable_freezefunc(ypObject *x)
 #define MIN4(a, b, c, d) MIN(MIN(a, b), MIN(c, d))
 
 // Returns val, clamped to be no less than min and no more than max.
-// FIXME Exclusive end?
 #define yp_CLAMP(val, min, max) ((val) < (min) ? (min) : (val) > (max) ? (max) : (val))
 
 // Functions that return nohtyP objects return the error object to "raise" it. Use this as
@@ -12699,7 +12698,7 @@ static ypObject *_ypTuple_setslice_fromtuple(
     return yp_None;
 }
 
-// Returns NULL if i is out of bounds.
+// Returns NULL if i is out of bounds. Never returns an exception.
 static ypObject *_ypTuple_popindex(ypObject *sq, yp_ssize_t i)
 {
     ypObject *result;
@@ -12711,6 +12710,7 @@ static ypObject *_ypTuple_popindex(ypObject *sq, yp_ssize_t i)
     result = ypTuple_ARRAY(sq)[i];
     ypTuple_ELEMMOVE(sq, i, i + 1);
     ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
+    yp_ASSERT1(!yp_isexceptionC(result));
     return result;
 }
 
@@ -12965,7 +12965,7 @@ static ypObject *list_delindex(ypObject *sq, yp_ssize_t i, int raise_on_missing)
     if (result == NULL) {
         return raise_on_missing ? yp_IndexError : yp_None;
     }
-    if (yp_isexceptionC(result)) return result;
+    yp_ASSERT1(!yp_isexceptionC(result));  // _ypTuple_popindex never returns an exception
     yp_decref(result);
     return yp_None;
 }

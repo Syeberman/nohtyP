@@ -549,8 +549,8 @@ typedef struct _yp_generator_decl_t {
 // remain in a partially- or fully-exhausted state after use.
 
 // "Sends" a value into iterator and returns a new reference to the next yielded value, or an
-// exception. The iterator may ignore the value. value cannot be an exception. When the iterator is
-// exhausted yp_StopIteration is raised.
+// exception. The iterator may ignore the value. When the iterator is exhausted yp_StopIteration is
+// raised.
 ypAPI ypObject *yp_send(ypObject *iterator, ypObject *value);
 
 // Equivalent to yp_send(iterator, yp_None). Typically used on iterators that ignore the value.
@@ -558,6 +558,7 @@ ypAPI ypObject *yp_next(ypObject *iterator);
 
 // Similar to yp_next, but when the iterator is exhausted a new reference to default_ is returned.
 // default_ _can_ be an exception: if it is, then exhaustion is treated as an error.
+// FIXME Remove "can be an exception".
 ypAPI ypObject *yp_next2(ypObject *iterator, ypObject *default_);
 
 // "Sends" an exception into iterator and returns a new reference to the next yielded value, or an
@@ -636,6 +637,7 @@ ypAPI ypObject *yp_getitem(ypObject *sequence, ypObject *i);
 
 // Similar to yp_getitem, but returns a new reference to default_ if i is out of bounds. default_
 // _can_ be an exception: if it is, then that exception is raised on out of bounds.
+// FIXME Remove "can be an exception".
 ypAPI ypObject *yp_getdefault(ypObject *sequence, ypObject *i, ypObject *default_);
 
 // Returns the lowest index in sequence where x is found, such that x is contained in the slice
@@ -876,6 +878,7 @@ ypAPI ypObject *yp_getitem(ypObject *mapping, ypObject *key);
 // Similar to yp_getitem, but returns a new reference to default_ if key is not in the map. default_
 // _can_ be an exception: if it is, then that exception is raised on a missing key. The
 // Python-equivalent "default" for default_ is yp_None.
+// FIXME Remove "can be an exception".
 ypAPI ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *default_);
 
 // Returns a new reference to an iterator that yields mapping's (key, value) pairs as 2-tuples.
@@ -902,6 +905,7 @@ ypAPI void yp_dropitem(ypObject *mapping, ypObject *key, ypObject **exc);
 // reference to default_. default_ _can_ be an exception: if it is, then that exception is raised on
 // a missing key. The Python-equivalent "default" of default_ is yp_KeyError. Note that yp_push and
 // yp_pop are not applicable for mapping objects.
+// FIXME Remove "can be an exception".
 ypAPI ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_);
 
 // Equivalent to yp_popvalue3(mapping, key, yp_KeyError).
@@ -913,8 +917,7 @@ ypAPI ypObject *yp_popvalue2(ypObject *mapping, ypObject *key);
 ypAPI void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value);
 
 // Similar to yp_getitem, but returns a new reference to default_ _and_ adds it to mapping if key is
-// not in the map. default_ cannot be an exception. The Python-equivalent "default" for default_ is
-// yp_None.
+// not in the map. The Python-equivalent "default" for default_ is yp_None.
 ypAPI ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *default_);
 
 // Add the given n (key, value) pairs (for a total of 2*n objects) to mapping, overwriting existing
@@ -1190,7 +1193,8 @@ ypAPI ypObject *yp_format(ypObject *s, ypObject *sequence, ypObject *mapping);
 
 // Returns true (non-zero) if x appears callable, else false. If this returns true, it is still
 // possible that a call fails, but if it is false, calling x will always raise yp_TypeError. Always
-// succeeds: if x is an exception false is returned. Equivalent to callable(x) in Python.
+// succeeds: if x is an exception or invalidated false is returned. Equivalent to callable(x) in
+// Python.
 ypAPI int yp_iscallableC(ypObject *x);
 
 // Calls c with n positional arguments, returning the result of the call (which may be a new
@@ -1523,8 +1527,8 @@ ypAPI void yp_deepinvalidate(ypObject *x, ypObject **exc);
  * Type Operations
  */
 
-// Returns a new reference to the type of object. If object is an exception, yp_t_exception is
-// returned; if it is invalidated, yp_t_invalidated is returned.
+// Returns a new reference to the type of object. Always succeeds: if object is an exception
+// yp_t_exception is returned, and if it is invalidated yp_t_invalidated is returned.
 ypAPI ypObject *yp_type(ypObject *object);
 
 // The immortal type objects. Calling a type object (e.g., with yp_callN) typically constructs an
@@ -1832,10 +1836,12 @@ ypAPI ypObject *const yp_InvalidatedError;
 
 // Returns true (non-zero) if x is an exception that matches exception, else false. This takes into
 // account the exception heirarchy, so is the preferred way to test for specific exceptions. Always
-// succeeds.
+// succeeds: if x is invalidated or exception is not an exception, false is returned.
+// FIXME Test/handle if exception is not an exception
 ypAPI int yp_isexceptionC2(ypObject *x, ypObject *exception);
 
-// A convenience function to compare x against n possible exceptions. Returns false if n is zero.
+// Returns true (non-zero) if x is an exception that matches any of the given exceptions, else
+// false. Returns false if n is zero. Otherwise behaves as yp_isexceptionC2.
 ypAPI int yp_isexceptionCN(ypObject *x, int n, ...);
 ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
 
