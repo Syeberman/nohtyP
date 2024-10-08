@@ -9966,9 +9966,12 @@ static ypObject *bytes_concat(ypObject *b, ypObject *iterable)
     }
 }
 
+// A default_ of NULL means to raise an error if i is out of bounds.
 // TODO Do we want a special-case for yp_intC that goes direct to the prealloc array?
 static ypObject *bytes_getindex(ypObject *b, yp_ssize_t i, ypObject *default_)
 {
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
     if (!ypSequence_AdjustIndexC(ypBytes_LEN(b), &i)) {
         if (default_ == NULL) return yp_IndexError;
         return yp_incref(default_);
@@ -10934,8 +10937,11 @@ static ypObject *str_concat(ypObject *s, ypObject *iterable)
     }
 }
 
+// A default_ of NULL means to raise an error if i is out of bounds.
 static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *default_)
 {
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
         if (default_ == NULL) return yp_IndexError;
         return yp_incref(default_);
@@ -12794,8 +12800,11 @@ static ypObject *tuple_repeat(ypObject *sq, yp_ssize_t factor)
     return newSq;
 }
 
+// A default_ of NULL means to raise an error if i is out of bounds.
 static ypObject *tuple_getindex(ypObject *sq, yp_ssize_t i, ypObject *default_)
 {
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
     if (!ypSequence_AdjustIndexC(ypTuple_LEN(sq), &i)) {
         if (default_ == NULL) return yp_IndexError;
         return yp_incref(default_);
@@ -17636,7 +17645,7 @@ static ypObject *dict_clear(ypObject *mp)
     return yp_None;
 }
 
-// A default_ of NULL means to raise an error if key is not in dict
+// A default_ of NULL means to raise an error if key is not in dict.
 static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *default_)
 {
     ypObject       *keyset = ypDict_KEYSET(mp);
@@ -17646,6 +17655,8 @@ static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *de
 
     // Because we are called directly (i.e. ypFunction), ensure we're called correctly
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(mp) == ypFrozenDict_CODE);
+
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
@@ -17657,12 +17668,10 @@ static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *de
     if (value == NULL) {
         if (default_ == NULL) return yp_KeyError;
         return yp_incref(default_);
-    } else {
-        return yp_incref(value);
     }
+    return yp_incref(value);
 }
 
-// yp_None or an exception
 static ypObject *dict_setitem(ypObject *mp, ypObject *key, ypObject *value)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
@@ -17683,10 +17692,18 @@ static ypObject *dict_delitem(ypObject *mp, ypObject *key, int raise_on_missing)
     return yp_None;
 }
 
+// A default_ of NULL means to raise an error if key is not in dict.
 static ypObject *dict_popvalue(ypObject *mp, ypObject *key, ypObject *default_)
 {
-    ypObject *result = _ypDict_pop(mp, key);
-    if (result == ypSet_dummy) return yp_incref(default_);
+    ypObject *result;
+
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
+    result = _ypDict_pop(mp, key);
+    if (result == ypSet_dummy) {
+        if (default_ == NULL) return yp_KeyError;
+        return yp_incref(default_);
+    }
     return result;
 }
 
@@ -18525,9 +18542,12 @@ static ypObject *range_frozen_deepcopy(ypObject *r, visitfunc copy_visitor, void
 
 static ypObject *range_bool(ypObject *r) { return ypBool_FROM_C(ypRange_LEN(r)); }
 
+// A default_ of NULL means to raise an error if i is out of bounds.
 // XXX Using ypSequence_AdjustIndexC assumes we don't have ranges longer than yp_SSIZE_T_MAX
 static ypObject *range_getindex(ypObject *r, yp_ssize_t i, ypObject *default_)
 {
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
     if (!ypSequence_AdjustIndexC(ypRange_LEN(r), &i)) {
         if (default_ == NULL) return yp_IndexError;
         return yp_incref(default_);
@@ -20110,7 +20130,9 @@ ypObject *yp_next(ypObject *iterator) { return _yp_send(iterator, yp_None); }
 
 ypObject *yp_next2(ypObject *iterator, ypObject *default_)
 {
-    ypObject *result = _yp_send(iterator, yp_None);
+    ypObject *result;
+    if (yp_isexceptionC(default_)) return default_;
+    result = _yp_send(iterator, yp_None);
     if (yp_isexceptionC2(result, yp_StopIteration)) {
         result = yp_incref(default_);
     }
@@ -20409,6 +20431,10 @@ void yp_dropitem(ypObject *mapping, ypObject *key, ypObject **exc)
 
 ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *default_)
 {
+    // We typically do not check for NULL, relying instead on the abort when NULL is dereferenced.
+    // However, NULL is valid in tp_getdefault, so if we didn't perform this check then NULL would
+    // de facto become part of the external API.
+    if (default_ == NULL) yp_FATAL1("default_ cannot be NULL");
     _yp_REDIRECT1(mapping, tp_getdefault, (mapping, key, default_));
 }
 
@@ -20422,14 +20448,18 @@ ypObject *yp_iter_keys(ypObject *mapping)
     _yp_REDIRECT2(mapping, tp_as_mapping, tp_iter_keys, (mapping));
 }
 
-ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_)
-{
-    _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, default_));
-}
-
 ypObject *yp_popvalue2(ypObject *mapping, ypObject *key)
 {
-    return yp_popvalue3(mapping, key, yp_KeyError);
+    _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, NULL));
+}
+
+ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_)
+{
+    // We typically do not check for NULL, relying instead on the abort when NULL is dereferenced.
+    // However, NULL is valid in tp_popvalue, so if we didn't perform this check then NULL would
+    // de facto become part of the external API.
+    if (default_ == NULL) yp_FATAL1("default_ cannot be NULL");
+    _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, default_));
 }
 
 void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value)

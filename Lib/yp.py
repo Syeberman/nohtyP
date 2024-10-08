@@ -548,6 +548,9 @@ yp_func(c_ypObject_p, "yp_iter_items", ((c_ypObject_p, "mapping"), ))
 # ypObject *yp_iter_keys(ypObject *mapping);
 yp_func(c_ypObject_p, "yp_iter_keys", ((c_ypObject_p, "mapping"), ))
 
+# ypObject *yp_popvalue2(ypObject *mapping, ypObject *key);
+yp_func(c_ypObject_p, "yp_popvalue2", ((c_ypObject_p, "mapping"), (c_ypObject_p, "key")))
+
 # ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_);
 yp_func(c_ypObject_p, "yp_popvalue3", ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"),
                                        (c_ypObject_p, "default_")))
@@ -2058,7 +2061,10 @@ class _ypDict(ypObject):
     def items(self): return _items_dictview(self)
 
     def pop(self, key, default=_yp_KeyError):
-        return _yp_popvalue3(self, key, default)
+        if default is _yp_KeyError:
+            return _yp_popvalue2(self, key)
+        else:
+            return _yp_popvalue3(self, key, default)
 
     def popitem(self):
         key_p = c_ypObject_pp(yp_None)

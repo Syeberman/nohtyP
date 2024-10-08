@@ -430,9 +430,6 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
         yp_decrefN(N(mp_delitem));
     }
 
-    // Exception-as-default.
-    assert_raises(yp_getdefault(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
-
     // Empty mp.
     ead(value, yp_getdefault(empty, keys[0], values[2]), assert_obj(value, eq, values[2]));
 
@@ -464,6 +461,9 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     // Exception passthrough.
     assert_isexception(yp_getdefault(mp, yp_SyntaxError, values[2]), yp_SyntaxError);
     assert_isexception(yp_getdefault(empty, yp_SyntaxError, values[2]), yp_SyntaxError);
+    assert_isexception(yp_getdefault(mp, keys[0], yp_SyntaxError), yp_SyntaxError);
+    assert_isexception(yp_getdefault(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
+    assert_isexception(yp_getdefault(empty, keys[0], yp_SyntaxError), yp_SyntaxError);
 
     assert_mapping(mp, keys[0], values[0], keys[1], values[1]);  // mp unchanged
 
@@ -721,7 +721,6 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
         ead(value, yp_popvalue3(mp, keys[3], values[3]), assert_obj(value, eq, values[3]));
-        assert_raises(yp_popvalue3(mp, keys[3], yp_SyntaxError), yp_SyntaxError);
         assert_raises(yp_popvalue2(mp, keys[3]), yp_KeyError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
         yp_decref(mp);
@@ -733,7 +732,6 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
         assert_not_raises_exc(yp_delitem(mp, keys[2], &exc));
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         ead(value, yp_popvalue3(mp, keys[2], values[3]), assert_obj(value, eq, values[3]));
-        assert_raises(yp_popvalue3(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
         assert_raises(yp_popvalue2(mp, keys[2]), yp_KeyError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
@@ -743,7 +741,6 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
     {
         ypObject *mp = type->newK(0);
         ead(value, yp_popvalue3(mp, keys[3], values[3]), assert_obj(value, eq, values[3]));
-        assert_raises(yp_popvalue3(mp, keys[3], yp_SyntaxError), yp_SyntaxError);
         assert_raises(yp_popvalue2(mp, keys[3]), yp_KeyError);
         assert_len(mp, 0);
         yp_decref(mp);
@@ -753,7 +750,6 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
         ead(value, yp_popvalue3(mp, mp, values[3]), assert_obj(value, eq, values[3]));
-        assert_raises(yp_popvalue3(mp, mp, yp_SyntaxError), yp_SyntaxError);
         assert_raises(yp_popvalue2(mp, mp), yp_KeyError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
         yp_decref(mp);
@@ -774,7 +770,6 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
         ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
         ead(value, yp_popvalue3(mp, unhashable, values[3]), assert_obj(value, eq, values[3]));
-        assert_raises(yp_popvalue3(mp, unhashable, yp_SyntaxError), yp_SyntaxError);
         assert_raises(yp_popvalue2(mp, unhashable), yp_KeyError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
         yp_decrefN(N(mp, unhashable));
@@ -782,15 +777,14 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
 
     // An unhashable key should match the equal key in mp.
     {
-        hashability_pair_t pair = rand_obj_any_hashability_pair();
-        ypObject          *int_2 = yp_intC(2);
-        ypObject          *intstore_2 = yp_intstoreC(2);
-        ypObject          *mp = type->newK(K(pair.hashable, values[0], int_2, values[1]));
-        ead(value, yp_popvalue3(mp, pair.unhashable, values[3]), assert_obj(value, eq, values[0]));
-        assert_mapping(mp, int_2, values[1]);
-        ead(value, yp_popvalue2(mp, intstore_2), assert_obj(value, eq, values[1]));
+        hashability_pair_t pair0 = rand_obj_any_hashability_pair();
+        hashability_pair_t pair1 = rand_obj_any_hashability_pair();
+        ypObject          *mp = type->newK(K(pair0.hashable, values[0], pair1.hashable, values[1]));
+        ead(value, yp_popvalue3(mp, pair0.unhashable, values[3]), assert_obj(value, eq, values[0]));
+        assert_mapping(mp, pair1.hashable, values[1]);
+        ead(value, yp_popvalue2(mp, pair1.unhashable), assert_obj(value, eq, values[1]));
         assert_len(mp, 0);
-        yp_decrefN(N(pair.hashable, pair.unhashable, int_2, intstore_2, mp));
+        yp_decrefN(N(pair0.hashable, pair0.unhashable, pair1.hashable, pair1.unhashable, mp));
     }
 
     // Some types store references to the given objects and, thus, return exactly those objects.
@@ -805,10 +799,17 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
     // Exception passthrough.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        ypObject *empty = type->newK(0);
         assert_isexception(yp_popvalue3(mp, yp_SyntaxError, values[3]), yp_SyntaxError);
         assert_isexception(yp_popvalue2(mp, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_popvalue3(empty, yp_SyntaxError, values[3]), yp_SyntaxError);
+        assert_isexception(yp_popvalue2(empty, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_popvalue3(mp, keys[0], yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_popvalue3(mp, keys[3], yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_popvalue3(empty, keys[0], yp_SyntaxError), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
-        yp_decref(mp);
+        assert_len(empty, 0);
+        yp_decrefN(N(mp, empty));
     }
 
 tear_down:

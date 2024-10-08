@@ -601,10 +601,6 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     ead(two, yp_getdefault(sq, int_2, items[2]), assert_obj(two, eq, items[2]));
     ead(neg_three, yp_getdefault(sq, int_neg_3, items[2]), assert_obj(neg_three, eq, items[2]));
 
-    // Exception-as-default.
-    assert_raises(yp_getdefault(sq, int_2, yp_SyntaxError), yp_SyntaxError);
-    assert_raises(yp_getdefault(sq, int_neg_3, yp_SyntaxError), yp_SyntaxError);
-
     // Previously-deleted index.
     if (type->is_mutable) {
         ypObject *sq_delitem = type->newN(N(items[0], items[1]));
@@ -644,6 +640,9 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     // Exception passthrough.
     assert_isexception(yp_getdefault(sq, yp_SyntaxError, items[2]), yp_SyntaxError);
     assert_isexception(yp_getdefault(empty, yp_SyntaxError, items[2]), yp_SyntaxError);
+    assert_isexception(yp_getdefault(sq, int_0, yp_SyntaxError), yp_SyntaxError);
+    assert_isexception(yp_getdefault(sq, int_2, yp_SyntaxError), yp_SyntaxError);
+    assert_isexception(yp_getdefault(empty, int_0, yp_SyntaxError), yp_SyntaxError);
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 

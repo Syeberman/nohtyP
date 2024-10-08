@@ -557,8 +557,6 @@ ypAPI ypObject *yp_send(ypObject *iterator, ypObject *value);
 ypAPI ypObject *yp_next(ypObject *iterator);
 
 // Similar to yp_next, but when the iterator is exhausted a new reference to default_ is returned.
-// default_ _can_ be an exception: if it is, then exhaustion is treated as an error.
-// FIXME Remove "can be an exception".
 ypAPI ypObject *yp_next2(ypObject *iterator, ypObject *default_);
 
 // "Sends" an exception into iterator and returns a new reference to the next yielded value, or an
@@ -635,9 +633,7 @@ ypAPI ypObject *yp_getsliceC4(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp
 // Equivalent to yp_getindexC(sequence, yp_asssizeC(i, exc)).
 ypAPI ypObject *yp_getitem(ypObject *sequence, ypObject *i);
 
-// Similar to yp_getitem, but returns a new reference to default_ if i is out of bounds. default_
-// _can_ be an exception: if it is, then that exception is raised on out of bounds.
-// FIXME Remove "can be an exception".
+// Similar to yp_getitem, but returns a new reference to default_ if i is out of bounds.
 ypAPI ypObject *yp_getdefault(ypObject *sequence, ypObject *i, ypObject *default_);
 
 // Returns the lowest index in sequence where x is found, such that x is contained in the slice
@@ -869,16 +865,14 @@ ypAPI ypObject *const yp_frozenset_empty;
 // frozendicts and dicts are both "mapping" objects. A mapping object maps distinct hashable "keys"
 // to arbitrary "values". Attempting to add a key that already exists in the mapping replaces the
 // existing value for that key. Note that yp_contains, yp_in, yp_not_in, and yp_iter operate solely
-// on a mapping's keys.
+// on a mapping's keys. Also note that yp_push and yp_pop are not applicable for mapping objects.
 
 // Returns a new reference to the value of mapping with the given key. Returns yp_KeyError if key is
 // not in the map.
 ypAPI ypObject *yp_getitem(ypObject *mapping, ypObject *key);
 
-// Similar to yp_getitem, but returns a new reference to default_ if key is not in the map. default_
-// _can_ be an exception: if it is, then that exception is raised on a missing key. The
+// Similar to yp_getitem, but returns a new reference to default_ if key is not in the map. The
 // Python-equivalent "default" for default_ is yp_None.
-// FIXME Remove "can be an exception".
 ypAPI ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *default_);
 
 // Returns a new reference to an iterator that yields mapping's (key, value) pairs as 2-tuples.
@@ -901,15 +895,12 @@ ypAPI void yp_delitem(ypObject *mapping, ypObject *key, ypObject **exc);
 // mapping. Sets *exc on error.
 ypAPI void yp_dropitem(ypObject *mapping, ypObject *key, ypObject **exc);
 
-// If key is in mapping, remove it and return a new reference to its value, else return a new
-// reference to default_. default_ _can_ be an exception: if it is, then that exception is raised on
-// a missing key. The Python-equivalent "default" of default_ is yp_KeyError. Note that yp_push and
-// yp_pop are not applicable for mapping objects.
-// FIXME Remove "can be an exception".
-ypAPI ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_);
-
-// Equivalent to yp_popvalue3(mapping, key, yp_KeyError).
+// Remove key from mapping and return a new reference to its value. Returns yp_KeyError if key is
+// not in the map.
 ypAPI ypObject *yp_popvalue2(ypObject *mapping, ypObject *key);
+
+// Similar to yp_popvalue2, but returns a new reference to default_ if key is not in the map.
+ypAPI ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_);
 
 // Removes an arbitrary item from mapping and returns new references to its *key and *value. If
 // mapping is empty yp_KeyError is raised. On error, both *key and *value are set to the same
