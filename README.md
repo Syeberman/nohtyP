@@ -10,7 +10,7 @@ conformance.
 
 [![][AppVeyor badge]][AppVeyor log]
 
-CI is run against both Linux and Windows with the generous support of [AppVeyor].
+CI is run against Linux, MacOS, and Windows with the generous support of [AppVeyor].
 
 
 Build Instructions
