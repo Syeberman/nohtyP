@@ -621,7 +621,7 @@ namespace nohtyP
         internal static extern ypObject_p yp_next( ypObject_p iterator );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_next2( ypObject_p iterator, ypObject_p defval );
+        internal static extern ypObject_p yp_next2( ypObject_p iterator, ypObject_p default_ );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_throw( ypObject_p iterator, ypObject_p exc );
@@ -827,7 +827,7 @@ namespace nohtyP
         internal static extern void yp_pushunique( ypObject_p set, ypObject_p x, ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_getdefault( ypObject_p mapping, ypObject_p key, ypObject_p defval );
+        internal static extern ypObject_p yp_getdefault( ypObject_p mapping, ypObject_p key, ypObject_p default_ );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_iter_items( ypObject_p mapping );
@@ -839,7 +839,7 @@ namespace nohtyP
         internal static extern ypObject_p yp_iter_values( ypObject_p mapping );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_popvalue3( ref ypObject_p mapping, ypObject_p key, ypObject_p defval );
+        internal static extern ypObject_p yp_popvalue3( ref ypObject_p mapping, ypObject_p key, ypObject_p default_ );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_popvalue2( ref ypObject_p mapping, ypObject_p key );
@@ -848,7 +848,7 @@ namespace nohtyP
         internal static extern void yp_popitem( ref ypObject_p mapping, ref ypObject_p key, ref ypObject_p value );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_setdefault( ref ypObject_p mapping, ypObject_p key, ypObject_p defval );
+        internal static extern ypObject_p yp_setdefault( ref ypObject_p mapping, ypObject_p key, ypObject_p default_ );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_updateK( ref ypObject_p mapping, int n, params ypObject_p[] args );
@@ -950,7 +950,7 @@ namespace nohtyP
         internal static extern ypObject_p yp_sum( ypObject_p iterable );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern yp_int_t yp_int_bit_lengthC( ypObject_p x, ref ypObject_p exc );
+        internal static extern yp_int_t yp_bit_lengthC( ypObject_p x, ref ypObject_p exc );
 
         internal static ypObject_p yp_sys_maxint = DllImportData( "yp_sys_maxint" );
         internal static ypObject_p yp_sys_minint = DllImportData( "yp_sys_minint" );

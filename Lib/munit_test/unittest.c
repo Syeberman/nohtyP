@@ -1,6 +1,12 @@
 
 #include "munit_test/unittest.h"
 
+// TODO We go to the trouble of having fixture_type_t.rand_items/etc to allow the type to control
+// what types of items are stored inside it. But then we use functions like
+// rand_obj_any_hashability_pair, rand_obj_any_mutable_unique, etc that could return objects that
+// aren't supported by the types under test. If this becomes a problem the tests will fail, but it
+// may become a problem.
+
 
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
 {
@@ -9,6 +15,59 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
         if (yp_isexceptionC2(x, exceptions[i])) return TRUE;
     }
     return FALSE;
+}
+
+
+// Helper function for assert_setlike. If yp_miniiter_next succeeds, sets *actual to a new reference
+// to the next yielded value, *items_i to the index in items of the first equal object, and returns
+// true; if there is no equal object in items, *items_i is set to n. If mi is exhausted, *actual and
+// *items_i are undefined, and false is returned. If yp_miniiter_next fails, *actual is set to the
+// exception, *items_i is undefined, and true is returned.  n is the number of elements in items.
+extern int _assert_setlike_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t n,
+        ypObject **items, ypObject **actual, yp_ssize_t *items_i)
+{
+    ypObject *eq;
+
+    *actual = yp_miniiter_next(mi, mi_state);  // new ref
+    if (yp_isexceptionC(*actual)) {
+        if (yp_isexceptionC2(*actual, yp_StopIteration)) return FALSE;  // mi is exhausted
+        return TRUE;  // yp_miniiter_next failed with an exception
+    }
+
+    for ((*items_i) = 0; (*items_i) < n; (*items_i)++) {
+        // yp_eq would only fail here if items contained an exception.
+        assert_not_raises(eq = yp_eq(*actual, items[*items_i]));
+        if (eq == yp_True) break;  // equal item found, *items_i is less than n
+    }
+    return TRUE;  // if an equal item was not found, *items_i is equal to n
+}
+
+// Helper function for assert_mapping. If yp_miniiter_items_next succeeds, sets *actual_key and
+// *actual_value to new references to the next yielded pair, *items_ki to the "k-index" in items of
+// the first matching key, and returns true; if there is no equal keys in items, *items_ki is set to
+// k. If mi is exhausted, *actual_key, *actual_value, and *items_ki are undefined, and false is
+// returned. If yp_miniiter_items_next fails, *actual_key is set to the exception, *actual_value and
+// *items_ki are undefined, and true is returned.  k is the number of (key, value) pairs in items;
+// the index of the matching key is (*items_ki)*2, and the value is (*items_ki)*2+1.
+extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t k,
+        ypObject **items, ypObject **actual_key, ypObject **actual_value, yp_ssize_t *items_ki)
+{
+    ypObject *eq;
+
+    yp_miniiter_items_next(mi, mi_state, actual_key, actual_value);  // new refs
+    if (yp_isexceptionC(*actual_key)) {
+        assert_ptr(*actual_value, ==, *actual_key);
+        if (yp_isexceptionC2(*actual_key, yp_StopIteration)) return FALSE;  // mi is exhausted
+        return TRUE;  // yp_miniiter_items_next failed with an exception
+    }
+    assert_not_exception(*actual_value);
+
+    for ((*items_ki) = 0; (*items_ki) < k; (*items_ki)++) {
+        // yp_eq would only fail here if items contained an exception.
+        assert_not_raises(eq = yp_eq(*actual_key, items[(*items_ki) * 2]));
+        if (eq == yp_True) break;  // equal key found, *items_ki is less than k
+    }
+    return TRUE;  // if an equal key was not found, *items_ki is equal to k
 }
 
 
@@ -44,19 +103,21 @@ static fixture_type_t fixture_type_frozenset_dirty_struct;
 static fixture_type_t fixture_type_set_dirty_struct;
 static fixture_type_t fixture_type_frozendict_struct;
 static fixture_type_t fixture_type_dict_struct;
+static fixture_type_t fixture_type_frozendict_dirty_struct;
+static fixture_type_t fixture_type_dict_dirty_struct;
 static fixture_type_t fixture_type_function_struct;
 
 
-static ypObject *objvoidfunc_error(void)
+static ypObject *objobjfunc_error(ypObject *x)
 {
     munit_error("unsupported operation");
-    return NULL;
+    return yp_SystemError;
 }
 
 static ypObject *objvarargfunc_error(int n, ...)
 {
     munit_error("unsupported operation");
-    return NULL;
+    return yp_SystemError;
 }
 
 static void voidarrayfunc_error(yp_ssize_t n, ypObject **array)
@@ -108,6 +169,11 @@ static void rand_ascii(yp_ssize_t len, yp_uint8_t *source)
 // coerced to pointers.
 #define rand_choice_array(array) rand_choice(yp_lengthof_array(array), (array))
 
+static fixture_type_t *rand_choice_fixture_types(fixture_types_t *types)
+{
+    return rand_choice(types->len, types->types);
+}
+
 
 typedef struct _rand_obj_supplier_memo_t {
     yp_ssize_t depth;          // The maximum depth of objects.
@@ -115,21 +181,11 @@ typedef struct _rand_obj_supplier_memo_t {
 } rand_obj_supplier_memo_t;
 
 // "Any" may be limited by memo.
-static yp_ssize_t fixture_types_mutable_len;
-static ypObject  *rand_obj_any_mutable1(const rand_obj_supplier_memo_t *memo)
-{
-    rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, memo->only_hashable};
-    assert_ssizeC(sub_memo.depth, >=, 0);
-    return rand_choice(fixture_types_mutable_len, fixture_types_mutable)->_new_rand(&sub_memo);
-}
-
-// "Any" may be limited by memo.
-static yp_ssize_t fixture_types_immutable_len;
-static ypObject  *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 {
     rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/TRUE};
     assert_ssizeC(sub_memo.depth, >=, 0);
-    return rand_choice(fixture_types_immutable_len, fixture_types_immutable)->_new_rand(&sub_memo);
+    return rand_choice_fixture_types(fixture_types_immutable)->_new_rand(&sub_memo);
 }
 
 // "Any" may be limited by memo (i.e. we might only return hashable types).
@@ -140,7 +196,7 @@ static ypObject *rand_obj_any1(const rand_obj_supplier_memo_t *memo)
     } else {
         rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/FALSE};
         assert_ssizeC(sub_memo.depth, >=, 0);
-        return rand_choice(FIXTURE_TYPES_ALL_LEN, fixture_types_all)->_new_rand(&sub_memo);
+        return rand_choice_fixture_types(fixture_types_all)->_new_rand(&sub_memo);
     }
 }
 
@@ -161,7 +217,7 @@ static ypObject *rand_obj_byte(void) { return yp_intC(munit_rand_int_range(0, 25
 // TODO Return more than just latin-1 characters
 static ypObject *rand_obj_chr(void) { return yp_chrC(munit_rand_int_range(0, 255)); }
 
-ypObject *rand_obj_hashable(fixture_type_t *type)
+extern ypObject *rand_obj_hashable(fixture_type_t *type)
 {
     // Start with depth-1 as we are calling _new_rand ourselves.
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH - 1, /*only_hashable=*/TRUE};
@@ -170,37 +226,44 @@ ypObject *rand_obj_hashable(fixture_type_t *type)
     return result;
 }
 
-ypObject *rand_obj(fixture_type_t *type)
+extern ypObject *rand_obj(fixture_type_t *type)
 {
     // Start with depth-1 as we are calling _new_rand ourselves.
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH - 1, /*only_hashable=*/FALSE};
     return type->_new_rand(&memo);
 }
 
-static yp_ssize_t      fixture_types_immutable_not_str_len;
-static fixture_type_t *fixture_types_immutable_not_str[FIXTURE_TYPES_ALL_LEN + 1];
-ypObject              *rand_obj_hashable_not_str(void)
+extern ypObject *rand_obj_any_not_iterable(void)
 {
-    return rand_obj_hashable(
-            rand_choice(fixture_types_immutable_not_str_len, fixture_types_immutable_not_str));
+    return rand_obj(rand_choice_fixture_types(fixture_types_not_iterable));
 }
 
-ypObject *rand_obj_any_mutable(void)
+extern ypObject *rand_obj_any_hashable_not_str(void)
 {
-    rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH, /*only_hashable=*/FALSE};
-    return rand_obj_any_mutable1(&memo);
+    return rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable_not_str));
 }
 
-ypObject *rand_obj_any_hashable(void)
+extern hashability_pair_t rand_obj_any_hashability_pair(void)
 {
-    rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH, /*only_hashable=*/TRUE};
-    return rand_obj_any_hashable1(&memo);
+    hashability_pair_t pair;
+    pair.hashable = rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable_paired));
+    assert_not_raises(pair.unhashable = yp_unfrozen_copy(pair.hashable));
+    return pair;
 }
 
-ypObject *rand_obj_any(void)
+extern ypObject *rand_obj_any_mutable(void)
 {
-    rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH, /*only_hashable=*/FALSE};
-    return rand_obj_any1(&memo);
+    return rand_obj(rand_choice_fixture_types(fixture_types_mutable));
+}
+
+extern ypObject *rand_obj_any_hashable(void)
+{
+    return rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable));
+}
+
+extern ypObject *rand_obj_any(void)
+{
+    return rand_obj(rand_choice_fixture_types(fixture_types_all));
 }
 
 static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
@@ -230,7 +293,7 @@ static ypObject *rand_obj_unique3(yp_ssize_t n, ypObject **array, objvoidfunc su
     }
 }
 
-ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array)
+extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array)
 {
     return rand_obj_unique3(n, array, rand_obj_any_mutable);
 }
@@ -261,21 +324,58 @@ static void rand_objs_any_hashable(yp_ssize_t n, ypObject **array)
     rand_objs3(n, array, rand_obj_any_hashable);
 }
 
-void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
+extern void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
 
 
-typedef struct _new_rand_iter_state {
+static ypObject *_new_items_listKV(yp_ssize_t n, va_list args)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_listN(0));  // new ref
+    for (/*n already initialized*/; n > 0; n--) {
+        ypObject *item;
+        // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
+        ypObject *key = va_arg(args, ypObject *);            // borrowed
+        ypObject *value = va_arg(args, ypObject *);          // borrowed
+        assert_not_raises(item = yp_tupleN(2, key, value));  // new ref
+        assert_not_raises_exc(yp_append(result, item, &exc));
+        yp_decref(item);
+    }
+    return result;
+}
+
+extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args)
+{
+    ypObject *result;
+    ypObject *list = _new_items_listKV(n, args);  // new ref
+    if (type == fixture_type_list) return list;
+    result = type->new_(list);
+    yp_decref(list);
+    return result;
+}
+
+extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...)
+{
+    ypObject *result;
+    va_list   args;
+    va_start(args, n);
+    result = new_itemsKV(type, n, args);  // new ref
+    va_end(args);
+    return result;
+}
+
+
+typedef struct _rand_iter_state_t {
     yp_ssize_t               n;
     rand_obj_supplier_t      supplier;
     rand_obj_supplier_memo_t supplier_memo;
-} new_rand_iter_state;
+} rand_iter_state_t;
 
-static yp_state_decl_t new_rand_iter_state_decl = {yp_sizeof(new_rand_iter_state)};
+static yp_state_decl_t rand_iter_state_decl = {yp_sizeof(rand_iter_state_t)};
 
-static ypObject *new_rand_iter_func(ypObject *g, ypObject *value)
+static ypObject *rand_iter_func(ypObject *g, ypObject *value)
 {
-    new_rand_iter_state *state;
-    yp_ssize_t           size;
+    rand_iter_state_t *state;
+    yp_ssize_t         size;
     if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
@@ -289,8 +389,8 @@ static ypObject *new_rand_iter3(
         yp_ssize_t n, rand_obj_supplier_t supplier, const rand_obj_supplier_memo_t *supplier_memo)
 {
     ypObject           *result;
-    new_rand_iter_state state = {n, supplier};
-    yp_generator_decl_t decl = {new_rand_iter_func, n, &state, &new_rand_iter_state_decl};
+    rand_iter_state_t   state = {n, supplier};
+    yp_generator_decl_t decl = {rand_iter_func, n, &state, &rand_iter_state_decl};
     state.supplier_memo = *supplier_memo;
 
     result = yp_generatorC(&decl);
@@ -298,20 +398,19 @@ static ypObject *new_rand_iter3(
     return result;
 }
 
-typedef struct _new_faulty_iter_state {
+typedef struct _faulty_iter_state_t {
     ypObject  *supplier;   // Sub-iterator supplying values to yield until n reaches zero.
     yp_ssize_t n;          // Raise exception when this reaches zero.
     ypObject  *exception;  // Exception to raise.
-} new_faulty_iter_state;
+} faulty_iter_state_t;
 
-static yp_state_decl_t new_faulty_iter_state_decl = {yp_sizeof(new_faulty_iter_state), 2,
-        {yp_offsetof(new_faulty_iter_state, supplier),
-                yp_offsetof(new_faulty_iter_state, exception)}};
+static yp_state_decl_t faulty_iter_state_decl = {yp_sizeof(faulty_iter_state_t), 2,
+        {yp_offsetof(faulty_iter_state_t, supplier), yp_offsetof(faulty_iter_state_t, exception)}};
 
-static ypObject *new_faulty_iter_func(ypObject *g, ypObject *value)
+static ypObject *faulty_iter_func(ypObject *g, ypObject *value)
 {
-    new_faulty_iter_state *state;
-    yp_ssize_t             size;
+    faulty_iter_state_t *state;
+    yp_ssize_t           size;
     if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
@@ -324,10 +423,9 @@ static ypObject *new_faulty_iter_func(ypObject *g, ypObject *value)
 extern ypObject *new_faulty_iter(
         ypObject *supplier, yp_ssize_t n, ypObject *exception, yp_ssize_t length_hint)
 {
-    ypObject             *result;
-    new_faulty_iter_state state = {yp_iter(supplier) /*new ref*/, n, exception};
-    yp_generator_decl_t   decl = {
-            new_faulty_iter_func, length_hint, &state, &new_faulty_iter_state_decl};
+    ypObject           *result;
+    faulty_iter_state_t state = {yp_iter(supplier) /*new ref*/, n, exception};
+    yp_generator_decl_t decl = {faulty_iter_func, length_hint, &state, &faulty_iter_state_decl};
     assert_not_exception(state.supplier);
     assert_isexception(exception, yp_BaseException);
 
@@ -341,7 +439,7 @@ extern ypObject *new_faulty_iter(
 // Returns a random type object, except invalidated and exception objects.
 static ypObject *new_rand_type(const rand_obj_supplier_memo_t *memo)
 {
-    return rand_choice(FIXTURE_TYPES_ALL_LEN, fixture_types_all)->type;
+    return rand_choice_fixture_types(fixture_types_all)->type;
 }
 
 static fixture_type_t fixture_type_type_struct = {
@@ -352,12 +450,13 @@ static fixture_type_t fixture_type_type_struct = {
 
         new_rand_type,  // _new_rand
 
+        yp_type,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -369,6 +468,8 @@ static fixture_type_t fixture_type_type_struct = {
         FALSE,  // is_mapping
         TRUE,   // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 // There is only one NoneType object: yp_None.
@@ -382,12 +483,13 @@ static fixture_type_t fixture_type_NoneType_struct = {
 
         new_rand_NoneType,  // _new_rand
 
+        objobjfunc_error,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -399,6 +501,8 @@ static fixture_type_t fixture_type_NoneType_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_bool(const rand_obj_supplier_memo_t *memo)
@@ -418,12 +522,13 @@ static fixture_type_t fixture_type_bool_struct = {
 
         new_rand_bool,  // _new_rand
 
+        yp_bool,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -435,6 +540,8 @@ static fixture_type_t fixture_type_bool_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_int(const rand_obj_supplier_memo_t *memo)
@@ -452,12 +559,13 @@ static fixture_type_t fixture_type_int_struct = {
 
         new_rand_int,  // _new_rand
 
+        yp_int,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -469,6 +577,8 @@ static fixture_type_t fixture_type_int_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_intstore(const rand_obj_supplier_memo_t *memo)
@@ -486,12 +596,13 @@ static fixture_type_t fixture_type_intstore_struct = {
 
         new_rand_intstore,  // _new_rand
 
+        yp_intstore,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -503,6 +614,8 @@ static fixture_type_t fixture_type_intstore_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_float(const rand_obj_supplier_memo_t *memo)
@@ -520,12 +633,13 @@ static fixture_type_t fixture_type_float_struct = {
 
         new_rand_float,  // _new_rand
 
+        yp_float,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -537,6 +651,8 @@ static fixture_type_t fixture_type_float_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_floatstore(const rand_obj_supplier_memo_t *memo)
@@ -554,12 +670,13 @@ static fixture_type_t fixture_type_floatstore_struct = {
 
         new_rand_floatstore,  // _new_rand
 
+        yp_floatstore,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -571,6 +688,8 @@ static fixture_type_t fixture_type_floatstore_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_iter(const rand_obj_supplier_memo_t *memo)
@@ -603,12 +722,13 @@ static fixture_type_t fixture_type_iter_struct = {
 
         new_rand_iter,  // _new_rand
 
+        yp_iter,  // new_
+
         newN_iter,      // newN
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -620,6 +740,8 @@ static fixture_type_t fixture_type_iter_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 // TODO Ranges that cover more values, not just 32-bit-ish.
@@ -702,12 +824,13 @@ static fixture_type_t fixture_type_range_struct = {
 
         new_rand_range,  // _new_rand
 
+        objobjfunc_error,  // new_
+
         newN_range,        // newN
         rand_items_range,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -719,6 +842,8 @@ static fixture_type_t fixture_type_range_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         TRUE,   // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_bytes(const rand_obj_supplier_memo_t *memo)
@@ -761,12 +886,13 @@ static fixture_type_t fixture_type_bytes_struct = {
 
         new_rand_bytes,  // _new_rand
 
+        yp_bytes,  // new_
+
         newN_bytes,      // newN
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -778,6 +904,8 @@ static fixture_type_t fixture_type_bytes_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_bytearray(const rand_obj_supplier_memo_t *memo)
@@ -820,12 +948,13 @@ static fixture_type_t fixture_type_bytearray_struct = {
 
         new_rand_bytearray,  // _new_rand
 
+        yp_bytearray,  // new_
+
         newN_bytearray,  // newN
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -837,6 +966,8 @@ static fixture_type_t fixture_type_bytearray_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 // TODO Return larger characters than just ascii.
@@ -881,12 +1012,13 @@ static fixture_type_t fixture_type_str_struct = {
 
         new_rand_str,  // _new_rand
 
+        yp_str,  // new_
+
         newN_str,       // newN
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -898,6 +1030,8 @@ static fixture_type_t fixture_type_str_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 // TODO Return larger characters than just ascii.
@@ -943,12 +1077,13 @@ static fixture_type_t fixture_type_chrarray_struct = {
 
         new_rand_chrarray,  // _new_rand
 
+        yp_chrarray,  // new_
+
         newN_chrarray,  // newN
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -960,6 +1095,8 @@ static fixture_type_t fixture_type_chrarray_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
@@ -984,12 +1121,13 @@ static fixture_type_t fixture_type_tuple_struct = {
 
         new_rand_tuple,  // _new_rand
 
+        yp_tuple,  // new_
+
         yp_tupleN,      // newN
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1001,6 +1139,8 @@ static fixture_type_t fixture_type_tuple_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
@@ -1025,12 +1165,13 @@ static fixture_type_t fixture_type_list_struct = {
 
         new_rand_list,  // _new_rand
 
+        yp_list,  // new_
+
         yp_listN,       // newN
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1042,6 +1183,8 @@ static fixture_type_t fixture_type_list_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
@@ -1067,12 +1210,13 @@ static fixture_type_t fixture_type_frozenset_struct = {
 
         new_rand_frozenset,  // _new_rand
 
+        yp_frozenset,  // new_
+
         yp_frozensetN,           // newN
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1084,6 +1228,8 @@ static fixture_type_t fixture_type_frozenset_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        TRUE,   // hashable_items_only
 };
 
 static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
@@ -1109,12 +1255,13 @@ static fixture_type_t fixture_type_set_struct = {
 
         new_rand_set,  // _new_rand
 
+        yp_set,  // new_
+
         yp_setN,                 // newN
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1126,6 +1273,8 @@ static fixture_type_t fixture_type_set_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        TRUE,   // hashable_items_only
 };
 
 // Adds and discards a unique object from so such that it will contain a deleted entry.
@@ -1149,11 +1298,22 @@ static void make_set_dirty(ypObject *so)
     yp_decref(item);
 }
 
+static ypObject *new_frozenset_dirty(ypObject *x)
+{
+    ypObject *result = yp_set(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_set_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozenset);
+    return result;
+}
+
 static ypObject *new_rand_frozenset_dirty(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = new_rand_set(memo);  // new ref
     make_set_dirty(result);
     assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozenset);
     return result;
 }
 
@@ -1163,11 +1323,12 @@ static ypObject *new_frozenset_dirtyN(int n, ...)
     ypObject *result;
 
     va_start(args, n);
-    result = yp_setNV(n, args);  // new ref
+    assert_not_raises(result = yp_setNV(n, args));  // new ref
     va_end(args);
 
     make_set_dirty(result);
     assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozenset);
     return result;
 }
 
@@ -1180,12 +1341,13 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
 
         new_rand_frozenset_dirty,  // _new_rand
 
+        new_frozenset_dirty,  // new_
+
         new_frozenset_dirtyN,    // newN
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1197,7 +1359,17 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        TRUE,   // hashable_items_only
 };
+
+static ypObject *new_set_dirty(ypObject *x)
+{
+    ypObject *result = yp_set(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_set_dirty(result);
+    return result;
+}
 
 static ypObject *new_rand_set_dirty(const rand_obj_supplier_memo_t *memo)
 {
@@ -1212,7 +1384,7 @@ static ypObject *new_set_dirtyN(int n, ...)
     ypObject *result;
 
     va_start(args, n);
-    result = yp_setNV(n, args);  // new ref
+    assert_not_raises(result = yp_setNV(n, args));  // new ref
     va_end(args);
 
     make_set_dirty(result);
@@ -1228,12 +1400,13 @@ static fixture_type_t fixture_type_set_dirty_struct = {
 
         new_rand_set_dirty,  // _new_rand
 
+        new_set_dirty,  // new_
+
         new_set_dirtyN,          // newN
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1245,6 +1418,8 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        TRUE,   // hashable_items_only
 };
 
 static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
@@ -1316,12 +1491,13 @@ static fixture_type_t fixture_type_frozendict_struct = {
 
         new_rand_frozendict,  // _new_rand
 
+        yp_frozendict,  // new_
+
         new_frozendictN,         // newN
         rand_objs_any_hashable,  // rand_items
 
-        yp_frozendictK,         // newK
-        rand_obj_any_hashable,  // rand_key
-        rand_obj_any,           // rand_value
+        yp_frozendictK,  // newK
+        rand_objs_any,   // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1333,6 +1509,8 @@ static fixture_type_t fixture_type_frozendict_struct = {
         TRUE,   // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        TRUE,   // hashable_items_only
 };
 
 static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
@@ -1350,18 +1528,22 @@ static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *new_dictNV(int n, va_list args)
+{
+    ypObject *result;
+    ypObject *supplier = _mapping_new_supplierN(n, args);  // new ref
+    assert_not_raises(result = yp_dict(supplier));         // new ref
+    yp_decref(supplier);
+    return result;
+}
+
 static ypObject *new_dictN(int n, ...)
 {
     va_list   args;
-    ypObject *supplier;
     ypObject *result;
-
     va_start(args, n);
-    supplier = _mapping_new_supplierN(n, args);  // new ref
+    result = new_dictNV(n, args);  // new ref
     va_end(args);
-
-    assert_not_raises(result = yp_dict(supplier));  // new ref
-    yp_decref(supplier);
     return result;
 }
 
@@ -1373,12 +1555,13 @@ static fixture_type_t fixture_type_dict_struct = {
 
         new_rand_dict,  // _new_rand
 
+        yp_dict,  // new_
+
         new_dictN,               // newN
         rand_objs_any_hashable,  // rand_items
 
-        yp_dictK,               // newK
-        rand_obj_any_hashable,  // rand_key
-        rand_obj_any,           // rand_value
+        yp_dictK,       // newK
+        rand_objs_any,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1390,6 +1573,180 @@ static fixture_type_t fixture_type_dict_struct = {
         TRUE,   // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        TRUE,   // hashable_items_only
+};
+
+// Adds and discards a unique object from mp such that it will contain a deleted entry.
+static void make_dict_dirty(ypObject *mp)
+{
+    yp_uint8_t bytes[16];
+    ypObject  *item;
+
+    // We could use any object to make the dict dirty: the type and value don't affect the final
+    // result, only the hash of the object remains after removing it. 16 random bytes is unique
+    // enough for UUIDs, so we'll use that. It's unlikely, but possible, that the hash could equal
+    // an existing or future item in this dict, and we don't know what order the entries in the dict
+    // will be visited, so coverage results for the tests could conceivably change run-to-run. Also,
+    // the dict will become clean again if resized, which would affect coverage.
+    munit_rand_memory(16, bytes);
+    assert_not_raises(item = yp_bytesC(16, bytes));  // new ref
+
+    assert_obj(item, not_in, mp);
+    assert_not_raises_exc(yp_setitem(mp, item, item, &exc));
+    assert_not_raises_exc(yp_delitem(mp, item, &exc));
+
+    yp_decref(item);
+}
+
+static ypObject *new_frozendict_dirty(ypObject *x)
+{
+    ypObject *result = yp_dict(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_dict_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozendict);
+    return result;
+}
+
+static ypObject *new_rand_frozendict_dirty(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = new_rand_dict(memo);  // new ref
+    make_dict_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozendict);
+    return result;
+}
+
+static ypObject *new_frozendict_dirtyN(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = new_dictNV(n, args);  // new ref
+    va_end(args);
+
+    make_dict_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozendict);
+    return result;
+}
+
+static ypObject *new_frozendict_dirtyK(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = yp_dictKV(n, args);  // new ref
+    va_end(args);
+
+    make_dict_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozendict);
+    return result;
+}
+
+static fixture_type_t fixture_type_frozendict_dirty_struct = {
+        "frozendict_dirty",               // name
+        NULL,                             // type (initialized at runtime)
+        NULL,                             // falsy (initialized at runtime, maybe)
+        &fixture_type_dict_dirty_struct,  // pair
+
+        new_rand_frozendict_dirty,  // _new_rand
+
+        new_frozendict_dirty,  // new_
+
+        new_frozendict_dirtyN,   // newN
+        rand_objs_any_hashable,  // rand_items
+
+        new_frozendict_dirtyK,  // newK
+        rand_objs_any,          // rand_values
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        TRUE,   // is_iterable
+        TRUE,   // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_setlike
+        TRUE,   // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        TRUE,   // hashable_items_only
+};
+
+static ypObject *new_dict_dirty(ypObject *x)
+{
+    ypObject *result = yp_dict(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_dict_dirty(result);
+    return result;
+}
+
+static ypObject *new_rand_dict_dirty(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = new_rand_dict(memo);  // new ref
+    make_dict_dirty(result);
+    return result;
+}
+
+static ypObject *new_dict_dirtyN(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = new_dictNV(n, args);  // new ref
+    va_end(args);
+
+    make_dict_dirty(result);
+    return result;
+}
+
+static ypObject *new_dict_dirtyK(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = yp_dictKV(n, args);  // new ref
+    va_end(args);
+
+    make_dict_dirty(result);
+    return result;
+}
+
+static fixture_type_t fixture_type_dict_dirty_struct = {
+        "dict_dirty",                           // name
+        NULL,                                   // type (initialized at runtime)
+        NULL,                                   // falsy (initialized at runtime, maybe)
+        &fixture_type_frozendict_dirty_struct,  // pair
+
+        new_rand_dict_dirty,  // _new_rand
+
+        new_dict_dirty,  // new_
+
+        new_dict_dirtyN,         // newN
+        rand_objs_any_hashable,  // rand_items
+
+        new_dict_dirtyK,  // newK
+        rand_objs_any,    // rand_values
+
+        TRUE,   // is_mutable
+        FALSE,  // is_numeric
+        TRUE,   // is_iterable
+        TRUE,   // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_setlike
+        TRUE,   // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_patterned
+        TRUE,   // original_object_return
+        TRUE,   // hashable_items_only
 };
 
 static ypObject *new_rand_function_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
@@ -1397,6 +1754,8 @@ static ypObject *new_rand_function_code(ypObject *f, yp_ssize_t n, ypObject *con
     return rand_obj_any();
 }
 
+// TODO Randomly return a statically-allocated function.
+// TODO Randomize the parameters, default values, etc.
 static ypObject *new_rand_function(const rand_obj_supplier_memo_t *memo)
 {
     yp_parameter_decl_t parameter_decl[] = {{yp_s_star_args}, {yp_s_star_star_kwargs}};
@@ -1415,12 +1774,13 @@ static fixture_type_t fixture_type_function_struct = {
 
         new_rand_function,  // _new_rand
 
+        objobjfunc_error,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1432,6 +1792,8 @@ static fixture_type_t fixture_type_function_struct = {
         FALSE,  // is_mapping
         TRUE,   // is_callable
         FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
 };
 
 fixture_type_t *fixture_type_type = &fixture_type_type_struct;
@@ -1455,58 +1817,73 @@ fixture_type_t *fixture_type_frozenset_dirty = &fixture_type_frozenset_dirty_str
 fixture_type_t *fixture_type_set_dirty = &fixture_type_set_dirty_struct;
 fixture_type_t *fixture_type_frozendict = &fixture_type_frozendict_struct;
 fixture_type_t *fixture_type_dict = &fixture_type_dict_struct;
+fixture_type_t *fixture_type_frozendict_dirty = &fixture_type_frozendict_dirty_struct;
+fixture_type_t *fixture_type_dict_dirty = &fixture_type_dict_dirty_struct;
 fixture_type_t *fixture_type_function = &fixture_type_function_struct;
 
-fixture_type_t *fixture_types_all[] = {&fixture_type_type_struct, &fixture_type_NoneType_struct,
-        &fixture_type_bool_struct, &fixture_type_int_struct, &fixture_type_intstore_struct,
-        &fixture_type_float_struct, &fixture_type_floatstore_struct, &fixture_type_iter_struct,
-        &fixture_type_range_struct, &fixture_type_bytes_struct, &fixture_type_bytearray_struct,
-        &fixture_type_str_struct, &fixture_type_chrarray_struct, &fixture_type_tuple_struct,
-        &fixture_type_list_struct, &fixture_type_frozenset_struct, &fixture_type_set_struct,
-        &fixture_type_frozenset_dirty_struct, &fixture_type_set_dirty_struct,
-        &fixture_type_frozendict_struct, &fixture_type_dict_struct, &fixture_type_function_struct,
-        NULL};
+#define FIXTURE_TYPES_ALL_LEN 24  // Verified in initialize_fixture_types.
+static fixture_type_t *fixture_types_all_types[] = {&fixture_type_type_struct,
+        &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
+        &fixture_type_intstore_struct, &fixture_type_float_struct, &fixture_type_floatstore_struct,
+        &fixture_type_iter_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
+        &fixture_type_bytearray_struct, &fixture_type_str_struct, &fixture_type_chrarray_struct,
+        &fixture_type_tuple_struct, &fixture_type_list_struct, &fixture_type_frozenset_struct,
+        &fixture_type_set_struct, &fixture_type_frozenset_dirty_struct,
+        &fixture_type_set_dirty_struct, &fixture_type_frozendict_struct, &fixture_type_dict_struct,
+        &fixture_type_frozendict_dirty_struct, &fixture_type_dict_dirty_struct,
+        &fixture_type_function_struct, NULL};
+// param_values_types_all is populated in initialize_fixture_types.
+static fixture_types_t fixture_types_all_struct = {FIXTURE_TYPES_ALL_LEN, fixture_types_all_types};
+fixture_types_t       *fixture_types_all = &fixture_types_all_struct;
+char                  *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
 
-// These are subsets of fixture_types_all, so will at most hold that many elements.
-fixture_type_t        *fixture_types_mutable[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_immutable[FIXTURE_TYPES_ALL_LEN + 1];
-static fixture_type_t *fixture_types_immutable_not_str[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_numeric[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_iterable[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_collection[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_sequence[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_string[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_setlike[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_mapping[FIXTURE_TYPES_ALL_LEN + 1];
-
-static yp_ssize_t fixture_types_mutable_len = 0;            // Incremented later
-static yp_ssize_t fixture_types_immutable_len = 0;          // Incremented later
-static yp_ssize_t fixture_types_immutable_not_str_len = 0;  // Incremented later
-
-// Once again, subsets of fixture_types_all.
-char *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_numeric[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_iterable[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_collection[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_sequence[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_string[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_setlike[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_mapping[FIXTURE_TYPES_ALL_LEN + 1];
-
-// The given arrays must be no smaller than fixture_types_all.
-static void fill_type_arrays(fixture_type_t **fixture_array, char **param_array, yp_ssize_t offset)
+// Defines the type arrays (i.e. fixture_types_mutable and param_values_types_mutable). Also defines
+// the filter functions used by FILL_FIXTURE_TYPES_ARRAYS to fill these type arrays. These are
+// subsets of fixture_types_all, so will at most hold FIXTURE_TYPES_ALL_LEN elements.
+#define DEFINE_FIXTURE_TYPES_ARRAYS(name)                                                     \
+    static fixture_type_t *fixture_types_##name##_types[FIXTURE_TYPES_ALL_LEN + 1];           \
+    static fixture_types_t fixture_types_##name##_struct = {0, fixture_types_##name##_types}; \
+    fixture_types_t       *fixture_types_##name = &fixture_types_##name##_struct;             \
+    char                  *param_values_types_##name[FIXTURE_TYPES_ALL_LEN + 1];
+#define DEFINE_FIXTURE_TYPES(protocol, not_name)                                                \
+    DEFINE_FIXTURE_TYPES_ARRAYS(protocol)                                                       \
+    static int fixture_type_is_##protocol(fixture_type_t *type) { return type->is_##protocol; } \
+    DEFINE_FIXTURE_TYPES_ARRAYS(not_name)                                                       \
+    static int fixture_type_is_##not_name(fixture_type_t *type) { return !type->is_##protocol; }
+DEFINE_FIXTURE_TYPES(mutable, immutable);
+DEFINE_FIXTURE_TYPES(numeric, not_numeric);
+DEFINE_FIXTURE_TYPES(iterable, not_iterable);
+DEFINE_FIXTURE_TYPES(collection, not_collection);
+DEFINE_FIXTURE_TYPES(sequence, not_sequence);
+DEFINE_FIXTURE_TYPES(string, not_string);
+DEFINE_FIXTURE_TYPES(setlike, not_setlike);
+DEFINE_FIXTURE_TYPES(mapping, not_mapping);
+#undef DEFINE_FIXTURE_TYPES
+DEFINE_FIXTURE_TYPES_ARRAYS(immutable_not_str);
+static int fixture_type_is_immutable_not_str(fixture_type_t *type)
 {
-    fixture_type_t **types;
-    for (types = fixture_types_all; *types != NULL; types++) {
-        if (*((int *)(((yp_uint8_t *)*types) + offset))) {
-            *fixture_array = *types;
-            fixture_array++;
-            *param_array = (*types)->name;
-            param_array++;
+    return !type->is_mutable && type != fixture_type_str;
+}
+DEFINE_FIXTURE_TYPES_ARRAYS(immutable_paired);
+static int fixture_type_is_immutable_paired(fixture_type_t *type)
+{
+    return !type->is_mutable && type->pair != type;
+}
+#undef DEFINE_FIXTURE_TYPES_ARRAYS
+
+static void fill_fixture_types_arrays(fixture_types_t *fixture_types, char **param_values_types,
+        int (*is_of_type)(fixture_type_t *))
+{
+    fixture_type_t **type;
+    for (type = fixture_types_all->types; *type != NULL; type++) {
+        if (is_of_type(*type)) {
+            fixture_types->types[fixture_types->len] = *type;
+            param_values_types[fixture_types->len] = (*type)->name;
+            fixture_types->len++;
         }
     }
-    *fixture_array = NULL;
-    *param_array = NULL;
+    fixture_types->types[fixture_types->len] = NULL;
+    param_values_types[fixture_types->len] = NULL;
 }
 
 static void initialize_fixture_types(void)
@@ -1544,57 +1921,75 @@ static void initialize_fixture_types(void)
     fixture_type_frozendict->type = yp_t_frozendict;
     fixture_type_frozendict->falsy = yp_frozendict_empty;
     fixture_type_dict->type = yp_t_dict;
+    fixture_type_frozendict_dirty->type = yp_t_frozendict;
+    fixture_type_frozendict_dirty->falsy = yp_frozendict_empty;
+    fixture_type_dict_dirty->type = yp_t_dict;
     fixture_type_function->type = yp_t_function;
 
     // The fixture_types_* and param_values_types_* arrays above were sized based on
     // FIXTURE_TYPES_ALL_LEN, so make sure that value is correct.
-    if (yp_lengthof_array(fixture_types_all) != FIXTURE_TYPES_ALL_LEN + 1) {
+    if (yp_lengthof_array(fixture_types_all_types) != FIXTURE_TYPES_ALL_LEN + 1) {
         fprintf(stderr, "Update FIXTURE_TYPES_ALL_LEN in unittest.h to %" PRIssize "\n",
-                yp_lengthof_array(fixture_types_all) - 1);
+                yp_lengthof_array(fixture_types_all_types) - 1);
         abort();
     }
 
+    // Fill param_values_types_all. fixture_types_all was initialized statically.
     {
-        fixture_type_t **types;
+        fixture_type_t **type;
         char           **param_values = param_values_types_all;
-        fixture_type_t **mutables = fixture_types_mutable;
-        fixture_type_t **immutables = fixture_types_immutable;
-        fixture_type_t **immutables_not_str = fixture_types_immutable_not_str;
-        for (types = fixture_types_all; *types != NULL; types++) {
-            *param_values = (*types)->name;
+        for (type = fixture_types_all->types; *type != NULL; type++) {
+            *param_values = (*type)->name;
             param_values++;
-            if ((*types)->is_mutable) {
-                *mutables = *types;
-                mutables++;
-                fixture_types_mutable_len++;
-            } else {
-                *immutables = *types;
-                immutables++;
-                fixture_types_immutable_len++;
-                if ((*types) != fixture_type_str) {
-                    *immutables_not_str = *types;
-                    immutables_not_str++;
-                    fixture_types_immutable_not_str_len++;
-                }
-            }
         }
         *param_values = NULL;
-        *mutables = NULL;
-        *immutables = NULL;
-        *immutables_not_str = NULL;
     }
 
-#define FILL_TYPE_ARRAYS(protocol)                                            \
-    fill_type_arrays(fixture_types_##protocol, param_values_types_##protocol, \
-            yp_offsetof(fixture_type_t, is_##protocol));
-    FILL_TYPE_ARRAYS(numeric);
-    FILL_TYPE_ARRAYS(iterable);
-    FILL_TYPE_ARRAYS(collection);
-    FILL_TYPE_ARRAYS(sequence);
-    FILL_TYPE_ARRAYS(string);
-    FILL_TYPE_ARRAYS(setlike);
-    FILL_TYPE_ARRAYS(mapping);
-#undef FILL_TYPE_ARRAYS
+    // Fill the remaining fixture_types_* and param_values_types_* arrays.
+#define FILL_FIXTURE_TYPES_ARRAYS(protocol) \
+    fill_fixture_types_arrays(              \
+            fixture_types_##protocol, param_values_types_##protocol, fixture_type_is_##protocol);
+    FILL_FIXTURE_TYPES_ARRAYS(mutable);
+    FILL_FIXTURE_TYPES_ARRAYS(numeric);
+    FILL_FIXTURE_TYPES_ARRAYS(iterable);
+    FILL_FIXTURE_TYPES_ARRAYS(collection);
+    FILL_FIXTURE_TYPES_ARRAYS(sequence);
+    FILL_FIXTURE_TYPES_ARRAYS(string);
+    FILL_FIXTURE_TYPES_ARRAYS(setlike);
+    FILL_FIXTURE_TYPES_ARRAYS(mapping);
+    FILL_FIXTURE_TYPES_ARRAYS(immutable);
+    FILL_FIXTURE_TYPES_ARRAYS(not_numeric);
+    FILL_FIXTURE_TYPES_ARRAYS(not_iterable);
+    FILL_FIXTURE_TYPES_ARRAYS(not_collection);
+    FILL_FIXTURE_TYPES_ARRAYS(not_sequence);
+    FILL_FIXTURE_TYPES_ARRAYS(not_string);
+    FILL_FIXTURE_TYPES_ARRAYS(not_setlike);
+    FILL_FIXTURE_TYPES_ARRAYS(not_mapping);
+    FILL_FIXTURE_TYPES_ARRAYS(immutable_not_str);
+    FILL_FIXTURE_TYPES_ARRAYS(immutable_paired);
+#undef FILL_FIXTURE_TYPES_ARRAYS
+}
+
+// TODO We could speed this up with a frozendict or somesuch.
+extern fixture_type_t *fixture_type_from_object(ypObject *object)
+{
+    fixture_type_t **fixture_type;
+    ypObject        *type = yp_type(object);
+    for (fixture_type = fixture_types_all->types; (*fixture_type) != NULL; fixture_type++) {
+        if ((*fixture_type)->type == type) break;
+    }
+    yp_decref(type);
+    assert_not_null(*fixture_type);
+    return *fixture_type;
+}
+
+extern int object_is_hashable(ypObject *object)
+{
+    ypObject *exc = yp_None;
+    (void)yp_hashC(object, &exc);
+    if (yp_isexceptionC2(exc, yp_TypeError)) return FALSE;
+    assert_not_exception(exc);  // unexpected exception
+    return TRUE;
 }
 
 
@@ -1609,7 +2004,7 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array)
 }
 
 
-yp_ssize_t yp_lenC_not_raises(ypObject *container)
+extern yp_ssize_t yp_lenC_not_raises(ypObject *container)
 {
     yp_ssize_t result;
     assert_not_raises_exc(result = yp_lenC(container, &exc));
@@ -1617,7 +2012,7 @@ yp_ssize_t yp_lenC_not_raises(ypObject *container)
 }
 
 
-#define MALLOC_TRACKER_MAX_LEN 2000
+#define MALLOC_TRACKER_MAX_LEN 4000
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {
@@ -1663,21 +2058,22 @@ static void malloc_tracker_pop(void *p)
     }
 }
 
-void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size)
+extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p = yp_mem_default_malloc(actual, size);
     if (p != NULL) malloc_tracker_push(p);
     return p;
 }
 
-void *malloc_tracker_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
+extern void *malloc_tracker_malloc_resize(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newP = yp_mem_default_malloc_resize(actual, p, size, extra);
     if (newP != NULL && newP != p) malloc_tracker_push(newP);
     return newP;
 }
 
-void malloc_tracker_free(void *p)
+extern void malloc_tracker_free(void *p)
 {
     yp_mem_default_free(p);
     if (p != NULL) malloc_tracker_pop(p);
@@ -1699,7 +2095,7 @@ static fixture_type_t *fixture_get_type(const MunitParameter params[])
     const char      *type_name = munit_parameters_get(params, param_key_type);
     if (type_name == NULL) return NULL;
 
-    for (type = fixture_types_all; *type != NULL; type++) {
+    for (type = fixture_types_all->types; *type != NULL; type++) {
         if (strcmp((*type)->name, type_name) == 0) return *type;
     }
 

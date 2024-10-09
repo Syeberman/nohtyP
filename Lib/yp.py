@@ -538,9 +538,9 @@ yp_func(c_void, "yp_setitem",
 # void yp_delitem(ypObject *mapping, ypObject *key, ypObject **exc);
 yp_func(c_void, "yp_delitem", ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), c_ypObject_pp_exc))
 
-# ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *defval);
+# ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *default_);
 yp_func(c_ypObject_p, "yp_getdefault",
-        ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")))
+        ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "default_")))
 
 # ypObject *yp_iter_items(ypObject *mapping);
 yp_func(c_ypObject_p, "yp_iter_items", ((c_ypObject_p, "mapping"), ))
@@ -548,17 +548,20 @@ yp_func(c_ypObject_p, "yp_iter_items", ((c_ypObject_p, "mapping"), ))
 # ypObject *yp_iter_keys(ypObject *mapping);
 yp_func(c_ypObject_p, "yp_iter_keys", ((c_ypObject_p, "mapping"), ))
 
-# ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *defval);
+# ypObject *yp_popvalue2(ypObject *mapping, ypObject *key);
+yp_func(c_ypObject_p, "yp_popvalue2", ((c_ypObject_p, "mapping"), (c_ypObject_p, "key")))
+
+# ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_);
 yp_func(c_ypObject_p, "yp_popvalue3", ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"),
-                                       (c_ypObject_p, "defval")))
+                                       (c_ypObject_p, "default_")))
 
 # void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value);
 yp_func(c_void, "yp_popitem", ((c_ypObject_p, "mapping"), (c_ypObject_pp, "key"),
                                (c_ypObject_pp, "value")))
 
-# ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval);
+# ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *default_);
 yp_func(c_ypObject_p, "yp_setdefault",
-        ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")))
+        ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "default_")))
 
 # void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...);
 yp_func(c_void, "yp_updateK", ((c_ypObject_p, "mapping"), c_ypObject_pp_exc, c_multiK_ypObject_p))
@@ -750,8 +753,8 @@ yp_func(c_yp_int_t, "yp_asintC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
 # yp_float_t yp_asfloatC(ypObject *x, ypObject **exc);
 yp_func(c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
 
-# yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc);
-yp_func(c_yp_int_t, "yp_int_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
+# yp_int_t yp_bit_lengthC(ypObject *x, ypObject **exc);
+yp_func(c_yp_int_t, "yp_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
 
 # ypObject *yp_type(ypObject *object);
 yp_func(c_ypObject_p, "yp_type", ((c_ypObject_p, "object"), ))
@@ -1075,9 +1078,9 @@ class ypObject(c_ypObject_p):
         else:
             _yp_delitem(self, key, yp_None)
 
-    def get(self, key, defval=None): return _yp_getdefault(self, key, defval)
+    def get(self, key, default=None): return _yp_getdefault(self, key, default)
 
-    def setdefault(self, key, defval=None): return _yp_setdefault(self, key, defval)
+    def setdefault(self, key, default=None): return _yp_setdefault(self, key, default)
 
     def isalnum(self): return _yp_isalnum(self)
 
@@ -1515,7 +1518,7 @@ class yp_int(ypObject):
 
     def _yp_repr(self): return yp_str(repr(self._asint()))
 
-    def bit_length(self): return yp_int(_yp_int_bit_lengthC(self, yp_None))
+    def bit_length(self): return yp_int(_yp_bit_lengthC(self, yp_None))
 
     # TODO Implement yp_index
     def __index__(self): return self._asint()
@@ -2058,7 +2061,10 @@ class _ypDict(ypObject):
     def items(self): return _items_dictview(self)
 
     def pop(self, key, default=_yp_KeyError):
-        return _yp_popvalue3(self, key, default)
+        if default is _yp_KeyError:
+            return _yp_popvalue2(self, key)
+        else:
+            return _yp_popvalue3(self, key, default)
 
     def popitem(self):
         key_p = c_ypObject_pp(yp_None)

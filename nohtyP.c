@@ -18,8 +18,6 @@
 
 // TODO Do like Python and have just type+refcnt for non-containers
 
-// TODO Python now has operator.length_hint that accepts a default=0 value to return
-
 // TODO Move all the in-line overflow checks into macros/functions that use platform-efficient
 // versions as appropriate (like
 // https://gcc.gnu.org/onlinedocs/gcc/Integer-Overflow-Builtins.html).
@@ -27,11 +25,7 @@
 // TODO Use NotImplemented, instead of NotImplementedError, as per Python.
 
 // TODO Look for all the places yp_decref, yp_eq, and others might execute arbitrary code that
-// might modify the object being iterated over. OR  Add some sort of universal flag to objects to
-// prevent modifications.
-
-// TODO Look for places we use a borrowed reference from an object and then call arbitrary code:
-// that code could invalidate and thus discard the reference.
+// might modify the object being iterated over or invalidate a borrowed reference.
 
 // TODO Big, big difference in DLL sizes: 187 KB for MSVS 9.0 64-bit release to 1.6 MB for GCC 8
 // 64-bit release. What's using up so much space? Why are GCC release builds larger than debug?
@@ -75,6 +69,14 @@
 // chrarray.stripped? ESL programmers may have trouble here, and we'd have to break from Python's
 // str.strip/etc. Really the bulk of the issues are in the str/bytes methods, as those tried hard to
 // be non-mutating.
+
+// TODO Python also has confusion in the terms delete (as in list.delitem), remove (set.remove()),
+// and discard (set.discard()); the distinctions are fairly arbitrary. And partly because of that,
+// and partly because discarditem is wordy, and partly because it's not called removeitem so it
+// wouldn't have symmetry with discarditem anyway, I'm using a new term "drop" (list.dropitem) for
+// "discard" (i.e. no error if not present). Python uses this for itertools.dropwhile(), but that's
+// the only use of drop. Does this introduction and meaning for "drop" make things clearer or not?
+// Would it make sense to rename set.discard() to set.drop()/etc?
 
 #define yp_FUTURE
 #include "nohtyP.h"
@@ -338,9 +340,9 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 
 // The length, and allocated length, of the object
 // XXX Do not set a length >ypObject_LEN_MAX, or a negative length !=ypObject_LEN_INVALID
-#define ypObject_CACHED_LEN(ob) ((yp_ssize_t)((ypObject *)(ob))->ob_len)  // negative if invalid
-#define ypObject_SET_CACHED_LEN(ob, len) (((ypObject *)(ob))->ob_len = (_yp_ob_len_t)(len))
-#define ypObject_ALLOCLEN(ob) ((yp_ssize_t)((ypObject *)(ob))->ob_alloclen)  // negative if invalid
+#define ypObject_LEN(ob) ((yp_ssize_t)((ypObject *)(ob))->ob_len)  // invalid if negative
+#define ypObject_SET_LEN(ob, len) (((ypObject *)(ob))->ob_len = (_yp_ob_len_t)(len))
+#define ypObject_ALLOCLEN(ob) ((yp_ssize_t)((ypObject *)(ob))->ob_alloclen)  // invalid if negative
 #define ypObject_SET_ALLOCLEN(ob, len) (((ypObject *)(ob))->ob_alloclen = (_yp_ob_len_t)(len))
 
 // Hashes can be cached in the object for easy retrieval
@@ -366,8 +368,10 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 typedef ypObject *(*objproc)(ypObject *);
 typedef ypObject *(*objobjproc)(ypObject *, ypObject *);
 typedef ypObject *(*objobjobjproc)(ypObject *, ypObject *, ypObject *);
+typedef ypObject *(*objobjintproc)(ypObject *, ypObject *, int);
 typedef ypObject *(*objssizeproc)(ypObject *, yp_ssize_t);
 typedef ypObject *(*objssizeobjproc)(ypObject *, yp_ssize_t, ypObject *);
+typedef ypObject *(*objssizeintproc)(ypObject *, yp_ssize_t, int);
 typedef ypObject *(*objsliceproc)(ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t);
 typedef ypObject *(*objsliceobjproc)(ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t, ypObject *);
 typedef ypObject *(*objvalistproc)(ypObject *, int, va_list);
@@ -396,13 +400,13 @@ typedef struct {
 typedef struct {
     objobjproc      tp_concat;
     objssizeproc    tp_repeat;
-    objssizeobjproc tp_getindex;  // if defval is NULL, raise exception if missing
+    objssizeobjproc tp_getindex;  // if default_ is NULL, raise exception if missing
     objsliceproc    tp_getslice;
     findfunc        tp_find;
     countfunc       tp_count;
     objssizeobjproc tp_setindex;
     objsliceobjproc tp_setslice;
-    objssizeproc    tp_delindex;
+    objssizeintproc tp_delindex;
     objsliceproc    tp_delslice;
     objobjproc      tp_append;
     objobjproc      tp_extend;
@@ -510,7 +514,7 @@ typedef struct {
     // Number operations
     ypNumberMethods *tp_as_number;
 
-    // Iterator operations
+    // Iterable/iterator operations
     miniiterfunc             tp_miniiter;
     miniiterfunc             tp_miniiter_reversed;
     miniiterfunc             tp_miniiter_next;
@@ -525,10 +529,10 @@ typedef struct {
     objobjproc    tp_push;
     objproc       tp_clear;  // delete references to contained objects
     objproc       tp_pop;
-    objobjobjproc tp_remove;      // if onmissing is NULL, raise exception if missing
-    objobjobjproc tp_getdefault;  // if defval is NULL, raise exception if missing
+    objobjintproc tp_remove;
+    objobjobjproc tp_getdefault;  // if default_ is NULL, raise exception if missing
     objobjobjproc tp_setitem;
-    objobjproc    tp_delitem;
+    objobjintproc tp_delitem;
     objobjproc    tp_update;
 
     // Sequence operations
@@ -599,77 +603,27 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
 // needs to point to a valid function (as opposed to constantly checking for NULL)
 // clang-format off
 #define DEFINE_GENERIC_METHODS(name, retval) \
-    static ypObject *name ## _objproc(ypObject *x) { return retval; } \
-    static ypObject *name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
-    static ypObject *name ## _objobjobjproc(ypObject *x, ypObject *y, ypObject *z) { return retval; } \
-    static ypObject *name ## _objssizeproc(ypObject *x, yp_ssize_t i) { return retval; } \
-    static ypObject *name ## _objssizeobjproc(ypObject *x, yp_ssize_t i, ypObject *y) { return retval; } \
-    static ypObject *name ## _objsliceproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k) { return retval; } \
-    static ypObject *name ## _objsliceobjproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y) { return retval; } \
-    static ypObject *name ## _objvalistproc(ypObject *x, int n, va_list args) { return retval; } \
-    static ypObject *name ## _objpobjpobjproc(ypObject *x, ypObject **key, ypObject **value) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objproc(ypObject *x) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objobjobjproc(ypObject *x, ypObject *y, ypObject *z) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objobjintproc(ypObject *x, ypObject *y, int b) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objssizeproc(ypObject *x, yp_ssize_t i) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objssizeobjproc(ypObject *x, yp_ssize_t i, ypObject *y) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objssizeintproc(ypObject *x, yp_ssize_t i, int b) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objsliceproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objsliceobjproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objvalistproc(ypObject *x, int n, va_list args) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objpobjpobjproc(ypObject *x, ypObject **key, ypObject **value) { return retval; } \
     \
-    static ypObject *name ## _visitfunc(ypObject *x, void *memo) { return retval; } \
-    static ypObject *name ## _traversefunc(ypObject *x, visitfunc visitor, void *memo) { return retval; } \
-    static ypObject *name ## _hashfunc(ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash) { return retval; } \
-    static ypObject *name ## _miniiterfunc(ypObject *x, yp_uint64_t *state) { return retval; } \
-    static ypObject *name ## _miniiter_items_nextfunc(ypObject *x, yp_uint64_t *state, ypObject **key, ypObject **value) { return retval; } \
-    static ypObject *name ## _miniiter_lenhfunc(ypObject *x, yp_uint64_t *state, yp_ssize_t *length_hint) { return retval; } \
-    static ypObject *name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
-    static ypObject *name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
-    static ypObject *name ## _findfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index) { return retval; } \
-    \
-    static ypNumberMethods yp_UNUSED name ## _NumberMethods[1] = { { \
-        *name ## _objproc \
-    } }; \
-    static ypSequenceMethods yp_UNUSED name ## _SequenceMethods[1] = { { \
-        *name ## _objobjproc, \
-        *name ## _objssizeproc, \
-        *name ## _objssizeobjproc, \
-        *name ## _objsliceproc, \
-        *name ## _findfunc, \
-        *name ## _countfunc, \
-        *name ## _objssizeobjproc, \
-        *name ## _objsliceobjproc, \
-        *name ## _objssizeproc, \
-        *name ## _objsliceproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objssizeproc, \
-        *name ## _objssizeobjproc, \
-        *name ## _objssizeproc, \
-        *name ## _objproc, \
-        *name ## _objobjobjproc \
-    } }; \
-    static ypSetMethods yp_UNUSED name ## _SetMethods[1] = { { \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc \
-    } }; \
-    static ypMappingMethods yp_UNUSED name ## _MappingMethods[1] = { { \
-        *name ## _miniiterfunc, \
-        *name ## _miniiterfunc, \
-        *name ## _miniiterfunc, \
-        *name ## _miniiter_items_nextfunc, \
-        *name ## _objproc, \
-        *name ## _objproc, \
-        *name ## _objproc, \
-        *name ## _objobjobjproc, \
-        *name ## _objpobjpobjproc, \
-        *name ## _objobjobjproc, \
-        *name ## _objvalistproc, \
-    } }; \
-    static ypCallableMethods yp_UNUSED name ## _CallableMethods[1] = { { \
-        *name ## _objpobjpobjproc \
-    } };
+    static ypObject *yp_UNUSED name ## _visitfunc(ypObject *x, void *memo) { return retval; } \
+    static ypObject *yp_UNUSED name ## _traversefunc(ypObject *x, visitfunc visitor, void *memo) { return retval; } \
+    static ypObject *yp_UNUSED name ## _hashfunc(ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash) { return retval; } \
+    static ypObject *yp_UNUSED name ## _miniiterfunc(ypObject *x, yp_uint64_t *state) { return retval; } \
+    static ypObject *yp_UNUSED name ## _miniiter_items_nextfunc(ypObject *x, yp_uint64_t *state, ypObject **key, ypObject **value) { return retval; } \
+    static ypObject *yp_UNUSED name ## _miniiter_lenhfunc(ypObject *x, yp_uint64_t *state, yp_ssize_t *length_hint) { return retval; } \
+    static ypObject *yp_UNUSED name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
+    static ypObject *yp_UNUSED name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
+    static ypObject *yp_UNUSED name ## _findfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index) { return retval; }
 // clang-format on
 
 DEFINE_GENERIC_METHODS(MethodError, yp_MethodError);  // for methods the type doesn't support
@@ -679,6 +633,66 @@ DEFINE_GENERIC_METHODS(MethodError, yp_MethodError);  // for methods the type do
 DEFINE_GENERIC_METHODS(TypeError, yp_TypeError);
 DEFINE_GENERIC_METHODS(InvalidatedError, yp_InvalidatedError);  // for Invalidated objects
 DEFINE_GENERIC_METHODS(ExceptionMethod, x);  // for exception objects; returns "self"
+#undef DEFINE_GENERIC_METHODS
+
+// TODO Is this yp_MethodError vs yp_TypeError distinction important to nohtyP? In Python it comes
+// down to the historical choices of if it was implemented as a function, as syntax, or as a method.
+#define DEFINE_GENERIC_PROTOCOL_METHODS(prefix, methodErrorName, typeErrorName)      \
+    static ypNumberMethods yp_UNUSED   prefix##_NumberMethods[1] = {{                \
+            *methodErrorName##_objproc /* _placeholder */                          \
+    }};                                                                            \
+    static ypSequenceMethods yp_UNUSED prefix##_SequenceMethods[1] = {{              \
+            *typeErrorName##_objobjproc,        /* tp_concat */                      \
+            *typeErrorName##_objssizeproc,      /* tp_repeat */                      \
+            *typeErrorName##_objssizeobjproc,   /* tp_getindex */                    \
+            *typeErrorName##_objsliceproc,      /* tp_getslice */                    \
+            *methodErrorName##_findfunc,        /* tp_find */                        \
+            *methodErrorName##_countfunc,       /* tp_count */                       \
+            *typeErrorName##_objssizeobjproc,   /* tp_setindex */                    \
+            *typeErrorName##_objsliceobjproc,   /* tp_setslice */                    \
+            *typeErrorName##_objssizeintproc,   /* tp_delindex */                    \
+            *typeErrorName##_objsliceproc,      /* tp_delslice */                    \
+            *methodErrorName##_objobjproc,      /* tp_append */                      \
+            *methodErrorName##_objobjproc,      /* tp_extend */                      \
+            *typeErrorName##_objssizeproc,      /* tp_irepeat */                     \
+            *methodErrorName##_objssizeobjproc, /* tp_insert */                      \
+            *methodErrorName##_objssizeproc,    /* tp_popindex */                    \
+            *methodErrorName##_objproc,         /* tp_reverse */                     \
+            *methodErrorName##_objobjobjproc    /* tp_sort */                        \
+    }};                                                                              \
+    static ypSetMethods yp_UNUSED      prefix##_SetMethods[1] = {{                   \
+            *methodErrorName##_objobjproc /* tp_isdisjoint */,                  \
+            *methodErrorName##_objobjproc /* tp_issubset */,                    \
+            *methodErrorName##_objobjproc /* tp_issuperset */,                  \
+            *methodErrorName##_objobjproc /* tp_union */,                       \
+            *methodErrorName##_objobjproc /* tp_intersection */,                \
+            *methodErrorName##_objobjproc /* tp_difference */,                  \
+            *methodErrorName##_objobjproc /* tp_symmetric_difference */,        \
+            *methodErrorName##_objobjproc /* tp_intersection_update */,         \
+            *methodErrorName##_objobjproc /* tp_difference_update */,           \
+            *methodErrorName##_objobjproc /* tp_symmetric_difference_update */, \
+            *methodErrorName##_objobjproc /* tp_pushunique */                   \
+    }};                                                                         \
+    static ypMappingMethods yp_UNUSED  prefix##_MappingMethods[1] = {{               \
+            *methodErrorName##_miniiterfunc,          /* tp_miniiter_keys */        \
+            *methodErrorName##_miniiterfunc,          /* tp_miniiter_values */      \
+            *methodErrorName##_miniiterfunc,          /* tp_miniiter_items */       \
+            *typeErrorName##_miniiter_items_nextfunc, /* tp_miniiter_items_next */  \
+            *methodErrorName##_objproc,               /* tp_iter_keys */            \
+            *methodErrorName##_objproc,               /* tp_iter_values */          \
+            *methodErrorName##_objproc,               /* tp_iter_items */           \
+            *methodErrorName##_objobjobjproc,         /* tp_popvalue */             \
+            *methodErrorName##_objpobjpobjproc,       /* tp_popitem */              \
+            *methodErrorName##_objobjobjproc,         /* tp_setdefault */           \
+            *methodErrorName##_objvalistproc,         /* tp_updateK */              \
+    }};                                                                             \
+    static ypCallableMethods yp_UNUSED prefix##_CallableMethods[1] = {{              \
+            *typeErrorName##_objpobjpobjproc /* tp_call */                           \
+    }}
+DEFINE_GENERIC_PROTOCOL_METHODS(Unsupported, MethodError, TypeError);
+DEFINE_GENERIC_PROTOCOL_METHODS(InvalidatedError, InvalidatedError, InvalidatedError);
+DEFINE_GENERIC_PROTOCOL_METHODS(ExceptionMethod, ExceptionMethod, ExceptionMethod);
+#undef DEFINE_GENERIC_PROTOCOL_METHODS
 
 // For use when an object doesn't support a particular comparison operation
 // FIXME Python has NotImplemented singleton instead
@@ -692,9 +706,16 @@ static ypObject *NotImplemented_comparefunc(ypObject *x, ypObject *y)
 // For use when an object contains no references to other objects
 static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo) { return yp_None; }
 
+// For use as tp_freeze for immutable objects.
+static ypObject *Immutable_freezefunc(ypObject *x)
+{
+    yp_ASSERT(!ypObject_IS_MUTABLE(x), "Immutable_freezefunc called for mutable object");
+    return yp_None;
+}
+
 // list/tuple internals that are shared among other types
 #define ypTuple_ARRAY(sq) ((ypObject **)((ypObject *)sq)->ob_data)
-#define ypTuple_LEN ypObject_CACHED_LEN
+#define ypTuple_LEN ypObject_LEN
 
 #pragma endregion fundamentals
 
@@ -712,6 +733,8 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 #define MIN3(a, b, c) MIN(MIN(a, b), c)
 #define MIN4(a, b, c, d) MIN(MIN(a, b), MIN(c, d))
 
+// Returns val, clamped to be no less than min and no more than max.
+#define yp_CLAMP(val, min, max) ((val) < (min) ? (min) : (val) > (max) ? (max) : (val))
 
 // Functions that return nohtyP objects return the error object to "raise" it. Use this as
 // "return_yp_ERR(yp_ValueError);" to return the error properly.
@@ -744,22 +767,29 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 // When an object encounters an unknown type, there are three possible cases:
 //  - it's an invalidated object, so return yp_InvalidatedError
 //  - it's an exception, so return that exception
-//  - it's some other type, so return yp_TypeError
+//  - it's some other type, so return yp_TypeError (or sometimes yp_MethodError)
 // TODO It'd be nice to remove a comparison from this, as a minor efficiency, but not sure how
 // TODO Ensure we are using yp_BAD_TYPE in place of yp_TypeError in all the right places
 // clang-format off
-#define yp_BAD_TYPE(bad_ob) ( \
+#define _yp_BAD_TYPE(bad_ob, exception) ( \
     ypObject_TYPE_PAIR_CODE(bad_ob) == ypInvalidated_CODE ? \
         yp_InvalidatedError : \
     ypObject_TYPE_PAIR_CODE(bad_ob) == ypException_CODE ? \
         (bad_ob) : \
     /* else */ \
-        yp_TypeError)
+        (exception))
 // clang-format on
+#define yp_BAD_TYPE(bad_ob) _yp_BAD_TYPE((bad_ob), yp_TypeError)
 #define return_yp_BAD_TYPE(bad_ob) return_yp_ERR(yp_BAD_TYPE(bad_ob))
 #define return_yp_CEXC_BAD_TYPE(retval, exc, bad_ob) \
     return_yp_CEXC_ERR((retval), (exc), yp_BAD_TYPE(bad_ob))
 #define return_yp_EXC_BAD_TYPE(exc, bad_ob) return_yp_EXC_ERR((exc), yp_BAD_TYPE(bad_ob))
+
+#define yp_METHOD_ERR(bad_ob) _yp_BAD_TYPE((bad_ob), yp_MethodError)
+#define return_yp_METHOD_ERR(bad_ob) return_yp_ERR(yp_METHOD_ERR(bad_ob))
+#define return_yp_CEXC_METHOD_ERR(retval, exc, bad_ob) \
+    return_yp_CEXC_ERR((retval), (exc), yp_METHOD_ERR(bad_ob))
+#define return_yp_EXC_METHOD_ERR(exc, bad_ob) return_yp_EXC_ERR((exc), yp_METHOD_ERR(bad_ob))
 
 #define yp_IS_EXCEPTION_C(x) (ypObject_TYPE_PAIR_CODE(x) == ypException_CODE)
 int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
@@ -784,43 +814,43 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 
 // XXX Adapted from _Py_SIZE_ROUND_DOWN et al
 // Below "a" is a power of 2. Round down size "n" to be a multiple of "a".
-#define yp_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a)-1))
+#define yp_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a) - 1))
 // Round up size "n" to be a multiple of "a".
-#define yp_SIZE_ROUND_UP(n, a) (((size_t)(n) + (size_t)((a)-1)) & ~(size_t)((a)-1))
+#define yp_SIZE_ROUND_UP(n, a) (((size_t)(n) + (size_t)((a) - 1)) & ~(size_t)((a) - 1))
 yp_STATIC_ASSERT(yp_sizeof(size_t) == yp_sizeof(void *), uintptr_unnecessary);
 // Round pointer "p" down to the closest "a"-aligned address <= "p".
-#define yp_ALIGN_DOWN(p, a) ((void *)((size_t)(p) & ~(size_t)((a)-1)))
+#define yp_ALIGN_DOWN(p, a) ((void *)((size_t)(p) & ~(size_t)((a) - 1)))
 // Round pointer "p" up to the closest "a"-aligned address >= "p".
-#define yp_ALIGN_UP(p, a) ((void *)(((size_t)(p) + (size_t)((a)-1)) & ~(size_t)((a)-1)))
+#define yp_ALIGN_UP(p, a) ((void *)(((size_t)(p) + (size_t)((a) - 1)) & ~(size_t)((a) - 1)))
 // Check if pointer "p" is aligned to "a"-bytes boundary.
-#define yp_IS_ALIGNED(p, a) (!((size_t)(p) & (size_t)((a)-1)))
+#define yp_IS_ALIGNED(p, a) (!((size_t)(p) & (size_t)((a) - 1)))
 
-// For N functions (that take variable arguments); to be used as follows:
-//      return_yp_V_FUNC(ypObject *, yp_foobarV, (x, n, args), n)
-// v_func_args must end in the identifier "args", which is declared internal to the macro.
-#define return_yp_V_FUNC(v_func_rettype, v_func, v_func_args, last_fixed) \
-    do {                                                                  \
-        v_func_rettype retval;                                            \
-        va_list        args;                                              \
-        va_start(args, last_fixed);                                       \
-        retval = v_func v_func_args;                                      \
-        va_end(args);                                                     \
-        return retval;                                                    \
+// For "N" functions (that take variable arguments); to be used as follows:
+//      return_yp_NV_FUNC(ypObject *, yp_foobarNV, (x, n, args), n)
+// nv_func_args must end in the identifier "args", which is declared internal to the macro.
+#define return_yp_NV_FUNC(nv_func_rettype, nv_func, nv_func_args, last_fixed) \
+    do {                                                                      \
+        nv_func_rettype retval;                                               \
+        va_list         args;                                                 \
+        va_start(args, last_fixed);                                           \
+        retval = nv_func nv_func_args;                                        \
+        va_end(args);                                                         \
+        return retval;                                                        \
     } while (0)
 
 // As above, but for functions without a return value
-#define return_yp_V_FUNC_void(v_func, v_func_args, last_fixed) \
-    do {                                                       \
-        va_list args;                                          \
-        va_start(args, last_fixed);                            \
-        v_func v_func_args;                                    \
-        va_end(args);                                          \
-        return;                                                \
+#define return_yp_NV_FUNC_void(nv_func, nv_func_args, last_fixed) \
+    do {                                                          \
+        va_list args;                                             \
+        va_start(args, last_fixed);                               \
+        nv_func nv_func_args;                                     \
+        va_end(args);                                             \
+        return;                                                   \
     } while (0)
 
 // As above, but for "K"-functions
-#define return_yp_K_FUNC return_yp_V_FUNC
-#define return_yp_K_FUNC_void return_yp_V_FUNC_void
+#define return_yp_KV_FUNC return_yp_NV_FUNC
+#define return_yp_KV_FUNC_void return_yp_NV_FUNC_void
 
 // For when we need to work with unsigned yp_int_t's in the math below; casting to unsigned helps
 // avoid undefined behaviour on overflow.
@@ -1280,10 +1310,12 @@ ypObject *const yp_None = yp_CONST_REF(yp_None);
 
 // There are exactly two bool objects
 // TODO Could initialize ypObject_CACHED_HASH here...in fact our value could be in CACHED_HASH.
-static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, 0, NULL), 1};
+static ypBoolObject _yp_True_struct = {
+        yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, _ypObject_LEN_INVALID, NULL), 1};
 ypObject *const     yp_True = yp_CONST_REF(yp_True);
-static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, 0, NULL), 0};
-ypObject *const     yp_False = yp_CONST_REF(yp_False);
+static ypBoolObject _yp_False_struct = {
+        yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, _ypObject_LEN_INVALID, NULL), 0};
+ypObject *const yp_False = yp_CONST_REF(yp_False);
 
 
 #define _ypInt_PREALLOC_START (-5)
@@ -1293,7 +1325,7 @@ static ypIntObject _ypInt_pre_allocated[_ypInt_PREALLOC_END - _ypInt_PREALLOC_ST
 #define ypInt_IS_PREALLOC(i) (_ypInt_PREALLOC_START <= i && i < _ypInt_PREALLOC_END)
 
 // XXX Careful! Do not use ypInt_PREALLOC_REF with a value that is not preallocated.
-#define ypInt_PREALLOC_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i)-_ypInt_PREALLOC_START]))
+#define ypInt_PREALLOC_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i) - _ypInt_PREALLOC_START]))
 
 // TODO Rename to yp_int_*?  I'm OK with yp_s_* because strs are going to be used more often and
 // will likely have long names already (i.e. they'll be named like the string they represent), but
@@ -2176,10 +2208,7 @@ typedef struct {
     ypObject *tail;
 } ypObject_dealloclist;
 
-#define ypObject_DEALLOCLIST_INIT() \
-    {                               \
-        NULL, NULL                  \
-    }
+#define ypObject_DEALLOCLIST_INIT() {NULL, NULL}
 
 static void _ypObject_dealloclist_push(ypObject_dealloclist *list, ypObject *x)
 {
@@ -2948,7 +2977,7 @@ static ypObject *iter_close(ypObject *i)
     return yp_RuntimeError;
 }
 
-// iter objects can be returned from yp_miniiter...they simply ignore *state
+// iter objects can be returned from yp_miniiter; such objects ignore *state.
 static ypObject *iter_miniiter(ypObject *i, yp_uint64_t *state)
 {
     *state = 0;  // just in case...
@@ -3025,7 +3054,7 @@ static ypTypeObject ypIter_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,     // tp_freeze
+        Immutable_freezefunc,    // tp_freeze
         TypeError_objproc,       // tp_unfrozen_copy
         TypeError_objproc,       // tp_frozen_copy
         TypeError_traversefunc,  // tp_unfrozen_deepcopy
@@ -3046,7 +3075,7 @@ static ypTypeObject ypIter_Type = {
         iter_close,        // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         iter_miniiter,              // tp_miniiter
@@ -3063,23 +3092,23 @@ static ypTypeObject ypIter_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // Public functions
@@ -3115,7 +3144,7 @@ ypObject *yp_iter_stateCX(ypObject *i, yp_ssize_t *size, void **state)
 // code, our yp_sets will be ordered too. So perhaps this is OK again.
 void yp_unpackN(ypObject *iterable, int n, ...)
 {
-    return_yp_V_FUNC_void(yp_unpackNV, (iterable, n, args), n);
+    return_yp_NV_FUNC_void(yp_unpackNV, (iterable, n, args), n);
 }
 
 void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
@@ -3301,6 +3330,8 @@ ypObject *yp_iter2(ypObject *callable, ypObject *sentinel)
 {
     ypObject *i;
 
+    if (!yp_iscallableC(callable)) return yp_TypeError;
+
     // Allocate the iterator
     i = ypMem_MALLOC_FIXED(ypCallableIterObject, ypIter_CODE);
     if (yp_isexceptionC(i)) return i;
@@ -3317,6 +3348,18 @@ ypObject *yp_iter2(ypObject *callable, ypObject *sentinel)
     ypIter_LENHINT(i) = 0;  // it's not known how many values will be yielded
     return i;
 }
+
+
+// Iter constructors for filter.
+
+ypObject *yp_filter(ypObject *function, ypObject *iterable) { return yp_NotImplementedError; }
+ypObject *yp_filterfalse(ypObject *function, ypObject *iterable) { return yp_NotImplementedError; }
+
+
+// Iter constructors for zip.
+
+ypObject *yp_zipN(int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_zipNV(int n, va_list args) { return yp_NotImplementedError; }
 
 
 // Generic Mini Iterator Methods for Sequences
@@ -3343,9 +3386,9 @@ static ypObject *_ypSequence_miniiter_next(ypObject *x, yp_uint64_t *_state)
         return yp_isexceptionC2(result, yp_IndexError) ? yp_StopIteration : result;
     }
 
-    if (*state >= 0) {  // we are counting up from the first element
+    if (*state >= 0) {  // We are counting up from the first element.
         *state += 1;
-    } else {  // we are counting down from the last element
+    } else {  // We are counting down from the last element.
         *state -= 1;
     }
     return result;
@@ -3359,9 +3402,9 @@ static ypObject *_ypSequence_miniiter_lenh(
     ypObject   *exc = yp_None;
     yp_ssize_t  len = yp_lenC(x, &exc);
     if (yp_isexceptionC(exc)) return exc;
-    if (*state >= 0) {
+    if (*state >= 0) {  // We are counting up from the first element.
         *length_hint = len - ((yp_ssize_t)*state);
-    } else {
+    } else {  // We are counting down from the last element.
         *length_hint = len - ((yp_ssize_t)(-1 - *state));
     }
     return yp_None;
@@ -3384,33 +3427,14 @@ typedef struct _yp_deepcopy_memo_t {
 
 extern ypObject *const yp_RecursionLimitError;
 
-static ypObject *_yp_freeze(ypObject *x)
-{
-    int           oldCode = ypObject_TYPE_CODE(x);
-    int           newCode = ypObject_TYPE_CODE_AS_FROZEN(oldCode);
-    ypTypeObject *newType;
-    ypObject     *result;
-
-    // Check if it's already frozen (no-op) or if it can't be frozen (error)
-    if (oldCode == newCode) return yp_None;
-    newType = ypTypeTable[newCode];
-    yp_ASSERT(newType != NULL, "all types should have an immutable counterpart");
-
-    // Freeze the object, possibly reduce memory usage, etc
-    // FIXME Support unfreezable objects. Let tp_freeze set the type code as appropriate, then
-    // inspect it after to see if it worked. (Or return yp_NotImplemented.) Perhaps return an
-    // exception if the top-level freeze doesn't freeze, but in the case of deep freeze allow deeper
-    // objects to silently fail to freeze.
-    result = newType->tp_freeze(x);  // FIXME shouldn't oldType control freezing?
-    if (yp_isexceptionC(result)) return result;
-    ypObject_SET_TYPE_CODE(x, newCode);  // FIXME shouldn't tp_freeze control type code?
-    return result;
-}
-
+// TODO Support unfreezable objects. Perhaps tp_freeze can return yp_NotImplemented in this case.
+// yp_freeze should raise an error in this case, but yp_deepfreeze might do something different...
+// TODO Make sure we don't modify immortals...although immortals should be immutable anyway.
 void yp_freeze(ypObject *x, ypObject **exc)
 {
-    ypObject *result = _yp_freeze(x);
+    ypObject *result = ypObject_TYPE(x)->tp_freeze(x);
     if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
+    yp_ASSERT(!ypObject_IS_MUTABLE(x), "tp_freeze didn't freeze the object");
 }
 
 static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
@@ -3421,11 +3445,11 @@ static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
     ypObject *result;
 
     // Avoid recursion: we only have to visit each object once
-    // TODO An easier way to accomplish the same is to inspect ypObject_IS_MUTABLE, since we freeze
-    // before going deep.
-    // TODO ...and then switch to recursion depth check. In fact, reconsider anywhere we take a
-    // "weak reference" to an object as a means of preventing recursion. (And, also, if we do
-    // this we need a keepalive like deepcopy does.)
+    // TODO Consider switching to a keepalive list like deepcopy does. For example, if we have a
+    // large object x that's reachable many times (i.e. [x] * 1000000, as a silly example), we
+    // are going to process all of x each time. However, if we remember that we've already
+    // deep-frozen x, then we will only process it once...at the expense of maintaning keepalive
+    // all the time for every call to yp_deepfreeze.
     id = yp_intC((yp_ssize_t)x);
     yp_pushunique(memo, id, &exc);
     yp_decref(id);
@@ -3436,13 +3460,14 @@ static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
 
     // Freeze current object before going deep
     // XXX tp_traverse must propagate exceptions returned by visitor
-    result = _yp_freeze(x);
+    result = ypObject_TYPE(x)->tp_freeze(x);
     if (yp_isexceptionC(result)) return result;
+    yp_ASSERT(!ypObject_IS_MUTABLE(x), "tp_freeze didn't freeze the object");
     return ypObject_TYPE(x)->tp_traverse(x, _yp_deepfreeze, memo);
 }
 
-// TODO All "deep" operations may try to operate on immortals...but shouldn't all immortals be
-// immutable already anyway?
+// TODO Support unfreezable objects. Perhaps raise an error if the top-level freeze doesn't freeze,
+// but in the case of deep freeze allow deeper objects to silently fail to freeze.
 void yp_deepfreeze(ypObject *x, ypObject **exc)
 {
     ypObject *memo = yp_setN(0);
@@ -3477,6 +3502,8 @@ static ypObject *_yp_deepcopy_memo_setitem(void *_memo, ypObject *x, ypObject *x
     ypObject           *x_id;
 
     // We keep the objects in memo uninitialized until we need them.
+    // TODO Since we know the type of objects stored in memo, it'd be nice to use the methods
+    // directly, rather than going through the indirection of yp_append and yp_setitem.
     if (memo->keep_alive == NULL) {
         memo->keep_alive = yp_listN(0);
         memo->copies = yp_dictK(0);
@@ -3501,6 +3528,7 @@ static ypObject *_yp_deepcopy_memo_setitem(void *_memo, ypObject *x, ypObject *x
 // maybe even those should be copied as well...or just those that contain other objects?
 // XXX This is contrary to in Python, where if immutables (tuple, frozenset, etc) contain the exact
 // same objects, it discards the copy and returns the original object (i.e. {1, 2, 3}).
+// TODO We are currently copying immortals; implement skipping the copying of immortals?
 static ypObject *_yp_deepcopy_visitor(ypObject *x, visitfunc visitor, void *_memo, int freeze)
 {
     yp_deepcopy_memo_t *memo = (yp_deepcopy_memo_t *)_memo;
@@ -3639,7 +3667,7 @@ ypObject *yp_or(ypObject *x, ypObject *y)
     return yp_incref(x);
 }
 
-ypObject *yp_orN(int n, ...) { return_yp_V_FUNC(ypObject *, yp_orNV, (n, args), n); }
+ypObject *yp_orN(int n, ...) { return_yp_NV_FUNC(ypObject *, yp_orNV, (n, args), n); }
 ypObject *yp_orNV(int n, va_list args)
 {
     ypObject *x;
@@ -3655,7 +3683,7 @@ ypObject *yp_orNV(int n, va_list args)
     return yp_incref(va_arg(args, ypObject *));
 }
 
-ypObject *yp_anyN(int n, ...) { return_yp_V_FUNC(ypObject *, yp_anyNV, (n, args), n); }
+ypObject *yp_anyN(int n, ...) { return_yp_NV_FUNC(ypObject *, yp_anyNV, (n, args), n); }
 ypObject *yp_anyNV(int n, va_list args)
 {
     for (/*n already set*/; n > 0; n--) {
@@ -3692,7 +3720,7 @@ ypObject *yp_and(ypObject *x, ypObject *y)
     return yp_incref(y);
 }
 
-ypObject *yp_andN(int n, ...) { return_yp_V_FUNC(ypObject *, yp_andNV, (n, args), n); }
+ypObject *yp_andN(int n, ...) { return_yp_NV_FUNC(ypObject *, yp_andNV, (n, args), n); }
 ypObject *yp_andNV(int n, va_list args)
 {
     ypObject *x;
@@ -3708,7 +3736,7 @@ ypObject *yp_andNV(int n, va_list args)
     return yp_incref(va_arg(args, ypObject *));
 }
 
-ypObject *yp_allN(int n, ...) { return_yp_V_FUNC(ypObject *, yp_allNV, (n, args), n); }
+ypObject *yp_allN(int n, ...) { return_yp_NV_FUNC(ypObject *, yp_allNV, (n, args), n); }
 ypObject *yp_allNV(int n, va_list args)
 {
     for (/*n already set*/; n > 0; n--) {
@@ -3741,7 +3769,7 @@ ypObject *yp_all(ypObject *iterable)
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
 // TODO Here and elsewhere, the singleton NotImplemented should be used
 // TODO Comparison functions have the possibility of recursion; trap (also, add tests)
-#define _ypBool_PUBLIC_CMP_FUNCTION(name, reflection, defval)                         \
+#define _ypBool_PUBLIC_CMP_FUNCTION(name, reflection, default_)                       \
     ypObject *yp_##name(ypObject *x, ypObject *y)                                     \
     {                                                                                 \
         ypTypeObject *type = ypObject_TYPE(x);                                        \
@@ -3754,7 +3782,7 @@ ypObject *yp_all(ypObject *iterable)
         yp_ASSERT(result == yp_True || result == yp_False || yp_isexceptionC(result), \
                 "tp_" #reflection " must return yp_True, yp_False, or an exception"); \
         if (result != yp_ComparisonNotImplemented) return result;                     \
-        return (defval);                                                              \
+        return (default_);                                                            \
     }
 // Recall that tp_lt/etc for exceptions and invalidateds will return the correct exception, so
 // yp_TypeError is correct to use here (rather than yp_BAD_TYPE).
@@ -3764,6 +3792,23 @@ _ypBool_PUBLIC_CMP_FUNCTION(eq, eq, ypBool_FROM_C(x == y));
 _ypBool_PUBLIC_CMP_FUNCTION(ne, ne, ypBool_FROM_C(x != y));
 _ypBool_PUBLIC_CMP_FUNCTION(ge, le, yp_TypeError);
 _ypBool_PUBLIC_CMP_FUNCTION(gt, lt, yp_TypeError);
+
+ypObject *yp_max_keyN(ypObject *key, int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_max_keyNV(ypObject *key, int n, va_list args) { return yp_NotImplementedError; }
+ypObject *yp_min_keyN(ypObject *key, int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_min_keyNV(ypObject *key, int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_maxN(int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_maxNV(int n, va_list args) { return yp_NotImplementedError; }
+ypObject *yp_minN(int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_minNV(int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_max_key(ypObject *iterable, ypObject *key) { return yp_NotImplementedError; }
+ypObject *yp_min_key(ypObject *iterable, ypObject *key) { return yp_NotImplementedError; }
+
+ypObject *yp_max(ypObject *iterable) { return yp_NotImplementedError; }
+ypObject *yp_min(ypObject *iterable) { return yp_NotImplementedError; }
+
 
 // XXX Remember, an immutable container may hold mutable objects; yp_hashC must fail in that case
 // TODO Need to decide whether to keep pre-computed hash in ypObject and, if so, if we can remove
@@ -3782,6 +3827,7 @@ static ypObject *_yp_hash_visitor(ypObject *x, void *_memo, yp_hash_t *hash)
     }
 
     // If the hash has already been calculated, return it immediately
+    // TODO Rethink these "cached hash" optimizations: should we always call the method?
     if (ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID) {
         *hash = ypObject_CACHED_HASH(x);
         return yp_None;
@@ -3818,6 +3864,7 @@ static ypObject *_yp_cachedhash_visitor(ypObject *x, void *_memo, yp_hash_t *has
     ypObject  *result;
 
     // Check cached hash, and recursion depth first
+    // TODO Rethink these "cached hash" optimizations: should we always call the method?
     if (!ypObject_IS_MUTABLE(x) && ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID) {
         *hash = ypObject_CACHED_HASH(x);
         return yp_None;
@@ -3844,12 +3891,9 @@ yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc)
 
 yp_ssize_t yp_lenC(ypObject *x, ypObject **exc)
 {
-    // FIXME Rethink these "cached len/hash" optimizations: should we always call the method?
-    yp_ssize_t len = ypObject_CACHED_LEN(x);
-    ypObject  *result;
-
-    if (len >= 0) return len;
-    result = ypObject_TYPE(x)->tp_len(x, &len);
+    // TODO Protect against a tp_len that forgets to set len? Similar for all other methods?
+    yp_ssize_t len;
+    ypObject  *result = ypObject_TYPE(x)->tp_len(x, &len);
     if (yp_isexceptionC(result)) return_yp_CEXC_ERR(0, exc, result);
     yp_ASSERT(len >= 0, "tp_len cannot return negative");
     return len;
@@ -3923,10 +3967,10 @@ static ypTypeObject ypInvalidated_Type = {
         InvalidatedError_objobjproc,     // tp_push
         InvalidatedError_objproc,        // tp_clear
         InvalidatedError_objproc,        // tp_pop
-        InvalidatedError_objobjobjproc,  // tp_remove
+        InvalidatedError_objobjintproc,  // tp_remove
         InvalidatedError_objobjobjproc,  // tp_getdefault
         InvalidatedError_objobjobjproc,  // tp_setitem
-        InvalidatedError_objobjproc,     // tp_delitem
+        InvalidatedError_objobjintproc,  // tp_delitem
         InvalidatedError_objobjproc,     // tp_update
 
         // Sequence operations
@@ -4016,10 +4060,10 @@ static ypTypeObject ypException_Type = {
         ExceptionMethod_objobjproc,     // tp_push
         ExceptionMethod_objproc,        // tp_clear
         ExceptionMethod_objproc,        // tp_pop
-        ExceptionMethod_objobjobjproc,  // tp_remove
+        ExceptionMethod_objobjintproc,  // tp_remove
         ExceptionMethod_objobjobjproc,  // tp_getdefault
         ExceptionMethod_objobjobjproc,  // tp_setitem
-        ExceptionMethod_objobjproc,     // tp_delitem
+        ExceptionMethod_objobjintproc,  // tp_delitem
         ExceptionMethod_objobjproc,     // tp_update
 
         // Sequence operations
@@ -4116,21 +4160,24 @@ _yp_IMMORTAL_EXCEPTION_SUPERPTR(yp_BaseException, NULL);
 
 // yp_isexceptionC defined above
 
+// x must be an exception.
 static int _yp_isexceptionC2(ypObject *x, ypObject *exc)
 {
+    yp_ASSERT1(yp_IS_EXCEPTION_C(x));
     do {
-        if (x == exc) return 1;  // x is a (sub)exception of exc
+        if (x == exc) return TRUE;  // x is a (sub)exception of exc
         x = _ypException_SUPER(x);
     } while (x != NULL);
-    return 0;  // neither x nor its superexceptions match exc
+    return FALSE;  // neither x nor its superexceptions match exc
 }
 
 int yp_isexceptionC2(ypObject *x, ypObject *exc)
 {
-    if (!yp_IS_EXCEPTION_C(x)) return 0;
+    if (!yp_IS_EXCEPTION_C(x)) return FALSE;
     return _yp_isexceptionC2(x, exc);
 }
 
+// x must be an exception.
 static int _yp_isexceptionCNV(ypObject *x, int n, va_list args)
 {
     for (/*n already set*/; n > 0; n--) {
@@ -4146,7 +4193,7 @@ int yp_isexceptionCN(ypObject *x, int n, ...)
     va_list args;
     int     result;
 
-    if (!yp_IS_EXCEPTION_C(x)) return 0;
+    if (!yp_IS_EXCEPTION_C(x)) return FALSE;
 
     va_start(args, n);
     result = _yp_isexceptionCNV(x, n, args);
@@ -4157,7 +4204,7 @@ int yp_isexceptionCN(ypObject *x, int n, ...)
 
 int yp_isexceptionCNV(ypObject *x, int n, va_list args)
 {
-    if (!yp_IS_EXCEPTION_C(x)) return 0;
+    if (!yp_IS_EXCEPTION_C(x)) return FALSE;
     return _yp_isexceptionCNV(x, n, args);
 }
 
@@ -4241,7 +4288,7 @@ static ypTypeObject ypType_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,   // tp_freeze
+        Immutable_freezefunc,  // tp_freeze
         type_frozen_copy,      // tp_unfrozen_copy
         type_frozen_copy,      // tp_frozen_copy
         type_frozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -4262,16 +4309,16 @@ static ypTypeObject ypType_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4279,20 +4326,20 @@ static ypTypeObject ypType_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
         &ypType_as_callable  // tp_as_callable
@@ -4348,7 +4395,7 @@ static ypTypeObject ypNoneType_Type = {
         NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,       // tp_freeze
+        Immutable_freezefunc,      // tp_freeze
         nonetype_frozen_copy,      // tp_unfrozen_copy
         nonetype_frozen_copy,      // tp_frozen_copy
         nonetype_frozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -4369,16 +4416,16 @@ static ypTypeObject ypNoneType_Type = {
         MethodError_objproc,   // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4386,23 +4433,23 @@ static ypTypeObject ypNoneType_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // No constructors for nonetypes; there is exactly one, immortal object
@@ -4477,7 +4524,7 @@ static ypTypeObject ypBool_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,   // tp_freeze
+        Immutable_freezefunc,  // tp_freeze
         bool_frozen_copy,      // tp_unfrozen_copy
         bool_frozen_copy,      // tp_frozen_copy
         bool_frozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -4498,16 +4545,16 @@ static ypTypeObject ypBool_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4515,23 +4562,23 @@ static ypTypeObject ypBool_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 
@@ -4560,7 +4607,7 @@ typedef void (*iarithCFfunc)(ypObject *, yp_float_t, ypObject **);
 typedef yp_int_t (*unaryLfunc)(yp_int_t, ypObject **);
 typedef yp_float_t (*unaryLFfunc)(yp_float_t, ypObject **);
 
-// Bitwise operations on floats aren't supported, so these functions simply raise yp_TypeError
+// Bitwise operations on floats aren't supported, so these functions raise yp_TypeError.
 static void       yp_ilshiftCF(ypObject *x, yp_float_t y, ypObject **exc);
 static void       yp_irshiftCF(ypObject *x, yp_float_t y, ypObject **exc);
 static void       yp_iampCF(ypObject *x, yp_float_t y, ypObject **exc);
@@ -4740,6 +4787,12 @@ static ypObject *int_dealloc(ypObject *i, void *memo)
     return yp_None;
 }
 
+static ypObject *intstore_freeze(ypObject *i)
+{
+    ypObject_SET_TYPE_CODE(i, ypInt_CODE);
+    return yp_None;
+}
+
 static ypObject *int_unfrozen_copy(ypObject *i) { return yp_intstoreC(ypInt_VALUE(i)); }
 
 static ypObject *int_frozen_copy(ypObject *i)
@@ -4862,7 +4915,7 @@ static ypTypeObject ypInt_Type = {
         NULL,                        // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        Immutable_freezefunc,   // tp_freeze
         int_unfrozen_copy,      // tp_unfrozen_copy
         int_frozen_copy,        // tp_frozen_copy
         int_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -4883,16 +4936,16 @@ static ypTypeObject ypInt_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4900,23 +4953,23 @@ static ypTypeObject ypInt_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypTypeObject ypIntStore_Type = {
@@ -4932,7 +4985,7 @@ static ypTypeObject ypIntStore_Type = {
         NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        intstore_freeze,        // tp_freeze
         int_unfrozen_copy,      // tp_unfrozen_copy
         int_frozen_copy,        // tp_frozen_copy
         int_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -4953,16 +5006,16 @@ static ypTypeObject ypIntStore_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4970,23 +5023,23 @@ static ypTypeObject ypIntStore_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // XXX Adapted from Python 2.7's int_add
@@ -5553,6 +5606,16 @@ void yp_divmod(ypObject *x, ypObject *y, ypObject **div, ypObject **mod)
     }
 }
 
+ypObject *yp_pow3(ypObject *x, ypObject *y, ypObject *z) { return yp_NotImplementedError; }
+void      yp_ipow4(ypObject *x, ypObject *y, ypObject *z, ypObject **exc)
+{
+    return_yp_EXC_ERR(exc, yp_NotImplementedError);
+}
+void yp_ipowC4(ypObject *x, yp_int_t y, yp_int_t z, ypObject **exc)
+{
+    return_yp_EXC_ERR(exc, yp_NotImplementedError);
+}
+
 static void iunaryoperation(ypObject *x, ypObject **exc, unaryLfunc intop, unaryLFfunc floatop)
 {
     int       x_type = ypObject_TYPE_CODE(x);
@@ -5623,13 +5686,18 @@ static const yp_uint8_t _BitLengthTable[32] = {
 };
 // clang-format on
 
+ypObject *yp_sumN(int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_sumNV(int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_sum(ypObject *iterable) { return yp_NotImplementedError; }
+
 // XXX Adapted from Python 2.7's bits_in_ulong
-yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc)
+yp_int_t yp_bit_lengthC(ypObject *x, ypObject **exc)
 {
     yp_int_t x_abs;
     yp_int_t x_bits;
 
-    if (ypObject_TYPE_PAIR_CODE(x) != ypInt_CODE) return_yp_CEXC_BAD_TYPE(0, exc, x);
+    if (ypObject_TYPE_PAIR_CODE(x) != ypInt_CODE) return_yp_CEXC_METHOD_ERR(0, exc, x);
 
     x_abs = ypInt_VALUE(x);
     if (x_abs < 0) {
@@ -5881,6 +5949,12 @@ static ypObject *float_dealloc(ypObject *f, void *memo)
     return yp_None;
 }
 
+static ypObject *floatstore_freeze(ypObject *f)
+{
+    ypObject_SET_TYPE_CODE(f, ypFloat_CODE);
+    return yp_None;
+}
+
 static ypObject *float_unfrozen_copy(ypObject *f) { return yp_floatstoreCF(ypFloat_VALUE(f)); }
 
 static ypObject *float_frozen_copy(ypObject *f)
@@ -5983,7 +6057,7 @@ static ypTypeObject ypFloat_Type = {
         NULL,                          // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        Immutable_freezefunc,     // tp_freeze
         float_unfrozen_copy,      // tp_unfrozen_copy
         float_frozen_copy,        // tp_frozen_copy
         float_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -6004,16 +6078,16 @@ static ypTypeObject ypFloat_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -6021,23 +6095,23 @@ static ypTypeObject ypFloat_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypTypeObject ypFloatStore_Type = {
@@ -6053,7 +6127,7 @@ static ypTypeObject ypFloatStore_Type = {
         NULL,                               // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        floatstore_freeze,        // tp_freeze
         float_unfrozen_copy,      // tp_unfrozen_copy
         float_frozen_copy,        // tp_frozen_copy
         float_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -6074,16 +6148,16 @@ static ypTypeObject ypFloatStore_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -6091,23 +6165,23 @@ static ypTypeObject ypFloatStore_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 yp_float_t yp_addLF(yp_float_t x, yp_float_t y, ypObject **exc)
@@ -6283,6 +6357,15 @@ yp_float_t yp_asfloatC(ypObject *x, ypObject **exc)
     return_yp_CEXC_BAD_TYPE(0.0, exc, x);
 }
 
+yp_float32_t yp_asfloat32C(ypObject *x, ypObject **exc)
+{
+    return_yp_CEXC_ERR(0.0, exc, yp_NotImplementedError);
+}
+yp_float64_t yp_asfloat64C(ypObject *x, ypObject **exc)
+{
+    return_yp_CEXC_ERR(0.0, exc, yp_NotImplementedError);
+}
+
 yp_float_t yp_asfloatL(yp_int_t x, ypObject **exc)
 {
     // TODO Implement this as Python does
@@ -6328,6 +6411,8 @@ static yp_int_t yp_asint_exactLF(yp_float_t x, ypObject **exc)
     return_yp_CEXC_ERR(0, exc, yp_OverflowError);
 }
 
+ypObject *yp_roundC(ypObject *x, int ndigits) { return yp_NotImplementedError; }
+
 #pragma endregion float
 
 
@@ -6362,7 +6447,7 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
                         ((stop) >= (start)) ? 0 : ((stop) - (start) + 1) / (step) + 1;          \
             } else {                                                                            \
                 expected_slicelength =                                                          \
-                        ((start) >= (stop)) ? 0 : ((stop) - (start)-1) / (step) + 1;            \
+                        ((start) >= (stop)) ? 0 : ((stop) - (start) - 1) / (step) + 1;          \
             }                                                                                   \
             yp_ASSERT((slicelength) == expected_slicelength,                                    \
                     "invalid slicelength %" PRIssize " (%" PRIssize ":%" PRIssize ":%" PRIssize \
@@ -6378,8 +6463,8 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 // also calculates the length of the slice. Returns yp_ValueError if *step is zero. Recall there are
 // no out-of-bounds errors with slices.
 // XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
-// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
-// as any value that's greater than length.
+// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is a very large number that is handled the same as any
+// value that's greater than length.
 // XXX Adapted from PySlice_GetIndicesEx
 static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
         yp_ssize_t *step, yp_ssize_t *slicelength)
@@ -6507,13 +6592,13 @@ static void _ypSlice_delslice_memmove(void *array, yp_ssize_t length, yp_ssize_t
     }
 }
 
-static ypObject *_ypSequence_getdefault(ypObject *x, ypObject *key, ypObject *defval)
+static ypObject *_ypSequence_getdefault(ypObject *x, ypObject *key, ypObject *default_)
 {
     ypObject     *exc = yp_None;
     ypTypeObject *type = ypObject_TYPE(x);
     yp_ssize_t    index = yp_index_asssizeC(key, &exc);
     if (yp_isexceptionC(exc)) return exc;
-    return type->tp_as_sequence->tp_getindex(x, index, defval);
+    return type->tp_as_sequence->tp_getindex(x, index, default_);
 }
 
 static ypObject *_ypSequence_setitem(ypObject *x, ypObject *key, ypObject *value)
@@ -6525,13 +6610,13 @@ static ypObject *_ypSequence_setitem(ypObject *x, ypObject *key, ypObject *value
     return type->tp_as_sequence->tp_setindex(x, index, value);
 }
 
-static ypObject *_ypSequence_delitem(ypObject *x, ypObject *key)
+static ypObject *_ypSequence_delitem(ypObject *x, ypObject *key, int raise_on_missing)
 {
     ypObject     *exc = yp_None;
     ypTypeObject *type = ypObject_TYPE(x);
     yp_ssize_t    index = yp_index_asssizeC(key, &exc);
     if (yp_isexceptionC(exc)) return exc;
-    return type->tp_as_sequence->tp_delindex(x, index);
+    return type->tp_as_sequence->tp_delindex(x, index, raise_on_missing);
 }
 
 #pragma endregion sequence
@@ -6628,8 +6713,8 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, yp
 #define ypStringLib_ENC_CODE(s) (((ypObject *)(s))->ob_type_flags)
 #define ypStringLib_ENC(s) (&(ypStringLib_encs[ypStringLib_ENC_CODE(s)]))
 #define ypStringLib_DATA(s) (((ypObject *)s)->ob_data)
-#define ypStringLib_LEN ypObject_CACHED_LEN
-#define ypStringLib_SET_LEN ypObject_SET_CACHED_LEN
+#define ypStringLib_LEN ypObject_LEN
+#define ypStringLib_SET_LEN ypObject_SET_LEN
 #define ypStringLib_ALLOCLEN ypObject_ALLOCLEN
 #define ypStringLib_SET_ALLOCLEN ypObject_SET_ALLOCLEN
 #define ypStringLib_INLINE_DATA(s) (((ypStringLibObject *)s)->ob_inline_data)
@@ -8232,7 +8317,7 @@ static void _ypStringLib_join_elemcopy(
     yp_ssize_t                 i;
 
     if (s_len < 1) {
-        // The separator is empty, so we just concatenate seq's elements
+        // The separator is empty, so we concatenate seq's elements.
         for (i = 0; /*stop at NULL*/; i++) {
             ypObject *x = seq->getindexX(state, i);  // borrowed
             if (x == NULL) break;
@@ -9095,7 +9180,7 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8(
         return _ypStringLib_decode_utf_8_onnull(type, len);
     } else if (source[0] < 0x80u) {
         // We optimize for UTF-8 data that is completely, or at least starts with, ASCII: since
-        // ASCII is equivalent to the first 128 ordinals in Unicode, we can just memcpy
+        // ASCII is equivalent to the first 128 ordinals in Unicode, we can memcpy.
         return _ypStringLib_decode_utf_8_ascii_start(type, len, source, errors);
     } else {
         return _ypStringLib_decode_utf_8(type, len, source, errors);
@@ -9809,6 +9894,12 @@ static ypObject *_ypBytes_coerce_intorbytes(
 
 // Public Methods
 
+static ypObject *bytearray_freeze(ypObject *b)
+{
+    ypObject_SET_TYPE_CODE(b, ypBytes_CODE);
+    return yp_None;
+}
+
 static ypObject *bytes_unfrozen_copy(ypObject *b)
 {
     return ypStringLib_new_copy(ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE);
@@ -9878,12 +9969,15 @@ static ypObject *bytes_concat(ypObject *b, ypObject *iterable)
     }
 }
 
+// A default_ of NULL means to raise an error if i is out of bounds.
 // TODO Do we want a special-case for yp_intC that goes direct to the prealloc array?
-static ypObject *bytes_getindex(ypObject *b, yp_ssize_t i, ypObject *defval)
+static ypObject *bytes_getindex(ypObject *b, yp_ssize_t i, ypObject *default_)
 {
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
     if (!ypSequence_AdjustIndexC(ypBytes_LEN(b), &i)) {
-        if (defval == NULL) return yp_IndexError;
-        return yp_incref(defval);
+        if (default_ == NULL) return yp_IndexError;
+        return yp_incref(default_);
     }
     return yp_intC(ypBytes_DATA(b)[i]);
 }
@@ -9904,10 +9998,10 @@ static ypObject *bytearray_setindex(ypObject *b, yp_ssize_t i, ypObject *x)
     return yp_None;
 }
 
-static ypObject *bytearray_delindex(ypObject *b, yp_ssize_t i)
+static ypObject *bytearray_delindex(ypObject *b, yp_ssize_t i, int raise_on_missing)
 {
     if (!ypSequence_AdjustIndexC(ypBytes_LEN(b), &i)) {
-        return yp_IndexError;
+        return raise_on_missing ? yp_IndexError : yp_None;
     }
 
     ypBytes_ELEMMOVE(b, i, i + 1);
@@ -10039,8 +10133,7 @@ static ypObject *bytearray_pop(ypObject *b)
     return result;
 }
 
-// onmissing must be an immortal, or NULL.
-static ypObject *bytearray_remove(ypObject *b, ypObject *x, ypObject *onmissing)
+static ypObject *bytearray_remove(ypObject *b, ypObject *x, int raise_on_missing)
 {
     yp_uint8_t *x_data;
     yp_ssize_t  x_len;
@@ -10062,8 +10155,7 @@ static ypObject *bytearray_remove(ypObject *b, ypObject *x, ypObject *onmissing)
     return yp_None;
 
 missing:
-    if (onmissing == NULL) return yp_ValueError;
-    return onmissing;
+    return raise_on_missing ? yp_ValueError : yp_None;
 }
 
 // TODO allow custom min/max methods?
@@ -10322,6 +10414,7 @@ static ypObject *_ypBytes_func_new_code(int type, yp_ssize_t n, ypObject *const 
 
     if (argarray[3] != yp_Arg_Missing) {  // TODO ...or just use None?
         ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
+        if (ypObject_TYPE_PAIR_CODE(argarray[2]) != ypStr_CODE) return_yp_BAD_TYPE(argarray[2]);
         return _ypBytes_encode(type, argarray[2], argarray[3], errors);
     } else if (argarray[4] != yp_Arg_Missing) {
         // Either "string argument without an encoding" or "errors without a string argument".
@@ -10359,13 +10452,13 @@ static ypSequenceMethods ypBytes_as_sequence = {
         ypStringLib_getslice,         // tp_getslice
         bytes_find,                   // tp_find
         bytes_count,                  // tp_count
-        MethodError_objssizeobjproc,  // tp_setindex
-        MethodError_objsliceobjproc,  // tp_setslice
-        MethodError_objssizeproc,     // tp_delindex
-        MethodError_objsliceproc,     // tp_delslice
+        TypeError_objssizeobjproc,    // tp_setindex
+        TypeError_objsliceobjproc,    // tp_setslice
+        TypeError_objssizeintproc,    // tp_delindex
+        TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
-        MethodError_objssizeproc,     // tp_irepeat
+        TypeError_objssizeproc,       // tp_irepeat
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
@@ -10385,7 +10478,7 @@ static ypTypeObject ypBytes_Type = {
         NULL,                          // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        Immutable_freezefunc,     // tp_freeze
         bytes_unfrozen_copy,      // tp_unfrozen_copy
         bytes_frozen_copy,        // tp_frozen_copy
         bytes_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -10406,7 +10499,7 @@ static ypTypeObject ypBytes_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -10423,23 +10516,23 @@ static ypTypeObject ypBytes_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypBytes_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypSequenceMethods ypByteArray_as_sequence = {
@@ -10475,7 +10568,7 @@ static ypTypeObject ypByteArray_Type = {
         NULL,                              // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        bytearray_freeze,         // tp_freeze
         bytes_unfrozen_copy,      // tp_unfrozen_copy
         bytes_frozen_copy,        // tp_frozen_copy
         bytes_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -10496,7 +10589,7 @@ static ypTypeObject ypByteArray_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -10523,13 +10616,13 @@ static ypTypeObject ypByteArray_Type = {
         &ypByteArray_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypObject *_yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **bytes)
@@ -10592,10 +10685,12 @@ ypObject *yp_bytearrayC(yp_ssize_t len, const yp_uint8_t *source)
     return _ypBytesC(ypByteArray_CODE, len, source);
 }
 
+// XXX source must be a str/chrarray object.
 static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
 {
     ypObject *result;
-    if (ypObject_TYPE_PAIR_CODE(source) != ypStr_CODE) return_yp_BAD_TYPE(source);
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(source) == ypStr_CODE);
 
     // XXX Not handling errors in yp_eq yet because this is just temporary
     if (yp_eq(encoding, yp_s_utf_8) != yp_True) return yp_NotImplementedError;
@@ -10609,20 +10704,23 @@ static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding,
 }
 ypObject *yp_bytes3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(source) != ypStr_CODE) return_yp_BAD_TYPE(source);
     return _ypBytes_encode(ypBytes_CODE, source, encoding, errors);
 }
 ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(source) != ypStr_CODE) return_yp_BAD_TYPE(source);
     return _ypBytes_encode(ypByteArray_CODE, source, encoding, errors);
 }
 ypObject *yp_encode3(ypObject *s, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_METHOD_ERR(s);
     return _ypBytes_encode(
             ypObject_IS_MUTABLE(s) ? ypByteArray_CODE : ypBytes_CODE, s, encoding, errors);
 }
 ypObject *yp_encode(ypObject *s)
 {
-    if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_BAD_TYPE(s);
+    if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_METHOD_ERR(s);
     return ypStringLib_encode_utf_8(
             ypObject_IS_MUTABLE(s) ? ypByteArray_CODE : ypBytes_CODE, s, yp_s_strict);
 }
@@ -10791,6 +10889,12 @@ static void _ypStr_coerce_encoding_free(ypObject *x, void *x_data)
 }
 
 
+static ypObject *chrarray_freeze(ypObject *s)
+{
+    ypObject_SET_TYPE_CODE(s, ypStr_CODE);
+    return yp_None;
+}
+
 static ypObject *str_unfrozen_copy(ypObject *s)
 {
     return ypStringLib_new_copy(ypChrArray_CODE, s, TRUE);
@@ -10836,11 +10940,14 @@ static ypObject *str_concat(ypObject *s, ypObject *iterable)
     }
 }
 
-static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
+// A default_ of NULL means to raise an error if i is out of bounds.
+static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *default_)
 {
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
-        if (defval == NULL) return yp_IndexError;
-        return yp_incref(defval);
+        if (default_ == NULL) return yp_IndexError;
+        return yp_incref(default_);
     }
     return yp_chrC(ypStr_ENC(s)->getindexX(ypStr_DATA(s), i));
 }
@@ -10866,10 +10973,10 @@ static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
     return ypStringLib_setslice_fromstring7(s, i, i + 1, 1, &x_asitem, 1, x_enc);
 }
 
-static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i)
+static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i, int raise_on_missing)
 {
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
-        return yp_IndexError;
+        return raise_on_missing ? yp_IndexError : yp_None;
     }
 
     // It's possible we will need to downconvert s in order to delete s[i]. The logic to do this is
@@ -10927,8 +11034,7 @@ static ypObject *chrarray_pop(ypObject *s)
     return result;
 }
 
-// onmissing must be an immortal, or NULL.
-static ypObject *chrarray_remove(ypObject *s, ypObject *x, ypObject *onmissing)
+static ypObject *chrarray_remove(ypObject *s, ypObject *x, int raise_on_missing)
 {
     void      *x_data;
     yp_ssize_t x_len;
@@ -10952,8 +11058,7 @@ static ypObject *chrarray_remove(ypObject *s, ypObject *x, ypObject *onmissing)
     return yp_None;
 
 missing:
-    if (onmissing == NULL) return yp_ValueError;
-    return onmissing;
+    return raise_on_missing ? yp_ValueError : yp_None;
 }
 
 static ypObject *chrarray_extend(ypObject *s, ypObject *iterable)
@@ -11341,17 +11446,15 @@ static ypObject *_ypStr_func_new_code(int type, yp_ssize_t n, ypObject *const *a
 {
     yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
 
-    // As object defaults to yp_str_empty, and _ypStr_decode rejects strs, encoding-without-object
-    // is an error, just as with bytes (but unlike Python).
-    if (argarray[3] != yp_Arg_Missing) {  // TODO ...or just use None?
-        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
-        return _ypStr_decode(type, argarray[2], argarray[3], errors);
-    } else if (argarray[4] != yp_Arg_Missing) {
-        // TODO In Python, sys.getdefaultencoding() is the default. Should we break with Python
-        // here? I certainly don't like global variables changing behaviour...
-        return _ypStr_decode(type, argarray[2], yp_s_utf_8, argarray[4]);
-    } else {
+    // Unlike Python, setting encoding and/or error without also setting object is an error. (Python
+    // returns the empty string in this case, as if the default for object is b''.)
+    if (argarray[3] == yp_Arg_Missing && argarray[4] == yp_Arg_Missing) {
         return _ypStr(type, argarray[2]);
+    } else {
+        ypObject *encoding = argarray[3] == yp_Arg_Missing ? yp_s_utf_8 : argarray[3];  // borrowed
+        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];   // borrowed
+        if (ypObject_TYPE_PAIR_CODE(argarray[2]) != ypBytes_CODE) return_yp_BAD_TYPE(argarray[2]);
+        return _ypStr_decode(type, argarray[2], encoding, errors);
     }
 }
 
@@ -11383,13 +11486,13 @@ static ypSequenceMethods ypStr_as_sequence = {
         str_getslice,                 // tp_getslice
         str_find,                     // tp_find
         str_count,                    // tp_count
-        MethodError_objssizeobjproc,  // tp_setindex
-        MethodError_objsliceobjproc,  // tp_setslice
-        MethodError_objssizeproc,     // tp_delindex
-        MethodError_objsliceproc,     // tp_delslice
+        TypeError_objssizeobjproc,    // tp_setindex
+        TypeError_objsliceobjproc,    // tp_setslice
+        TypeError_objssizeintproc,    // tp_delindex
+        TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
-        MethodError_objssizeproc,     // tp_irepeat
+        TypeError_objssizeproc,       // tp_irepeat
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
@@ -11409,7 +11512,7 @@ static ypTypeObject ypStr_Type = {
         NULL,                        // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        Immutable_freezefunc,   // tp_freeze
         str_unfrozen_copy,      // tp_unfrozen_copy
         str_frozen_copy,        // tp_frozen_copy
         str_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -11430,7 +11533,7 @@ static ypTypeObject ypStr_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -11447,23 +11550,23 @@ static ypTypeObject ypStr_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypStr_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypSequenceMethods ypChrArray_as_sequence = {
@@ -11499,7 +11602,7 @@ static ypTypeObject ypChrArray_Type = {
         NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        chrarray_freeze,        // tp_freeze
         str_unfrozen_copy,      // tp_unfrozen_copy
         str_frozen_copy,        // tp_frozen_copy
         str_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -11520,7 +11623,7 @@ static ypTypeObject ypChrArray_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -11547,13 +11650,13 @@ static ypTypeObject ypChrArray_Type = {
         &ypChrArray_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypObject *_yp_asencodedCX(
@@ -11626,13 +11729,14 @@ ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source)
     return ypStringLib_decode_frombytesC_utf_8(ypChrArray_CODE, len, source, yp_s_strict);
 }
 
+// XXX source must be a bytes/bytearray object.
 static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
 {
     ypObject *result;
 
     // TODO When we open this up to other types with a buffer interface, make sure we continue
     // to deny str/chrarray as source, as Python does.
-    if (ypObject_TYPE_PAIR_CODE(source) != ypBytes_CODE) return_yp_BAD_TYPE(source);
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(source) == ypBytes_CODE);
 
     // XXX Not handling errors in yp_eq yet because this is just temporary
     // TODO Python ignores "unknown encoding/errors" on empty buffer, but I'd rather raise error.
@@ -11648,20 +11752,23 @@ static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, y
 }
 ypObject *yp_str3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(source) != ypBytes_CODE) return_yp_BAD_TYPE(source);
     return _ypStr_decode(ypStr_CODE, source, encoding, errors);
 }
 ypObject *yp_chrarray3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(source) != ypBytes_CODE) return_yp_BAD_TYPE(source);
     return _ypStr_decode(ypChrArray_CODE, source, encoding, errors);
 }
 ypObject *yp_decode3(ypObject *b, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_METHOD_ERR(b);
     return _ypStr_decode(
             ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, b, encoding, errors);
 }
 ypObject *yp_decode(ypObject *b)
 {
-    if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_BAD_TYPE(b);
+    if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_METHOD_ERR(b);
     return ypStringLib_decode_frombytesC_utf_8(
             ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, ypBytes_LEN(b), ypBytes_DATA(b),
             yp_s_strict);
@@ -11831,7 +11938,7 @@ static const ypStringLib_encinfo ypStringLib_encs[4] = {
         if (ob_pair == ypBytes_CODE) {             \
             return bytes_##meth args;              \
         }                                          \
-        return_yp_BAD_TYPE(ob);                    \
+        return_yp_METHOD_ERR(ob);                  \
     } while (0)
 
 
@@ -11971,14 +12078,14 @@ ypObject *yp_join(ypObject *s, ypObject *iterable)
 
 ypObject *yp_joinN(ypObject *s, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, yp_joinNV, (s, n, args), n);
+    return_yp_NV_FUNC(ypObject *, yp_joinNV, (s, n, args), n);
 }
 ypObject *yp_joinNV(ypObject *s, int n, va_list args)
 {
     ypQuickSeq_state state;
     ypObject        *result;
 
-    if (!ypStringLib_TYPE_CHECK(s)) return_yp_BAD_TYPE(s);
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
     ypQuickSeq_new_fromvar(&state, n, args);
     result = ypStringLib_join(s, &ypQuickSeq_var_methods, &state);
     ypQuickSeq_var_close(&state);
@@ -11987,10 +12094,15 @@ ypObject *yp_joinNV(ypObject *s, int n, va_list args)
     return result;
 }
 
-void yp_partition(ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2);
+void yp_partition(ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2)
+{
+    *part0 = *part1 = *part2 = yp_NotImplementedError;
+}
 
-void yp_rpartition(
-        ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2);
+void yp_rpartition(ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2)
+{
+    *part0 = *part1 = *part2 = yp_NotImplementedError;
+}
 
 ypObject *yp_splitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit)
 {
@@ -12012,6 +12124,17 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
     _ypStringLib_REDIRECT1(s, splitlines, (s, keepends));
 }
 
+ypObject *yp_formatN(ypObject *s, int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_formatNV(ypObject *s, int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_formatK(ypObject *s, int n, ...) { return yp_NotImplementedError; }
+ypObject *yp_formatKV(ypObject *s, int n, va_list args) { return yp_NotImplementedError; }
+
+ypObject *yp_format(ypObject *s, ypObject *sequence, ypObject *mapping)
+{
+    return yp_NotImplementedError;
+}
+
 #pragma endregion string_methods
 
 
@@ -12023,7 +12146,7 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
 // ypTuple_ARRAY is defined above
 #define ypTuple_SET_ARRAY(sq, array) (((ypObject *)sq)->ob_data = array)
 // ypTuple_LEN is defined above
-#define ypTuple_SET_LEN ypObject_SET_CACHED_LEN
+#define ypTuple_SET_LEN ypObject_SET_LEN
 #define ypTuple_ALLOCLEN ypObject_ALLOCLEN
 #define ypTuple_SET_ALLOCLEN ypObject_SET_ALLOCLEN
 #define ypTuple_INLINE_DATA(sq) (((ypTupleObject *)sq)->ob_inline_data)
@@ -12584,6 +12707,22 @@ static ypObject *_ypTuple_setslice_fromtuple(
     return yp_None;
 }
 
+// Returns NULL if i is out of bounds. Never returns an exception.
+static ypObject *_ypTuple_popindex(ypObject *sq, yp_ssize_t i)
+{
+    ypObject *result;
+
+    if (!ypSequence_AdjustIndexC(ypTuple_LEN(sq), &i)) {
+        return NULL;
+    }
+
+    result = ypTuple_ARRAY(sq)[i];
+    ypTuple_ELEMMOVE(sq, i, i + 1);
+    ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
+    yp_ASSERT1(!yp_isexceptionC(result));
+    return result;
+}
+
 // Public Methods
 
 static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
@@ -12664,11 +12803,14 @@ static ypObject *tuple_repeat(ypObject *sq, yp_ssize_t factor)
     return newSq;
 }
 
-static ypObject *tuple_getindex(ypObject *sq, yp_ssize_t i, ypObject *defval)
+// A default_ of NULL means to raise an error if i is out of bounds.
+static ypObject *tuple_getindex(ypObject *sq, yp_ssize_t i, ypObject *default_)
 {
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
     if (!ypSequence_AdjustIndexC(ypTuple_LEN(sq), &i)) {
-        if (defval == NULL) return yp_IndexError;
-        return yp_incref(defval);
+        if (default_ == NULL) return yp_IndexError;
+        return yp_incref(default_);
     }
     return yp_incref(ypTuple_ARRAY(sq)[i]);
 }
@@ -12721,7 +12863,10 @@ static ypObject *tuple_find(ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssiz
 
     result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &sq_rlen);
     if (yp_isexceptionC(result)) return result;
-    if (sq_rlen < 1) goto not_found;
+    if (sq_rlen < 1) {
+        if (yp_isexceptionC(x)) return x;
+        goto not_found;
+    }
 
     if (direction == yp_FIND_REVERSE) {
         ypSlice_InvertIndicesC(&start, &stop, &step, sq_rlen);
@@ -12745,18 +12890,24 @@ static ypObject *tuple_count(
 {
     ypObject  *result;
     yp_ssize_t step = 1;  // ignored; assumed unchanged by ypSlice_AdjustIndicesC
-    yp_ssize_t newLen;    // ignored
+    yp_ssize_t slicelength;
     yp_ssize_t i;
     yp_ssize_t n = 0;
 
-    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &newLen);
+    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &slicelength);
     if (yp_isexceptionC(result)) return result;
+
+    if (slicelength < 1) {
+        if (yp_isexceptionC(x)) return x;
+        goto succeed;
+    }
 
     for (i = start; i < stop; i++) {
         result = yp_eq(x, ypTuple_ARRAY(sq)[i]);
         if (yp_isexceptionC(result)) return result;
         if (ypBool_IS_TRUE_C(result)) n += 1;
     }
+succeed:
     *count = n;
     return yp_None;
 }
@@ -12789,17 +12940,13 @@ static ypObject *list_setslice(
     }
 }
 
+// TODO Support a pop with a default rather than raising an exception? Same for the other "pops".
 static ypObject *list_popindex(ypObject *sq, yp_ssize_t i)
 {
-    ypObject *result;
-
-    if (!ypSequence_AdjustIndexC(ypTuple_LEN(sq), &i)) {
+    ypObject *result = _ypTuple_popindex(sq, i);
+    if (result == NULL) {
         return yp_IndexError;
     }
-
-    result = ypTuple_ARRAY(sq)[i];
-    ypTuple_ELEMMOVE(sq, i, i + 1);
-    ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
     return result;
 }
 
@@ -12824,10 +12971,13 @@ static ypObject *list_reverse(ypObject *sq)
     return yp_None;
 }
 
-static ypObject *list_delindex(ypObject *sq, yp_ssize_t i)
+static ypObject *list_delindex(ypObject *sq, yp_ssize_t i, int raise_on_missing)
 {
-    ypObject *result = list_popindex(sq, i);
-    if (yp_isexceptionC(result)) return result;
+    ypObject *result = _ypTuple_popindex(sq, i);
+    if (result == NULL) {
+        return raise_on_missing ? yp_IndexError : yp_None;
+    }
+    yp_ASSERT1(!yp_isexceptionC(result));  // _ypTuple_popindex never returns an exception
     yp_decref(result);
     return yp_None;
 }
@@ -12926,6 +13076,12 @@ static ypObject *tuple_traverse(ypObject *sq, visitfunc visitor, void *memo)
         ypObject *result = visitor(ypTuple_ARRAY(sq)[i], memo);
         if (yp_isexceptionC(result)) return result;
     }
+    return yp_None;
+}
+
+static ypObject *list_freeze(ypObject *sq)
+{
+    ypObject_SET_TYPE_CODE(sq, ypTuple_CODE);
     return yp_None;
 }
 
@@ -13048,6 +13204,9 @@ static ypObject *tuple_currenthash(
 static ypObject *tuple_contains(ypObject *sq, ypObject *x)
 {
     yp_ssize_t i;
+
+    if (ypTuple_LEN(sq) < 1) return yp_isexceptionC(x) ? x : yp_False;
+
     for (i = 0; i < ypTuple_LEN(sq); i++) {
         ypObject *result = yp_eq(x, ypTuple_ARRAY(sq)[i]);
         if (result != yp_False) return result;  // yp_True, or an exception
@@ -13091,8 +13250,7 @@ static ypObject *list_pop(ypObject *sq)
     return ypTuple_ARRAY(sq)[ypTuple_LEN(sq)];
 }
 
-// onmissing must be an immortal, or NULL
-static ypObject *list_remove(ypObject *sq, ypObject *x, ypObject *onmissing)
+static ypObject *list_remove(ypObject *sq, ypObject *x, int raise_on_missing)
 {
     yp_ssize_t i;
     for (i = 0; i < ypTuple_LEN(sq); i++) {
@@ -13107,8 +13265,7 @@ static ypObject *list_remove(ypObject *sq, ypObject *x, ypObject *onmissing)
         ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
         return yp_None;
     }
-    if (onmissing == NULL) return yp_ValueError;
-    return onmissing;
+    return raise_on_missing ? yp_ValueError : yp_None;
 }
 
 static ypObject *tuple_dealloc(ypObject *sq, void *memo)
@@ -13148,13 +13305,13 @@ static ypSequenceMethods ypTuple_as_sequence = {
         tuple_getslice,               // tp_getslice
         tuple_find,                   // tp_find
         tuple_count,                  // tp_count
-        MethodError_objssizeobjproc,  // tp_setindex
-        MethodError_objsliceobjproc,  // tp_setslice
-        MethodError_objssizeproc,     // tp_delindex
-        MethodError_objsliceproc,     // tp_delslice
+        TypeError_objssizeobjproc,    // tp_setindex
+        TypeError_objsliceobjproc,    // tp_setslice
+        TypeError_objssizeintproc,    // tp_delindex
+        TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
-        MethodError_objssizeproc,     // tp_irepeat
+        TypeError_objssizeproc,       // tp_irepeat
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
@@ -13174,7 +13331,7 @@ static ypTypeObject ypTuple_Type = {
         NULL,                          // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        Immutable_freezefunc,     // tp_freeze
         tuple_unfrozen_copy,      // tp_unfrozen_copy
         tuple_frozen_copy,        // tp_frozen_copy
         tuple_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -13195,7 +13352,7 @@ static ypTypeObject ypTuple_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -13212,23 +13369,23 @@ static ypTypeObject ypTuple_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypTuple_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypObject *list_sort(ypObject *, ypObject *, ypObject *);
@@ -13266,7 +13423,7 @@ static ypTypeObject ypList_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,      // tp_freeze
+        list_freeze,              // tp_freeze
         tuple_unfrozen_copy,      // tp_unfrozen_copy
         tuple_frozen_copy,        // tp_frozen_copy
         tuple_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -13287,7 +13444,7 @@ static ypTypeObject ypList_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -13314,13 +13471,13 @@ static ypTypeObject ypList_Type = {
         &ypList_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 ypObject *yp_itemarrayCX(ypObject *seq, yp_ssize_t *len, ypObject *const **array)
@@ -13470,7 +13627,7 @@ static ypObject *_ypTupleNV(int type, int n, va_list args)
 ypObject *yp_tupleN(int n, ...)
 {
     if (n < 1) return yp_tuple_empty;
-    return_yp_V_FUNC(ypObject *, _ypTupleNV, (ypTuple_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypTupleNV, (ypTuple_CODE, n, args), n);
 }
 ypObject *yp_tupleNV(int n, va_list args)
 {
@@ -13481,7 +13638,7 @@ ypObject *yp_tupleNV(int n, va_list args)
 ypObject *yp_listN(int n, ...)
 {
     if (n < 1) return _ypTuple_new(ypList_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return_yp_V_FUNC(ypObject *, _ypTupleNV, (ypList_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypTupleNV, (ypList_CODE, n, args), n);
 }
 ypObject *yp_listNV(int n, va_list args)
 {
@@ -13589,7 +13746,7 @@ static ypObject *_ypTuple_repeatCNV(int type, yp_ssize_t factor, int n, va_list 
 
 ypObject *yp_tuple_repeatCN(yp_ssize_t factor, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, _ypTuple_repeatCNV, (ypTuple_CODE, factor, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypTuple_repeatCNV, (ypTuple_CODE, factor, n, args), n);
 }
 ypObject *yp_tuple_repeatCNV(yp_ssize_t factor, int n, va_list args)
 {
@@ -13598,7 +13755,7 @@ ypObject *yp_tuple_repeatCNV(yp_ssize_t factor, int n, va_list args)
 
 ypObject *yp_list_repeatCN(yp_ssize_t factor, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, _ypTuple_repeatCNV, (ypList_CODE, factor, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypTuple_repeatCNV, (ypList_CODE, factor, n, args), n);
 }
 ypObject *yp_list_repeatCNV(yp_ssize_t factor, int n, va_list args)
 {
@@ -15025,8 +15182,8 @@ keyfunc_fail:
 
 #define ypSet_TABLE(so) ((ypSet_KeyEntry *)((ypObject *)so)->ob_data)
 #define ypSet_SET_TABLE(so, value) (((ypObject *)so)->ob_data = (void *)(value))
-#define ypSet_LEN ypObject_CACHED_LEN
-#define ypSet_SET_LEN ypObject_SET_CACHED_LEN
+#define ypSet_LEN ypObject_LEN
+#define ypSet_SET_LEN ypObject_SET_LEN
 #define ypSet_FILL(so) (((ypSetObject *)so)->fill)
 #define ypSet_ALLOCLEN ypObject_ALLOCLEN
 #define ypSet_SET_ALLOCLEN ypObject_SET_ALLOCLEN
@@ -15064,13 +15221,12 @@ yp_STATIC_ASSERT((ypSet_ALLOCLEN_MAX << 1u) >
 
 #define ypSet_LEN_MAX ((ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM)
 
-// When allocating a set from a generic iterable, limit the length of the initial allocation to this
-// amount. Per Python (dict_new_presized): "There are no strict guarantee that returned dict can
-// contain minused items without resize. So we create medium size dict instead of very large dict or
+// When (re)allocating a set, limit the length hint of the item container to this amount. Per
+// Python (dict_new_presized): "There are no strict guarantee that returned dict can contain
+// minused items without resize. So we create medium size dict instead of very large dict or
 // MemoryError."
-#define ypSet_FROMITERABLE_LEN_MAX ((yp_ssize_t)0x555555)
-yp_STATIC_ASSERT(
-        ypSet_FROMITERABLE_LEN_MAX <= ypSet_LEN_MAX, ypSet_FROMITERABLE_LEN_MAX_less_than_LEN_MAX);
+#define ypSet_ALLOC_HINT_MAX ((yp_ssize_t)0x555555)
+yp_STATIC_ASSERT(ypSet_ALLOC_HINT_MAX <= ypSet_LEN_MAX, ypSet_ALLOC_HINT_MAX_less_than_LEN_MAX);
 
 // A placeholder to replace deleted entries in the hash table
 yp_IMMORTAL_INVALIDATED(ypSet_dummy);
@@ -15078,7 +15234,7 @@ yp_IMMORTAL_INVALIDATED(ypSet_dummy);
 // Returns true if the given ypSet_KeyEntry contains a valid key
 #define ypSet_ENTRY_USED(loc) ((loc)->se_key != NULL && (loc)->se_key != ypSet_dummy)
 // Returns the index of the given ypSet_KeyEntry in the hash table
-#define ypSet_ENTRY_INDEX(so, loc) ((yp_ssize_t)((loc)-ypSet_TABLE(so)))
+#define ypSet_ENTRY_INDEX(so, loc) ((yp_ssize_t)((loc) - ypSet_TABLE(so)))
 
 // Before adding keys to the set, call this function to determine if a resize is necessary.
 // Returns 0 if the set should first be resized, otherwise returns the number of keys that can be
@@ -15104,7 +15260,7 @@ static yp_ssize_t _ypSet_space_remaining(ypObject *so)
 // than ypSet_LEN_MAX.
 // XXX Adapted from Python's dictresize
 // TODO Python uses optimized  _Py_bit_length or _BitScanReverse64 to find next log2 value... we
-// could use yp_int_bit_lengthC!
+// could use yp_bit_lengthC!
 yp_STATIC_ASSERT(ypSet_RESIZE_AT_DNM <= (yp_SSIZE_T_MAX - 1) / ypSet_LEN_MAX,
         ypSet_calc_alloclen_cant_overflow);
 static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
@@ -15129,7 +15285,7 @@ static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
     return alloclen;
 }
 
-// Returns a new, empty set or frozenset object to hold minused entries
+// Returns a new, empty set or frozenset object to hold at least minused entries.
 // XXX Check for the yp_frozenset_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Overallocate to avoid future resizings
@@ -15148,12 +15304,28 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
     }
     if (yp_isexceptionC(so)) return so;
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    // TODO We could use yp_int_bit_lengthC...
+    // TODO We could use yp_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, alloclen);
     ypSet_FILL(so) = 0;
     yp_memset(ypSet_TABLE(so), 0, alloclen * yp_sizeof(ypSet_KeyEntry));
     yp_ASSERT(_ypSet_space_remaining(so) >= minused, "new set doesn't have requested room");
     return so;
+}
+
+// Returns a new, empty set or frozenset object to hold approximately alloc_hint entries. Use this
+// instead of _ypSet_new where alloc_hint may represent duplicate entries (e.g. _ypSetNV), or where
+// alloc_hint may be incorrect (e.g. _ypSet_fromiterable). If alloc_hint is geater than
+// ypSet_ALLOC_HINT_MAX, then alloclen_fixed is ignored and a variable container with at least
+// ypSet_ALLOC_HINT_MAX entries is returned.
+static ypObject *_ypSet_new_fromhint(int type, yp_ssize_t alloc_hint, int alloclen_fixed)
+{
+    if (alloc_hint > ypSet_ALLOC_HINT_MAX) {
+        // We ignore alloclen_fixed and always return a variable container here, because it's
+        // possible that we really do need to add alloc_hint objects to this set.
+        return _ypSet_new(type, ypSet_ALLOC_HINT_MAX, /*alloclen_fixed=*/FALSE);
+    } else {
+        return _ypSet_new(type, alloc_hint, alloclen_fixed);
+    }
 }
 
 // XXX Check for the "lazy shallow copy" and "yp_frozenset_empty" cases first
@@ -15256,7 +15428,7 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
     if (oldkeys == NULL) return yp_MemoryError;
     yp_memset(ypSet_TABLE(so), 0, newalloclen * yp_sizeof(ypSet_KeyEntry));
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    // TODO We could use yp_int_bit_lengthC...
+    // TODO We could use yp_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, newalloclen);
 
     // Clear the new table.
@@ -15366,6 +15538,7 @@ static void _ypSet_movekey(
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
     yp_ASSERT1(!ypSet_ENTRY_USED(loc));
     yp_ASSERT1(loc->se_key != NULL || _ypSet_space_remaining(so) > 0);
+    yp_ASSERT1(!yp_isexceptionC(key));
     yp_ASSERT1(!ypObject_IS_MUTABLE(key));
     yp_ASSERT1(*spaceleft == _ypSet_space_remaining(so));
 
@@ -15394,6 +15567,7 @@ static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, yp
     yp_ASSERT1(_ypSet_space_remaining(so) > 0);
     yp_ASSERT1(ypSet_LEN(so) == ypSet_FILL(so));
     yp_ASSERT1(!ypObject_IS_MUTABLE(key));
+    yp_ASSERT1(!yp_isexceptionC(key));
 
     i = (size_t)hash & mask;
     (*ep) = &ep0[i];
@@ -15423,42 +15597,47 @@ static ypObject *_ypSet_removekey(ypObject *so, ypSet_KeyEntry *loc)
     return oldkey;
 }
 
-// Adds the key to the hash table at the given location if there is enough room, otherwise resizes
-// so and adds the key at the new location. loc must not currently be in use! *spaceleft should be
-// initialized from _ypSet_space_remaining; it will be decremented or reset as appropriate. growhint
-// is the number of additional items, not including key, that are expected to be added to the set.
+// Adds a new key with the given hash at the given *loc, which may require a resize. *loc must point
+// to a currently-unused location in the hash table; it will be updated if a resize occurs.
+// *spaceleft should be initialized from _ypSet_space_remaining; it will be decremented or reset as
+// appropriate. growhint is the number of additional items, not including key, that are expected to
+// be added to the set. Returns an exception on error.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypSet_push(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash,
-        yp_ssize_t *spaceleft, yp_ssize_t growhint)
+static ypObject *_ypSet_push_newkey(ypObject *so, ypSet_KeyEntry **loc, ypObject *key,
+        yp_hash_t hash, yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
     ypObject  *result;
     yp_ssize_t newlen;
 
-    yp_ASSERT1(!ypSet_ENTRY_USED(loc));
+    yp_ASSERT1(!ypSet_ENTRY_USED(*loc));
+    yp_ASSERT1(!yp_isexceptionC(key));
 
     // We need to add the key; it's possible this doesn't involve resizing.
-    if (*spaceleft > 0 || loc->se_key == ypSet_dummy) {
-        _ypSet_movekey(so, loc, yp_incref(key), hash, spaceleft);  // steals key
+    if (*spaceleft > 0 || (*loc)->se_key == ypSet_dummy) {
+        _ypSet_movekey(so, *loc, yp_incref(key), hash, spaceleft);  // steals key
         return yp_None;
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
     // fast _ypSet_movekey_clean. Give mutable objects a bit of room to grow. If adding growhint
     // overflows ypSet_LEN_MAX (or yp_SSIZE_T_MAX), clamp to ypSet_LEN_MAX.
-    if (growhint < 0) growhint = 0;
     if (ypSet_LEN(so) > ypSet_LEN_MAX - 1) return yp_MemorySizeOverflowError;
+    growhint = yp_CLAMP(growhint, 0, ypSet_ALLOC_HINT_MAX);
     newlen = yp_USIZE_MATH(ypSet_LEN(so) + 1, +, growhint);
     if (newlen < 0 || newlen > ypSet_LEN_MAX) newlen = ypSet_LEN_MAX;  // addition overflowed
     result = _ypSet_resize(so, newlen);                                // invalidates loc
     if (yp_isexceptionC(result)) return result;
 
-    _ypSet_movekey_clean(so, yp_incref(key), hash, &loc);  // steals key
+    _ypSet_movekey_clean(so, yp_incref(key), hash, loc);  // steals key, updates loc
     *spaceleft = _ypSet_space_remaining(so);
     return yp_None;
 }
 
-// As _ypSet_push, but calculates the hash using yp_hashC. Returns yp_True if so was modified,
-// yp_False if it wasn't due to the key already being in the set, or an exception on error.
+// Adds the key to the hash table using the hash returned by yp_hashC. *spaceleft should be
+// initialized from _ypSet_space_remaining; it will be decremented or reset as appropriate. growhint
+// is the number of additional items, not including key, that are expected to be added to the set.
+// Returns yp_True if so was modified, yp_False if it wasn't due to the key already being in the
+// set, or an exception on error.
 static ypObject *_ypSet_push_byhash(
         ypObject *so, ypObject *key, yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
@@ -15466,6 +15645,8 @@ static ypObject *_ypSet_push_byhash(
     ypObject       *exc = yp_None;
     ypSet_KeyEntry *loc;
     ypObject       *result;
+
+    yp_ASSERT1(!yp_isexceptionC(key));
 
     // Look for the appropriate entry in the hash table.
     hash = yp_hashC(key, &exc);
@@ -15476,7 +15657,8 @@ static ypObject *_ypSet_push_byhash(
     // If the key is already in the hash table, then there's nothing to do.
     if (ypSet_ENTRY_USED(loc)) return yp_False;
 
-    result = _ypSet_push(so, loc, key, hash, spaceleft, growhint);
+    // _ypSet_push_newkey may resize so, and may update loc and *spaceleft.
+    result = _ypSet_push_newkey(so, &loc, key, hash, spaceleft, growhint);
     if (yp_isexceptionC(result)) return result;
     return yp_True;
 }
@@ -15646,8 +15828,9 @@ static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
         if (yp_isexceptionC(result)) return result;
         if (ypSet_ENTRY_USED(so_loc)) continue;
 
-        result = _ypSet_push(
-                so, so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft, keysleft);
+        // _ypSet_push_newkey may resize so, and may update so_loc and spaceleft.
+        result = _ypSet_push_newkey(
+                so, &so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft, keysleft);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -15659,7 +15842,6 @@ static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject *mi, yp_uint64_t 
     ypObject  *result;
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
     // Ignore errors getting length_hint. Recall yp_miniiter_length_hintC returns zero on error.
-    // FIXME How does this handle excessively-large length hints?
     // FIXME Rewrite similarly to _ypSet_fromiterable?
     yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
 
@@ -15799,8 +15981,9 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
         if (ypSet_ENTRY_USED(so_loc)) {
             yp_decref(_ypSet_removekey(so, so_loc));
         } else {
-            result = _ypSet_push(so, so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft,
-                    keysleft);  // may resize so
+            // _ypSet_push_newkey may resize so, and may update so_loc and spaceleft.
+            result = _ypSet_push_newkey(
+                    so, &so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft, keysleft);
             if (yp_isexceptionC(result)) return result;
         }
     }
@@ -15995,9 +16178,10 @@ static ypObject *frozenset_traverse(ypObject *so, visitfunc visitor, void *memo)
     return yp_None;
 }
 
-static ypObject *frozenset_freeze(ypObject *so)
+static ypObject *set_freeze(ypObject *so)
 {
-    return yp_None;  // no-op, currently
+    ypObject_SET_TYPE_CODE(so, ypFrozenSet_CODE);
+    return yp_None;
 }
 
 static ypObject *frozenset_unfrozen_copy(ypObject *so)
@@ -16338,8 +16522,12 @@ static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
 static ypObject *set_pushunique(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
+    ypObject  *result;
+
+    if (yp_isexceptionC(x)) return x;
+
     // TODO Overallocate
-    ypObject *result = _ypSet_push_byhash(so, x, &spaceleft, 0);
+    result = _ypSet_push_byhash(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;  // TODO: As usual, what if this is yp_KeyError?
     return result == yp_True ? yp_None : yp_KeyError;
 }
@@ -16347,8 +16535,12 @@ static ypObject *set_pushunique(ypObject *so, ypObject *x)
 static ypObject *set_push(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
+    ypObject  *result;
+
+    if (yp_isexceptionC(x)) return x;
+
     // TODO Overallocate
-    ypObject *result = _ypSet_push_byhash(so, x, &spaceleft, 0);
+    result = _ypSet_push_byhash(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;
     return yp_None;
 }
@@ -16376,7 +16568,7 @@ static ypObject *set_clear(ypObject *so)
 
     // Update our attributes and return
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    // TODO We could use yp_int_bit_lengthC...
+    // TODO We could use yp_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, ypSet_ALLOCLEN_MIN);  // we can't make use of the excess anyway
     ypSet_SET_LEN(so, 0);
     ypSet_FILL(so) = 0;
@@ -16424,13 +16616,11 @@ static ypObject *frozenset_len(ypObject *so, yp_ssize_t *len)
     return yp_None;
 }
 
-// onmissing must be an immortal, or NULL
-static ypObject *set_remove(ypObject *so, ypObject *x, ypObject *onmissing)
+static ypObject *set_remove(ypObject *so, ypObject *x, int raise_on_missing)
 {
     ypObject *result = _ypSet_pop_bycurrenthash(so, x);
     if (result == ypSet_dummy) {
-        if (onmissing == NULL) return yp_KeyError;
-        return onmissing;
+        return raise_on_missing ? yp_KeyError : yp_None;
     }
     if (yp_isexceptionC(result)) return result;  // TODO As usual, what if this is yp_KeyError?
     yp_decref(result);
@@ -16505,7 +16695,7 @@ static ypTypeObject ypFrozenSet_Type = {
         NULL,                              // tp_repr
 
         // Freezing, copying, and invalidating
-        frozenset_freeze,             // tp_freeze
+        Immutable_freezefunc,         // tp_freeze
         frozenset_unfrozen_copy,      // tp_unfrozen_copy
         frozenset_frozen_copy,        // tp_frozen_copy
         frozenset_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -16526,7 +16716,7 @@ static ypTypeObject ypFrozenSet_Type = {
         MethodError_objproc,    // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         frozenset_miniiter,              // tp_miniiter
@@ -16543,23 +16733,23 @@ static ypTypeObject ypFrozenSet_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
         &ypFrozenSet_as_set,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypSetMethods ypSet_as_set = {
@@ -16593,7 +16783,7 @@ static ypTypeObject ypSet_Type = {
         NULL,                        // tp_repr
 
         // Freezing, copying, and invalidating
-        frozenset_freeze,             // tp_freeze
+        set_freeze,                   // tp_freeze
         frozenset_unfrozen_copy,      // tp_unfrozen_copy
         frozenset_frozen_copy,        // tp_frozen_copy
         frozenset_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -16614,7 +16804,7 @@ static ypTypeObject ypSet_Type = {
         MethodError_objproc,    // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         frozenset_miniiter,              // tp_miniiter
@@ -16626,28 +16816,28 @@ static ypTypeObject ypSet_Type = {
         TypeError_objobjproc,            // tp_send
 
         // Container operations
-        frozenset_contains,         // tp_contains
-        frozenset_len,              // tp_len
-        set_push,                   // tp_push
-        set_clear,                  // tp_clear
-        set_pop,                    // tp_pop
-        set_remove,                 // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
-        set_update,                 // tp_update
+        frozenset_contains,       // tp_contains
+        frozenset_len,            // tp_len
+        set_push,                 // tp_push
+        set_clear,                // tp_clear
+        set_pop,                  // tp_pop
+        set_remove,               // tp_remove
+        TypeError_objobjobjproc,  // tp_getdefault
+        TypeError_objobjobjproc,  // tp_setitem
+        TypeError_objobjintproc,  // tp_delitem
+        set_update,               // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
         &ypSet_as_set,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 
@@ -16667,12 +16857,20 @@ static ypObject *yp_set_getintern(ypObject *set, ypObject *x)
 
 // Constructors
 
+// XXX Handle the "no items" case first.
 static ypObject *_ypSetNV(int type, int n, va_list args)
 {
     yp_ssize_t spaceleft;
     ypObject  *result;
-    ypObject  *newSo = _ypSet_new(type, n, /*alloclen_fixed=*/TRUE);
+    ypObject  *newSo;
+
+    yp_ASSERT1(n > 0);
+
+    // We set alloclen_fixed to TRUE here because we know for certain that we will not be adding
+    // more than n entries.
+    newSo = _ypSet_new_fromhint(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newSo)) return newSo;
+
     spaceleft = _ypSet_space_remaining(newSo);
     while (n > 0) {
         ypObject *x = va_arg(args, ypObject *);  // borrowed
@@ -16693,7 +16891,7 @@ static ypObject *_ypSetNV(int type, int n, va_list args)
 ypObject *yp_frozensetN(int n, ...)
 {
     if (n < 1) return yp_frozenset_empty;
-    return_yp_V_FUNC(ypObject *, _ypSetNV, (ypFrozenSet_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypSetNV, (ypFrozenSet_CODE, n, args), n);
 }
 ypObject *yp_frozensetNV(int n, va_list args)
 {
@@ -16704,7 +16902,7 @@ ypObject *yp_frozensetNV(int n, va_list args)
 ypObject *yp_setN(int n, ...)
 {
     if (n < 1) return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return_yp_V_FUNC(ypObject *, _ypSetNV, (ypSet_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypSetNV, (ypSet_CODE, n, args), n);
 }
 ypObject *yp_setNV(int n, va_list args)
 {
@@ -16731,9 +16929,7 @@ static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
     if (yp_isexceptionC(mi)) return mi;
 
     // Ignore errors determining length_hint; it just means we can't pre-allocate
-    // FIXME Implement a similar "maximum length hint" everywhere.
     length_hint = yp_miniiter_length_hintC(mi, &mi_state, &yp_exc_ignored);
-    if (length_hint > ypSet_FROMITERABLE_LEN_MAX) length_hint = ypSet_FROMITERABLE_LEN_MAX;
 
     // FIXME Use a similar "empty iterable" optimization everywhere.
     first = yp_miniiter_next(mi, &mi_state);  // new ref
@@ -16753,7 +16949,7 @@ static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
         return exc;
     }
 
-    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_new_fromhint(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) {
         yp_decref(first);
         yp_decref(mi);
@@ -16811,8 +17007,8 @@ ypObject *yp_set(ypObject *iterable)
 
 #define ypDict_KEYSET(mp) (((ypDictObject *)mp)->keyset)
 #define ypDict_ALLOCLEN(mp) ypSet_ALLOCLEN(ypDict_KEYSET(mp))
-#define ypDict_LEN ypObject_CACHED_LEN
-#define ypDict_SET_LEN ypObject_SET_CACHED_LEN
+#define ypDict_LEN ypObject_LEN
+#define ypDict_SET_LEN ypObject_SET_LEN
 #define ypDict_VALUES(mp) ((ypObject **)((ypObject *)mp)->ob_data)
 #define ypDict_SET_VALUES(mp, x) (((ypObject *)mp)->ob_data = x)
 #define ypDict_INLINE_DATA(mp) (((ypDictObject *)mp)->ob_inline_data)
@@ -16828,6 +17024,12 @@ ypObject *yp_set(ypObject *iterable)
 #define ypDict_ALLOCLEN_MAX ypSet_ALLOCLEN_MAX
 #define ypDict_LEN_MAX ypSet_LEN_MAX
 
+// When (re)allocating a dict, limit the length hint of the item container to this amount. Per
+// Python (dict_new_presized): "There are no strict guarantee that returned dict can contain minused
+// items without resize. So we create medium size dict instead of very large dict or MemoryError."
+#define ypDict_ALLOC_HINT_MAX ypSet_ALLOC_HINT_MAX
+yp_STATIC_ASSERT(ypDict_ALLOC_HINT_MAX <= ypDict_LEN_MAX, ypDict_ALLOC_HINT_MAX_less_than_LEN_MAX);
+
 // Returns a pointer to the value element corresponding to the given key location
 #define ypDict_VALUE_ENTRY(mp, key_loc) \
     (&(ypDict_VALUES(mp)[ypSet_ENTRY_INDEX(ypDict_KEYSET(mp), key_loc)]))
@@ -16840,7 +17042,7 @@ yp_STATIC_ASSERT(
         (yp_SSIZE_T_MAX - yp_sizeof(ypDictObject)) / yp_sizeof(ypObject *) >= ypSet_ALLOCLEN_MAX,
         ypDict_alloclen_max_not_smaller_than_set_alloclen_max);
 
-// Returns a new, empty dict or frozendict object to hold minused entries
+// Returns a new, empty dict or frozendict object to hold at least minused entries.
 // XXX Check for the "yp_frozendict_empty" case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Overallocate to avoid future resizings
@@ -16868,6 +17070,22 @@ static ypObject *_ypDict_new(int type, yp_ssize_t minused, int alloclen_fixed)
     ypDict_KEYSET(mp) = keyset;
     yp_memset(ypDict_VALUES(mp), 0, alloclen * yp_sizeof(ypObject *));
     return mp;
+}
+
+// Returns a new, empty dict or frozendict object to hold approximately alloc_hint entries. Use this
+// instead of _ypDict_new where alloc_hint may represent duplicate entries (e.g. _ypDictKV), or
+// where alloc_hint may be incorrect (e.g. _ypDict_new_fromiterable). If alloc_hint is geater than
+// ypDict_ALLOC_HINT_MAX, then alloclen_fixed is ignored and a variable container with at least
+// ypDict_ALLOC_HINT_MAX entries is returned.
+static ypObject *_ypDict_new_fromhint(int type, yp_ssize_t alloc_hint, int alloclen_fixed)
+{
+    if (alloc_hint > ypDict_ALLOC_HINT_MAX) {
+        // We ignore alloclen_fixed and always return a variable container here, because it's
+        // possible that we really do need to add alloc_hint objects to this dict.
+        return _ypDict_new(type, ypDict_ALLOC_HINT_MAX, /*alloclen_fixed=*/FALSE);
+    } else {
+        return _ypDict_new(type, alloc_hint, alloclen_fixed);
+    }
 }
 
 // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
@@ -16975,9 +17193,10 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
     return yp_None;
 }
 
-// Adds a new key with the given hash at the given key_loc, which may require a resize, and sets
+// Adds a new key with the given hash at the given *key_loc, which may require a resize, and sets
 // value appropriately. *key_loc must point to a currently-unused location in the hash table; it
-// will be updated if a resize occurs. Otherwise behaves as _ypDict_push.
+// will be updated if a resize occurs. *spaceleft should be initialized from _ypSet_space_remaining;
+// it will be decremented or reset as appropriate. Returns an exception on error.
 // XXX Adapted from PyDict_SetItem
 // TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
 // shared keyset contains 5x the keys that we actually use?  That's a large waste in the value
@@ -16990,20 +17209,23 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     yp_ssize_t newlen;
 
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(!ypSet_ENTRY_USED(*key_loc));
+    yp_ASSERT1(!yp_isexceptionC(key));
+    yp_ASSERT1(!yp_isexceptionC(value));
 
     // It's possible we can add the key without resizing
     if (*spaceleft > 0 || (*key_loc)->se_key == ypSet_dummy) {
         _ypSet_movekey(keyset, *key_loc, yp_incref(key), hash, spaceleft);  // steals key
         *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
         ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
-        return yp_True;
+        return yp_None;
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
     // fast _ypSet_movekey_clean. Give mutable objects a bit of room to grow. If adding growhint
     // overflows ypSet_LEN_MAX (or yp_SSIZE_T_MAX), clamp to ypSet_LEN_MAX.
-    if (growhint < 0) growhint = 0;
     if (ypDict_LEN(mp) > ypSet_LEN_MAX - 1) return yp_MemorySizeOverflowError;
+    growhint = yp_CLAMP(growhint, 0, ypDict_ALLOC_HINT_MAX);
     newlen = yp_USIZE_MATH(ypDict_LEN(mp) + 1, +, growhint);
     if (newlen < 0 || newlen > ypSet_LEN_MAX) newlen = ypSet_LEN_MAX;  // addition overflowed
     result = _ypDict_resize(mp, newlen);  // invalidates keyset and *key_loc
@@ -17014,51 +17236,61 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
     ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
     *spaceleft = _ypSet_space_remaining(keyset);
-    return yp_True;
+    return yp_None;
 }
 
-// Adds the key/value to the dict. If override is false, returns yp_False and does not modify the
-// dict if there is an existing value. *spaceleft should be initialized from
-// _ypSet_space_remaining; it will be decremented or reset as appropriate.. Returns yp_True if mp
-// was modified, yp_False if it wasn't due to existing values being preserved (ie override is
-// false), or an exception on error.
+// Updates the value in the dict for the key at the given key_loc. key_loc must point to a
+// currently-used location in the hash table. Always succeeds.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int override,
-        yp_ssize_t *spaceleft, yp_ssize_t growhint)
+static void _ypDict_push_existingkey(ypObject *mp, ypSet_KeyEntry *key_loc, ypObject *value)
+{
+    ypObject **value_loc;
+
+    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(ypSet_ENTRY_USED(key_loc));
+    yp_ASSERT1(!yp_isexceptionC(value));
+
+    value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
+    if (*value_loc == NULL) {
+        *value_loc = yp_incref(value);
+        ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
+    } else {
+        // FIXME What if yp_decref modifies mp?
+        yp_decref(*value_loc);
+        *value_loc = yp_incref(value);
+    }
+}
+
+// Adds the key/value to the dict, overriding existing values, using the hash returned by up_hashC.
+// *spaceleft should be initialized from _ypSet_space_remaining; it will be decremented or reset as
+// appropriate. growhint is the number of additional items, not including key, that are expected to
+// be added to the dict. Returns an exception on error.
+static ypObject *_ypDict_push_byhash(
+        ypObject *mp, ypObject *key, ypObject *value, yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
     yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
     ypSet_KeyEntry *key_loc;
     ypObject       *exc = yp_None;
     ypObject       *result;
-    ypObject      **value_loc;
 
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(!yp_isexceptionC(key));
+    yp_ASSERT1(!yp_isexceptionC(value));
 
     // Look for the appropriate entry in the hash table
     hash = yp_hashC(key, &exc);
-    if (yp_isexceptionC(exc)) return exc;      // also verifies key is not an exception
-    if (yp_isexceptionC(value)) return value;  // verifies value is not an exception
+    if (yp_isexceptionC(exc)) return exc;
     result = _ypSet_lookkey(keyset, key, hash, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the key is already in the hash table, then we simply need to update the value
     if (ypSet_ENTRY_USED(key_loc)) {
-        value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
-        if (*value_loc == NULL) {
-            *value_loc = yp_incref(value);
-            ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
-        } else {
-            if (!override) return yp_False;
-            // FIXME What if yp_decref modifies mp?
-            yp_decref(*value_loc);
-            *value_loc = yp_incref(value);
-        }
-        return yp_True;
+        _ypDict_push_existingkey(mp, key_loc, value);
+        return yp_None;
+    } else {
+        // _ypDict_push_newkey may resize mp, and may update key_loc and *spaceleft.
+        return _ypDict_push_newkey(mp, &key_loc, key, hash, value, spaceleft, growhint);
     }
-
-    // Otherwise, we need to add both the key _and_ value, which may involve resizing
-    return _ypDict_push_newkey(mp, &key_loc, key, hash, value, spaceleft, growhint);
 }
 
 // Removes the value from the dict; the key stays in the keyset, but that's of no concern. The
@@ -17075,16 +17307,16 @@ static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
-    // because we are not adding it to the set
+    // because we are not adding it to the set.
     result = _ypSet_lookkey_bycurrenthash(keyset, key, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the there's no existing value, then there's nothing to do (if the key is not in the set,
-    // then *value_loc will be NULL)
+    // If there's no existing value, then there's nothing to do (if the key is not in the set, then
+    // *value_loc will be NULL).
     value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
     if (*value_loc == NULL) return ypSet_dummy;
 
-    // Otherwise, we need to remove the value
+    // Otherwise, we need to remove the value.
     oldvalue = *value_loc;
     *value_loc = NULL;
     ypDict_SET_LEN(mp, ypDict_LEN(mp) - 1);
@@ -17110,12 +17342,17 @@ static void _ypDict_iter_items_next(ypObject *itemiter, ypObject **key, ypObject
 // XXX Check for the mp==other case _before_ calling this function
 static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
 {
-    yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
-    yp_ssize_t valuesleft = ypDict_LEN(other);
-    ypObject  *other_keyset = ypDict_KEYSET(other);
-    yp_ssize_t i;
-    ypObject  *other_value;
-    ypObject  *result;
+    yp_ssize_t      spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
+    ypObject       *keyset = ypDict_KEYSET(mp);
+    yp_ssize_t      valuesleft = ypDict_LEN(other);
+    ypObject      **other_values = ypDict_VALUES(other);
+    ypSet_KeyEntry *other_keyset_table = ypSet_TABLE(ypDict_KEYSET(other));
+    yp_ssize_t      i;
+    ypObject       *value;
+    ypObject       *key;
+    yp_hash_t       hash;
+    ypSet_KeyEntry *key_loc;
+    ypObject       *result;
 
     yp_ASSERT(mp != other, "_ypDict_update_fromdict called with mp==other");
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenDict_CODE);
@@ -17124,15 +17361,23 @@ static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
     // values.
 
     for (i = 0; valuesleft > 0; i++) {
-        other_value = ypDict_VALUES(other)[i];
-        if (other_value == NULL) continue;
+        value = other_values[i];
+        if (value == NULL) continue;
+        key = other_keyset_table[i].se_key;
+        hash = other_keyset_table[i].se_hash;
         valuesleft -= 1;
 
-        // TODO _ypDict_push will call yp_hashC again, even though we already know the hash
-        // TODO yp_hashC may mutate mp, invalidating valuesleft!
-        result = _ypDict_push(
-                mp, ypSet_TABLE(other_keyset)[i].se_key, other_value, 1, &spaceleft, valuesleft);
+        // Look for the appropriate entry in the hash table.
+        result = _ypSet_lookkey(keyset, key, hash, &key_loc);
         if (yp_isexceptionC(result)) return result;
+
+        if (ypSet_ENTRY_USED(key_loc)) {
+            _ypDict_push_existingkey(mp, key_loc, value);
+        } else {
+            // _ypDict_push_newkey may resize mp, and may update key_loc and spaceleft.
+            result = _ypDict_push_newkey(mp, &key_loc, key, hash, value, &spaceleft, valuesleft);
+            if (yp_isexceptionC(result)) return result;
+        }
     }
     return yp_None;
 }
@@ -17154,8 +17399,10 @@ static ypObject *_ypDict_update_fromiter(ypObject *mp, ypObject *itemiter)
             if (yp_isexceptionC2(key, yp_StopIteration)) break;
             return key;
         }
-        length_hint -= 1;  // check for <0 only when we need it in _ypDict_push
-        result = _ypDict_push(mp, key, value, 1, &spaceleft, length_hint);
+        yp_ASSERT1(!yp_isexceptionC(value));  // if key is not an exception, then neither is value
+
+        length_hint -= 1;  // check for <0 only when we need it in _ypDict_push_byhash
+        result = _ypDict_push_byhash(mp, key, value, &spaceleft, length_hint);
         yp_decrefN(2, key, value);
         if (yp_isexceptionC(result)) return result;
     }
@@ -17212,6 +17459,12 @@ static ypObject *frozendict_traverse(ypObject *mp, visitfunc visitor, void *memo
         result = visitor(value, memo);
         if (yp_isexceptionC(result)) return result;
     }
+    return yp_None;
+}
+
+static ypObject *dict_freeze(ypObject *mp)
+{
+    ypObject_SET_TYPE_CODE(mp, ypFrozenDict_CODE);
     return yp_None;
 }
 
@@ -17395,8 +17648,8 @@ static ypObject *dict_clear(ypObject *mp)
     return yp_None;
 }
 
-// A defval of NULL means to raise an error if key is not in dict
-static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *defval)
+// A default_ of NULL means to raise an error if key is not in dict.
+static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *default_)
 {
     ypObject       *keyset = ypDict_KEYSET(mp);
     ypSet_KeyEntry *key_loc;
@@ -17406,44 +17659,54 @@ static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *de
     // Because we are called directly (i.e. ypFunction), ensure we're called correctly
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(mp) == ypFrozenDict_CODE);
 
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
     result = _ypSet_lookkey_bycurrenthash(keyset, key, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the there's no existing value, return defval, otherwise return the value
+    // If there's no existing value, return default_, otherwise return the value
     value = *ypDict_VALUE_ENTRY(mp, key_loc);
     if (value == NULL) {
-        if (defval == NULL) return yp_KeyError;
-        return yp_incref(defval);
-    } else {
-        return yp_incref(value);
+        if (default_ == NULL) return yp_KeyError;
+        return yp_incref(default_);
     }
+    return yp_incref(value);
 }
 
-// yp_None or an exception
 static ypObject *dict_setitem(ypObject *mp, ypObject *key, ypObject *value)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
+    if (yp_isexceptionC(key)) return key;
+    if (yp_isexceptionC(value)) return value;
     // TODO Overallocate
-    ypObject *result = _ypDict_push(mp, key, value, 1, &spaceleft, 0);
-    if (yp_isexceptionC(result)) return result;
-    return yp_None;
+    return _ypDict_push_byhash(mp, key, value, &spaceleft, 0);
 }
 
-static ypObject *dict_delitem(ypObject *mp, ypObject *key)
+static ypObject *dict_delitem(ypObject *mp, ypObject *key, int raise_on_missing)
 {
     ypObject *result = _ypDict_pop(mp, key);
-    if (result == ypSet_dummy) return yp_KeyError;
+    if (result == ypSet_dummy) {
+        return raise_on_missing ? yp_KeyError : yp_None;
+    }
     if (yp_isexceptionC(result)) return result;
     yp_decref(result);
     return yp_None;
 }
 
-static ypObject *dict_popvalue(ypObject *mp, ypObject *key, ypObject *defval)
+// A default_ of NULL means to raise an error if key is not in dict.
+static ypObject *dict_popvalue(ypObject *mp, ypObject *key, ypObject *default_)
 {
-    ypObject *result = _ypDict_pop(mp, key);
-    if (result == ypSet_dummy) return yp_incref(defval);
+    ypObject *result;
+
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
+    result = _ypDict_pop(mp, key);
+    if (result == ypSet_dummy) {
+        if (default_ == NULL) return yp_KeyError;
+        return yp_incref(default_);
+    }
     return result;
 }
 
@@ -17480,7 +17743,7 @@ static ypObject *dict_popitem(ypObject *mp, ypObject **key, ypObject **value)
     return yp_None;
 }
 
-static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *defval)
+static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *default_)
 {
     yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
@@ -17491,25 +17754,26 @@ static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *defval)
 
     // Look for the appropriate entry in the hash table.
     hash = yp_hashC(key, &exc);
-    if (yp_isexceptionC(exc)) return exc;        // returns if key is an exception
-    if (yp_isexceptionC(defval)) return defval;  // returns if defval is an exception
+    if (yp_isexceptionC(exc)) return exc;            // returns if key is an exception
+    if (yp_isexceptionC(default_)) return default_;  // returns if default_ is an exception
     result = _ypSet_lookkey(keyset, key, hash, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the there's no existing value, add and return defval, otherwise return the value
+    // If the there's no existing value, add and return default_, otherwise return the value
     value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
     if (*value_loc == NULL) {
         if (ypSet_ENTRY_USED(key_loc)) {
-            *value_loc = yp_incref(defval);
+            *value_loc = yp_incref(default_);
             ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
         } else {
             yp_ssize_t spaceleft = _ypSet_space_remaining(keyset);
+            // _ypDict_push_newkey may resize mp, and may update key_loc and spaceleft.
             // TODO Overallocate
-            result = _ypDict_push_newkey(mp, &key_loc, key, hash, defval, &spaceleft, 0);
+            result = _ypDict_push_newkey(mp, &key_loc, key, hash, default_, &spaceleft, 0);
             // value_loc is no longer valid
             if (yp_isexceptionC(result)) return result;
         }
-        return yp_incref(defval);
+        return yp_incref(default_);
     } else {
         return yp_incref(*value_loc);
     }
@@ -17523,10 +17787,13 @@ static ypObject *dict_updateK(ypObject *mp, int n, va_list args)
     ypObject  *value;
 
     while (n > 0) {
-        key = va_arg(args, ypObject *);    // borrowed
+        // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
+        key = va_arg(args, ypObject *);  // borrowed
+        if (yp_isexceptionC(key)) return key;
         value = va_arg(args, ypObject *);  // borrowed
+        if (yp_isexceptionC(value)) return value;
         n -= 1;
-        result = _ypDict_push(mp, key, value, 1, &spaceleft, n);
+        result = _ypDict_push_byhash(mp, key, value, &spaceleft, n);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -17702,36 +17969,60 @@ static ypObject *frozendict_dealloc(ypObject *mp, void *memo)
 
 static ypObject *frozendict_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
+    ypObject *object = argarray[1];  // borrowed
+    ypObject *kwargs = argarray[3];  // borrowed
+
     yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_frozendict);
-    yp_ASSERT1(ypObject_TYPE_CODE(argarray[3]) == ypFrozenDict_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
 
-    if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
-        return yp_frozendict(argarray[1]);
-    } else if (argarray[1] == yp_frozendict_empty) {  // the default value
-        return yp_incref(argarray[3]);  // **kwargs is always a frozendict, so just return it
+    if (ypDict_LEN(kwargs) < 1) {  // no keyword args
+        return yp_frozendict(object);
+    } else if (object == yp_frozendict_empty) {  // the default value
+        return yp_incref(kwargs);  // **kwargs is always a frozendict, so just return it
     } else {
-        // FIXME Need a yp_frozendict that merges multiple objects (yp_frozendictN?)
-        return yp_NotImplementedError;
+        // Don't use yp_frozendict: it returns alloclen_fixed objects and yp_frozendict_empty.
+        // TODO Could improve this by pre-allocating.
+        ypObject *result;
+        ypObject *mp = _ypDict_new(ypFrozenDict_CODE, 0, /*alloclen_fixed=*/FALSE);
+        if (yp_isexceptionC(mp)) return mp;
+        if (ypObject_TYPE_PAIR_CODE(object) == ypFrozenDict_CODE) {
+            result = _ypDict_update_fromdict(mp, object);
+        } else {
+            result = _ypDict_update_fromiterable(mp, object);
+        }
+        if (yp_isexceptionC(result)) {
+            yp_decref(mp);
+            return result;
+        }
+        result = _ypDict_update_fromdict(mp, kwargs);
+        if (yp_isexceptionC(result)) {
+            yp_decref(mp);
+            return result;
+        }
+        return mp;
     }
 }
 
 static ypObject *dict_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
+    ypObject *object = argarray[1];  // borrowed
+    ypObject *kwargs = argarray[3];  // borrowed
+
     yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_dict);
-    yp_ASSERT1(ypObject_TYPE_CODE(argarray[3]) == ypFrozenDict_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
 
-    if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
-        return yp_dict(argarray[1]);
-    } else if (argarray[1] == yp_frozendict_empty) {  // the default value
-        return _ypDict_copy(ypDict_CODE, argarray[3], /*alloclen_fixed=*/FALSE);
+    if (ypDict_LEN(kwargs) < 1) {  // no keyword args
+        return yp_dict(object);
+    } else if (object == yp_frozendict_empty) {  // the default value
+        return _ypDict_copy(ypDict_CODE, kwargs, /*alloclen_fixed=*/FALSE);
     } else {
         // TODO Could improve this by pre-allocating.
         ypObject *result;
-        ypObject *mp = yp_dict(argarray[1]);
+        ypObject *mp = yp_dict(object);
         if (yp_isexceptionC(mp)) return mp;
-        result = _ypDict_update_fromdict(mp, argarray[3]);
+        result = _ypDict_update_fromdict(mp, kwargs);
         if (yp_isexceptionC(result)) {
             yp_decref(mp);
             return result;
@@ -17775,7 +18066,7 @@ static ypTypeObject ypFrozenDict_Type = {
         NULL,                               // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,           // tp_freeze
+        Immutable_freezefunc,          // tp_freeze
         frozendict_unfrozen_copy,      // tp_unfrozen_copy
         frozendict_frozen_copy,        // tp_frozen_copy
         frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -17796,7 +18087,7 @@ static ypTypeObject ypFrozenDict_Type = {
         MethodError_objproc,     // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         frozendict_miniiter_keys,         // tp_miniiter
@@ -17813,23 +18104,23 @@ static ypTypeObject ypFrozenDict_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         frozendict_getdefault,      // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
         &ypFrozenDict_as_mapping,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypMappingMethods ypDict_as_mapping = {
@@ -17859,7 +18150,7 @@ static ypTypeObject ypDict_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,           // tp_freeze
+        dict_freeze,                   // tp_freeze
         frozendict_unfrozen_copy,      // tp_unfrozen_copy
         frozendict_frozen_copy,        // tp_frozen_copy
         frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -17880,7 +18171,7 @@ static ypTypeObject ypDict_Type = {
         MethodError_objproc,     // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         frozendict_miniiter_keys,         // tp_miniiter
@@ -17897,34 +18188,40 @@ static ypTypeObject ypDict_Type = {
         MethodError_objobjproc,     // tp_push
         dict_clear,                 // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         frozendict_getdefault,      // tp_getdefault
         dict_setitem,               // tp_setitem
         dict_delitem,               // tp_delitem
         dict_update,                // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
         &ypDict_as_mapping,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // Constructors
 
+// XXX Handle the "no items" case first.
 static ypObject *_ypDictKV(int type, int n, va_list args)
 {
     ypObject *newMp;
     ypObject *result;
 
-    newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
+    yp_ASSERT1(n > 0);
+
+    // We set alloclen_fixed to TRUE here because we know for certain that we will not be adding
+    // more than n entries.
+    newMp = _ypDict_new_fromhint(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newMp)) return newMp;
+
     result = dict_updateK(newMp, n, args);
     if (yp_isexceptionC(result)) {
         yp_decref(newMp);
@@ -17936,7 +18233,7 @@ static ypObject *_ypDictKV(int type, int n, va_list args)
 ypObject *yp_frozendictK(int n, ...)
 {
     if (n < 1) return yp_frozendict_empty;
-    return_yp_V_FUNC(ypObject *, _ypDictKV, (ypFrozenDict_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypDictKV, (ypFrozenDict_CODE, n, args), n);
 }
 ypObject *yp_frozendictKV(int n, va_list args)
 {
@@ -17947,7 +18244,7 @@ ypObject *yp_frozendictKV(int n, va_list args)
 ypObject *yp_dictK(int n, ...)
 {
     if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return_yp_V_FUNC(ypObject *, _ypDictKV, (ypDict_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypDictKV, (ypDict_CODE, n, args), n);
 }
 ypObject *yp_dictKV(int n, va_list args)
 {
@@ -17957,7 +18254,7 @@ ypObject *yp_dictKV(int n, va_list args)
 
 // XXX Handle the "fellow frozendict" case _before_ calling this function.
 // XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
-static ypObject *_ypDict(int type, ypObject *x)
+static ypObject *_ypDict_new_fromiterable(int type, ypObject *x)
 {
     ypObject  *exc = yp_None;
     ypObject  *newMp;
@@ -17966,22 +18263,17 @@ static ypObject *_ypDict(int type, ypObject *x)
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
 
-    // FIXME How does this handle excessively-large length hints?
     // FIXME Rewrite similarly to _ypSet_fromiterable?
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
         length_hint = yp_length_hintC(x, &yp_exc_ignored);
-        if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update_fromiterable
-        if (type == ypFrozenDict_CODE) return yp_frozenset_empty;
+        if (type == ypFrozenDict_CODE) return yp_frozendict_empty;
         return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    } else if (length_hint > ypDict_LEN_MAX) {
-        // yp_lenC reports that we don't have room to add their elements
-        return yp_MemorySizeOverflowError;
     }
 
-    newMp = _ypDict_new(type, length_hint, /*alloclen_fixed=*/FALSE);
+    newMp = _ypDict_new_fromhint(type, length_hint, /*alloclen_fixed=*/FALSE);
     if (yp_isexceptionC(newMp)) return newMp;
     result = _ypDict_update_fromiterable(newMp, x);
     if (yp_isexceptionC(result)) {
@@ -18007,7 +18299,7 @@ ypObject *yp_frozendict(ypObject *x)
         if (ypObject_TYPE_CODE(x) == ypFrozenDict_CODE) return yp_incref(x);
         return _ypDict_copy(ypFrozenDict_CODE, x, /*alloclen_fixed=*/TRUE);
     }
-    return _ypDict(ypFrozenDict_CODE, x);
+    return _ypDict_new_fromiterable(ypFrozenDict_CODE, x);
 }
 
 ypObject *yp_dict(ypObject *x)
@@ -18017,9 +18309,10 @@ ypObject *yp_dict(ypObject *x)
         if (ypDict_LEN(x) < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
         return _ypDict_copy(ypDict_CODE, x, /*alloclen_fixed=*/FALSE);
     }
-    return _ypDict(ypDict_CODE, x);
+    return _ypDict_new_fromiterable(ypDict_CODE, x);
 }
 
+// XXX Handle the "no keys" and "value is exception" cases first.
 // TOOD ypQuickIter could consolidate this with _ypDict_fromkeys
 static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list args)
 {
@@ -18028,15 +18321,23 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
     ypObject  *key;
     ypObject  *newMp;
 
-    if (n > ypDict_LEN_MAX) return yp_MemorySizeOverflowError;
-    newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
+    yp_ASSERT1(n > 0);
+    yp_ASSERT1(!yp_isexceptionC(value));
+
+    // We set alloclen_fixed to TRUE here because we know for certain that we will not be adding
+    // more than n entries.
+    newMp = _ypDict_new_fromhint(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newMp)) return newMp;
     spaceleft = _ypSet_space_remaining(ypDict_KEYSET(newMp));
 
     while (n > 0) {
         key = va_arg(args, ypObject *);  // borrowed
+        if (yp_isexceptionC(key)) {
+            yp_decref(newMp);
+            return key;
+        }
         n -= 1;
-        result = _ypDict_push(newMp, key, value, 1, &spaceleft, n);
+        result = _ypDict_push_byhash(newMp, key, value, &spaceleft, n);
         if (yp_isexceptionC(result)) {
             yp_decref(newMp);
             return result;
@@ -18047,22 +18348,26 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
 
 ypObject *yp_frozendict_fromkeysN(ypObject *value, int n, ...)
 {
+    if (yp_isexceptionC(value)) return value;
     if (n < 1) return yp_frozendict_empty;
-    return_yp_V_FUNC(ypObject *, _ypDict_fromkeysNV, (ypFrozenDict_CODE, value, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypDict_fromkeysNV, (ypFrozenDict_CODE, value, n, args), n);
 }
 ypObject *yp_frozendict_fromkeysNV(ypObject *value, int n, va_list args)
 {
+    if (yp_isexceptionC(value)) return value;
     if (n < 1) return yp_frozendict_empty;
     return _ypDict_fromkeysNV(ypFrozenDict_CODE, value, n, args);
 }
 
 ypObject *yp_dict_fromkeysN(ypObject *value, int n, ...)
 {
+    if (yp_isexceptionC(value)) return value;
     if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return_yp_V_FUNC(ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n);
 }
 ypObject *yp_dict_fromkeysNV(ypObject *value, int n, va_list args)
 {
+    if (yp_isexceptionC(value)) return value;
     if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     return _ypDict_fromkeysNV(ypDict_CODE, value, n, args);
 }
@@ -18078,26 +18383,23 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     ypObject   *key;
     yp_ssize_t  length_hint;
 
-    // FIXME How does this handle excessively-large length hints?
+    if (yp_isexceptionC(value)) return value;
+
     // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
         length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
-        if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_push
         if (type == ypFrozenDict_CODE) return yp_frozendict_empty;
         return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    } else if (length_hint > ypDict_LEN_MAX) {
-        // yp_lenC reports that we don't have room to add their elements
-        return yp_MemorySizeOverflowError;
     }
 
     mi = yp_miniiter(iterable, &mi_state);  // new ref
     if (yp_isexceptionC(mi)) return mi;
 
-    newMp = _ypDict_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
+    newMp = _ypDict_new_fromhint(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newMp)) {
         yp_decref(mi);
         return newMp;
@@ -18112,7 +18414,7 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
             break;
         }
         length_hint -= 1;
-        result = _ypDict_push(newMp, key, value, 1, &spaceleft, length_hint);
+        result = _ypDict_push_byhash(newMp, key, value, &spaceleft, length_hint);
         yp_decref(key);
         if (yp_isexceptionC(result)) break;
     }
@@ -18120,6 +18422,11 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     if (yp_isexceptionC(result)) {
         yp_decref(newMp);
         return result;
+    }
+
+    if (type == ypFrozenDict_CODE && ypDict_LEN(newMp) < 1) {
+        yp_decref(newMp);
+        return yp_frozendict_empty;
     }
     return newMp;
 }
@@ -18145,8 +18452,8 @@ ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value)
 
 #define ypRange_START(r) (((ypRangeObject *)r)->start)
 #define ypRange_STEP(r) (((ypRangeObject *)r)->step)
-#define ypRange_LEN ypObject_CACHED_LEN
-#define ypRange_SET_LEN ypObject_SET_CACHED_LEN
+#define ypRange_LEN ypObject_LEN
+#define ypRange_SET_LEN ypObject_SET_LEN
 
 // We normalize start and step for small ranges to make comparisons and hashes easier; use this to
 // ensure we've done it correctly
@@ -18238,12 +18545,15 @@ static ypObject *range_frozen_deepcopy(ypObject *r, visitfunc copy_visitor, void
 
 static ypObject *range_bool(ypObject *r) { return ypBool_FROM_C(ypRange_LEN(r)); }
 
+// A default_ of NULL means to raise an error if i is out of bounds.
 // XXX Using ypSequence_AdjustIndexC assumes we don't have ranges longer than yp_SSIZE_T_MAX
-static ypObject *range_getindex(ypObject *r, yp_ssize_t i, ypObject *defval)
+static ypObject *range_getindex(ypObject *r, yp_ssize_t i, ypObject *default_)
 {
+    if (default_ != NULL && yp_isexceptionC(default_)) return default_;
+
     if (!ypSequence_AdjustIndexC(ypRange_LEN(r), &i)) {
-        if (defval == NULL) return yp_IndexError;
-        return yp_incref(defval);
+        if (default_ == NULL) return yp_IndexError;
+        return yp_incref(default_);
     }
     return yp_intC(ypRange_GET_INDEX(r, i));
 }
@@ -18412,19 +18722,19 @@ yp_IMMORTAL_FUNCTION_static(range_func_new, range_func_new_code,
                 {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypSequenceMethods ypRange_as_sequence = {
-        MethodError_objobjproc,       // tp_concat
-        MethodError_objssizeproc,     // tp_repeat
+        TypeError_objobjproc,         // tp_concat
+        TypeError_objssizeproc,       // tp_repeat
         range_getindex,               // tp_getindex
         range_getslice,               // tp_getslice
         range_find,                   // tp_find
         range_count,                  // tp_count
-        MethodError_objssizeobjproc,  // tp_setindex
-        MethodError_objsliceobjproc,  // tp_setslice
-        MethodError_objssizeproc,     // tp_delindex
-        MethodError_objsliceproc,     // tp_delslice
+        TypeError_objssizeobjproc,    // tp_setindex
+        TypeError_objsliceobjproc,    // tp_setslice
+        TypeError_objssizeintproc,    // tp_delindex
+        TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
-        MethodError_objssizeproc,     // tp_irepeat
+        TypeError_objssizeproc,       // tp_irepeat
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
@@ -18444,7 +18754,7 @@ static ypTypeObject ypRange_Type = {
         NULL,                          // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,    // tp_freeze
+        Immutable_freezefunc,   // tp_freeze
         range_frozen_copy,      // tp_unfrozen_copy
         range_frozen_copy,      // tp_frozen_copy
         range_frozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -18465,7 +18775,7 @@ static ypTypeObject ypRange_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -18482,23 +18792,23 @@ static ypTypeObject ypRange_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjintproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypRange_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // XXX Adapted from Python's get_len_of_range
@@ -18598,7 +18908,7 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 // drop the trailing NULL from argarray, such that n is one less than the number of parameters.
 #define ypFunction_IS_POSITIONAL_MATCH(param_flags, params_len, args_len)          \
     ((ypFunction_HAS_ONLY_POS_OR_KW(param_flags) && (params_len) == (args_len)) || \
-            (ypFunction_HAS_ONLY_POS_ONLY(param_flags) && (params_len)-1 == (args_len)))
+            (ypFunction_HAS_ONLY_POS_ONLY(param_flags) && (params_len) - 1 == (args_len)))
 
 // True if function is exactly (*args, **kwargs).
 #define ypFunction_IS_VAR_POS_VAR_KW(param_flags) \
@@ -18629,8 +18939,8 @@ yp_STATIC_ASSERT(
 #define ypFunction_SET_STATE(f, state) \
     (((ypFunctionObject *)(f))->ob_state = (ypFunctionState *)(state))
 #define ypFunction_PARAMS(f) ((yp_parameter_decl_t *)((ypObject *)(f))->ob_data)
-#define ypFunction_PARAMS_LEN ypObject_CACHED_LEN
-#define ypFunction_SET_PARAMS_LEN ypObject_SET_CACHED_LEN
+#define ypFunction_PARAMS_LEN ypObject_LEN
+#define ypFunction_SET_PARAMS_LEN ypObject_SET_LEN
 #define ypFunction_CODE_FUNC(f) (((ypFunctionObject *)(f))->ob_code)
 
 // The maximum possible size of a function's state
@@ -18926,10 +19236,10 @@ static ypObject *_ypFunction_call_copy_var_kwargs(ypObject *kwargs, int kwargs_i
     yp_ASSERT1(ypObject_IS_MAPPING(kwargs));
 
     if (kwargs_is_copy) {
-        yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
-        // TODO Implement frozendict_freeze and freeze kwargs in-place here.
-        result = yp_frozendict(kwargs);
+        yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
+        result = dict_freeze(kwargs);
         if (yp_isexceptionC(result)) return result;
+        result = yp_incref(kwargs);
     } else {
         result = yp_frozendict(kwargs);
         if (yp_isexceptionC(result)) return result;
@@ -19562,6 +19872,11 @@ static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
 
 static ypObject *function_frozen_copy(ypObject *f) { return yp_incref(f); }
 
+static ypObject *function_frozen_deepcopy(ypObject *f, visitfunc copy_visitor, void *copy_memo)
+{
+    return yp_NotImplementedError;  // TODO Support deepcopy.
+}
+
 static ypObject *function_bool(ypObject *f) { return yp_True; }
 
 static ypObject *function_currenthash(
@@ -19621,11 +19936,11 @@ static ypTypeObject ypFunction_Type = {
         NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,       // tp_freeze
+        Immutable_freezefunc,      // tp_freeze
         function_frozen_copy,      // tp_unfrozen_copy
         function_frozen_copy,      // tp_frozen_copy
-        MethodError_traversefunc,  // tp_unfrozen_deepcopy
-        MethodError_traversefunc,  // tp_frozen_deepcopy
+        function_frozen_deepcopy,  // tp_unfrozen_deepcopy
+        function_frozen_deepcopy,  // tp_frozen_deepcopy
         MethodError_objproc,       // tp_invalidate
 
         // Boolean operations and comparisons
@@ -19642,16 +19957,16 @@ static ypTypeObject ypFunction_Type = {
         MethodError_objproc,   // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next  // FIXME Should be type error?
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -19659,20 +19974,20 @@ static ypTypeObject ypFunction_Type = {
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
-        MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        MethodError_objobjintproc,  // tp_remove
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjintproc,    // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
         &ypFunction_as_callable  // tp_as_callable
@@ -19723,6 +20038,13 @@ ypObject *yp_functionC(yp_function_decl_t *declaration)
     return newF;
 }
 
+ypObject *yp_function_stateCX(ypObject *function, yp_ssize_t *size, void **state)
+{
+    *size = 0;
+    *state = NULL;
+    return yp_NotImplementedError;
+}
+
 // FIXME A convenience function to decref all objects in yp_function_decl_t/yp_def_generator_t/etc,
 // but warn that it cannot contain borrowed references (as they would be stolen/decref'ed).
 
@@ -19736,8 +20058,8 @@ ypObject *yp_functionC(yp_function_decl_t *declaration)
  *************************************************************************************************/
 #pragma region methods
 
-// These are the functions that simply redirect to object methods; more complex public functions
-// are found elsewhere.
+// These are the functions that redirect to object methods; more complex public functions are found
+// elsewhere.
 
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
 #define _yp_REDIRECT1(ob, tp_meth, args)               \
@@ -19797,6 +20119,8 @@ static ypObject *_yp_send(ypObject *iterator, ypObject *value)
     return result;
 }
 
+// TODO In Python we get `TypeError: can't send non-None value to a just-started generator`. Have
+// the same check in nohtyP? (Note that Python allows you to throw into a just-started generator.)
 ypObject *yp_send(ypObject *iterator, ypObject *value)
 {
     if (yp_isexceptionC(value)) {
@@ -19807,11 +20131,13 @@ ypObject *yp_send(ypObject *iterator, ypObject *value)
 
 ypObject *yp_next(ypObject *iterator) { return _yp_send(iterator, yp_None); }
 
-ypObject *yp_next2(ypObject *iterator, ypObject *defval)
+ypObject *yp_next2(ypObject *iterator, ypObject *default_)
 {
-    ypObject *result = _yp_send(iterator, yp_None);
+    ypObject *result;
+    if (yp_isexceptionC(default_)) return default_;
+    result = _yp_send(iterator, yp_None);
     if (yp_isexceptionC2(result, yp_StopIteration)) {
-        result = yp_incref(defval);
+        result = yp_incref(default_);
     }
     return result;
 }
@@ -19961,7 +20287,14 @@ void yp_setsliceC6(
 
 void yp_delindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc)
 {
-    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_delindex, (sequence, i), exc);
+    _yp_REDIRECT_EXC2(
+            sequence, tp_as_sequence, tp_delindex, (sequence, i, /*raise_on_missing=*/TRUE), exc);
+}
+
+void yp_dropindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc)
+{
+    _yp_REDIRECT_EXC2(
+            sequence, tp_as_sequence, tp_delindex, (sequence, i, /*raise_on_missing=*/FALSE), exc);
 }
 
 void yp_delsliceC5(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject **exc)
@@ -19996,7 +20329,7 @@ ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i)
 
 void yp_remove(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    _yp_REDIRECT_EXC1(sequence, tp_remove, (sequence, x, NULL), exc);
+    _yp_REDIRECT_EXC1(sequence, tp_remove, (sequence, x, /*raise_on_missing=*/TRUE), exc);
 }
 
 void yp_reverse(ypObject *sequence, ypObject **exc)
@@ -20076,7 +20409,7 @@ void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc)
 
 void yp_discard(ypObject *set, ypObject *x, ypObject **exc)
 {
-    _yp_REDIRECT_EXC1(set, tp_remove, (set, x, yp_None), exc);
+    _yp_REDIRECT_EXC1(set, tp_remove, (set, x, /*raise_on_missing=*/FALSE), exc);
 }
 
 ypObject *yp_getitem(ypObject *mapping, ypObject *key)
@@ -20091,12 +20424,21 @@ void yp_setitem(ypObject *mapping, ypObject *key, ypObject *x, ypObject **exc)
 
 void yp_delitem(ypObject *mapping, ypObject *key, ypObject **exc)
 {
-    _yp_REDIRECT_EXC1(mapping, tp_delitem, (mapping, key), exc);
+    _yp_REDIRECT_EXC1(mapping, tp_delitem, (mapping, key, /*raise_on_missing=*/TRUE), exc);
 }
 
-ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *defval)
+void yp_dropitem(ypObject *mapping, ypObject *key, ypObject **exc)
 {
-    _yp_REDIRECT1(mapping, tp_getdefault, (mapping, key, defval));
+    _yp_REDIRECT_EXC1(mapping, tp_delitem, (mapping, key, /*raise_on_missing=*/FALSE), exc);
+}
+
+ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *default_)
+{
+    // We typically do not check for NULL, relying instead on the abort when NULL is dereferenced.
+    // However, NULL is valid in tp_getdefault, so if we didn't perform this check then NULL would
+    // de facto become part of the external API.
+    if (default_ == NULL) yp_FATAL1("default_ cannot be NULL");
+    _yp_REDIRECT1(mapping, tp_getdefault, (mapping, key, default_));
 }
 
 ypObject *yp_iter_items(ypObject *mapping)
@@ -20109,9 +20451,18 @@ ypObject *yp_iter_keys(ypObject *mapping)
     _yp_REDIRECT2(mapping, tp_as_mapping, tp_iter_keys, (mapping));
 }
 
-ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *defval)
+ypObject *yp_popvalue2(ypObject *mapping, ypObject *key)
 {
-    _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, defval));
+    _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, NULL));
+}
+
+ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *default_)
+{
+    // We typically do not check for NULL, relying instead on the abort when NULL is dereferenced.
+    // However, NULL is valid in tp_popvalue, so if we didn't perform this check then NULL would
+    // de facto become part of the external API.
+    if (default_ == NULL) yp_FATAL1("default_ cannot be NULL");
+    _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, default_));
 }
 
 void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value)
@@ -20123,16 +20474,16 @@ void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value)
     }
 }
 
-ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval)
+ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *default_)
 {
     ypTypeObject *type = ypObject_TYPE(mapping);
-    ypObject     *result = type->tp_as_mapping->tp_setdefault(mapping, key, defval);
+    ypObject     *result = type->tp_as_mapping->tp_setdefault(mapping, key, default_);
     return result;
 }
 
 void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...)
 {
-    return_yp_K_FUNC_void(yp_updateKV, (mapping, exc, n, args), n);
+    return_yp_KV_FUNC_void(yp_updateKV, (mapping, exc, n, args), n);
 }
 void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args)
 {
@@ -20147,7 +20498,7 @@ int yp_iscallableC(ypObject *x) { return ypObject_IS_CALLABLE(x); }
 // miscount would be disastrous).
 ypObject *yp_callN(ypObject *c, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, yp_callNV, (c, n, args), n);
+    return_yp_NV_FUNC(ypObject *, yp_callNV, (c, n, args), n);
 }
 
 ypObject *yp_callNV(ypObject *c, int n, va_list args)

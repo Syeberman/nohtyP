@@ -170,32 +170,32 @@ extern "C" {
 
 
 // parameters can be NULL.
-#define TEST(name, parameters)                                         \
-    {                                                                  \
-        "/" #name,                                    /* name */       \
-                (MunitTestFunc)(name),                /* test */       \
-                (MunitTestSetup)fixture_setup,        /* setup */      \
-                (MunitTestTearDown)fixture_tear_down, /* tear_down */  \
-                MUNIT_TEST_OPTION_NONE,               /* options */    \
-                parameters                            /* parameters */ \
+#define TEST(name, parameters)                                     \
+    {                                                              \
+            "/" #name,                            /* name */       \
+            (MunitTestFunc)(name),                /* test */       \
+            (MunitTestSetup)fixture_setup,        /* setup */      \
+            (MunitTestTearDown)fixture_tear_down, /* tear_down */  \
+            MUNIT_TEST_OPTION_NONE,               /* options */    \
+            parameters                            /* parameters */ \
     }
 
-#define SUITE_OF_TESTS(name)                             \
-    {                                                    \
-        "/" #name,                      /* prefix */     \
-                (name##_tests),         /* tests */      \
-                NULL,                   /* suites */     \
-                1,                      /* iterations */ \
-                MUNIT_SUITE_OPTION_NONE /* options */    \
+#define SUITE_OF_TESTS(name)                         \
+    {                                                \
+            "/" #name,              /* prefix */     \
+            (name##_tests),         /* tests */      \
+            NULL,                   /* suites */     \
+            1,                      /* iterations */ \
+            MUNIT_SUITE_OPTION_NONE /* options */    \
     }
 
-#define SUITE_OF_SUITES(name)                            \
-    {                                                    \
-        "/" #name,                      /* prefix */     \
-                NULL,                   /* tests */      \
-                (name##_suites),        /* suites */     \
-                1,                      /* iterations */ \
-                MUNIT_SUITE_OPTION_NONE /* options */    \
+#define SUITE_OF_SUITES(name)                        \
+    {                                                \
+            "/" #name,              /* prefix */     \
+            NULL,                   /* tests */      \
+            (name##_suites),        /* suites */     \
+            1,                      /* iterations */ \
+            MUNIT_SUITE_OPTION_NONE /* options */    \
     }
 
 
@@ -235,6 +235,7 @@ extern "C" {
         }                                                                                 \
     } while (0)
 
+// Asserts that obj is not an exception and that no exception has been raised.
 #define assert_not_exception(obj)                             \
     do {                                                      \
         ypObject *_ypmt_NOT_EXC_obj = (obj);                  \
@@ -257,6 +258,7 @@ extern "C" {
         _assert_not_exception(_ypmt_NOT_RAISES_obj, statement_fmt, __VA_ARGS__); \
     } while (0)
 
+// Asserts that statement does not raise an exception.
 #define assert_not_raises(statement) _assert_not_raises((statement), "%s", #statement)
 
 // statement is only evaluated once.
@@ -273,7 +275,7 @@ extern "C" {
         }                                                                                  \
     } while (0)
 
-// For a function that takes a `ypObject **exc` argument, asserts that it does not raise an
+// For a statement that takes a `ypObject **exc` argument, asserts that it does not raise an
 // exception. Statement must include `&exc` for the exception argument, and can include a variable
 // assignment. Example:
 //
@@ -296,7 +298,7 @@ extern "C" {
         }                                                                                         \
     } while (0)
 
-// Asserts that obj is one of the given exceptions.
+// Asserts that obj is one of the given exceptions, but that no exception has been raised.
 #define assert_isexception(obj, ...)                                                          \
     do {                                                                                      \
         ypObject  *_ypmt_ISEXC_obj = (obj);                                                   \
@@ -306,6 +308,15 @@ extern "C" {
                 #obj, #__VA_ARGS__);                                                          \
     } while (0)
 
+// For a statement that takes a `ypObject **exc` argument, asserts that it sets *exc to one of the
+// given exceptions, but that no exception has been raised. statement must include `&exc` for the
+// exception argument. Example:
+//
+//      assert_isexception_exc(yp_lenC(yp_SyntaxError, &exc), yp_SyntaxError);
+// TODO nohtyP does not currently make a distinction between returning and raising an exception, so
+// this is currently an alias to assert_raises_exc.
+#define assert_isexception_exc assert_raises_exc
+
 // statement is only evaluated once.
 #define _assert_raises(statement, n, expected, statement_fmt, expected_fmt, ...)                \
     do {                                                                                        \
@@ -314,7 +325,7 @@ extern "C" {
                 _ypmt_RAISES_statement, n, expected, statement_fmt, expected_fmt, __VA_ARGS__); \
     } while (0)
 
-// Asserts that statement evaluates to one of the given exceptions.
+// Asserts that statement raises one of the given exceptions.
 #define assert_raises(statement, ...)                                                              \
     do {                                                                                           \
         ypObject  *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                        \
@@ -343,8 +354,8 @@ extern "C" {
         }                                                                            \
     } while (0)
 
-// For a function that takes a `ypObject **exc` argument, asserts that it raises one of the given
-// exceptions. Statement must include `&exc` for the exception argument. Example:
+// For a statement that takes a `ypObject **exc` argument, asserts that it raises one of the given
+// exceptions. statement must include `&exc` for the exception argument. Example:
 //
 //      assert_raises_exc(yp_lenC(obj, &exc), yp_MethodError);
 #define assert_raises_exc(statement, ...)                                                  \
@@ -355,7 +366,7 @@ extern "C" {
                 #statement, #__VA_ARGS__);                                                 \
     } while (0)
 
-// A version of _assert_typeC that ensures a_statement and b_statement do not throw an exception via
+// A version of _assert_typeC that ensures a_statement and b_statement do not raise an exception via
 // a `ypObject **exc` argument. a_statement and b_statement are only evaluated once.
 #define _assert_typeC_exc(T, a_statement, op, b_statement, val_pri, a_fmt, b_fmt, ...)       \
     do {                                                                                     \
@@ -376,6 +387,40 @@ extern "C" {
     _assert_typeC_exc(yp_ssize_t, a, op, b, PRIssize, "%s", "%s", #a, #b)
 #define assert_hashC_exc(a, op, b) \
     _assert_typeC_exc(yp_hash_t, a, op, b, PRIssize, "%s", "%s", #a, #b)
+
+// A version of _assert_typeC that ensures a_statement raises one of the given exceptions via a
+// `ypObject **exc` argument. b_statement must not raise an exception. a_statement and b_statement
+// are only evaluated once.
+#define _assert_typeC_raises_exc(T, a_statement, op, b_statement, excs, val_pri, a_fmt, b_fmt,    \
+        excs_fmt, a_str, b_str, excs_str)                                                         \
+    do {                                                                                          \
+        ypObject  *_ypmt_TYPEC_excs[] = {UNPACK excs};                                            \
+        yp_ssize_t _ypmt_TYPEC_n = yp_lengthof_array(_ypmt_TYPEC_excs);                           \
+        T          _ypmt_TYPEC_a;                                                                 \
+        T          _ypmt_TYPEC_b;                                                                 \
+        _assert_raises_exc(_ypmt_TYPEC_a = (a_statement), _ypmt_TYPEC_n, _ypmt_TYPEC_excs, a_fmt, \
+                excs_fmt, a_str, excs_str);                                                       \
+        _assert_not_raises_exc(_ypmt_TYPEC_b = (b_statement), b_fmt, b_str);                      \
+        _assert_typeC(_ypmt_TYPEC_a, op, _ypmt_TYPEC_b, val_pri, a_fmt, b_fmt, a_str, b_str);     \
+    } while (0)
+
+// Asserts that a raises one of the given exceptions via a `ypObject **exc` argument. b must not
+// raise an exception. a and b must evaluate to the appropriate type, and a must be a function call
+// using `&exc` for the exception argument. Example:
+//
+//      assert_ssizeC_raises_exc(yp_findC(obj, item, &exc), ==, -1, yp_TypeError);
+#define assert_intC_raises_exc(a, op, b, ...) \
+    _assert_typeC_raises_exc(                 \
+            yp_int_t, a, op, b, (__VA_ARGS__), PRIint, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
+#define assert_floatC_raises_exc(a, op, b, ...) \
+    _assert_typeC_raises_exc(                   \
+            yp_float_t, a, op, b, (__VA_ARGS__), "lf", "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
+#define assert_ssizeC_raises_exc(a, op, b, ...) \
+    _assert_typeC_raises_exc(                   \
+            yp_ssize_t, a, op, b, (__VA_ARGS__), PRIssize, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
+#define assert_hashC_raises_exc(a, op, b, ...) \
+    _assert_typeC_raises_exc(                  \
+            yp_hash_t, a, op, b, (__VA_ARGS__), PRIssize, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
 
 // value is the expected value, either yp_True or yp_False; not_value is the negation of value.
 #define _assert_bool(obj, value, not_value, obj_fmt, ...)                                        \
@@ -429,11 +474,12 @@ extern "C" {
                 __VA_ARGS__);                                                                \
     } while (0)
 
-// yp_type(obj) == expected
+// yp_type(obj) == expected; obj is not an exception.
 #define assert_type_is(obj, expected)                                                      \
     do {                                                                                   \
         ypObject *_ypmt_TYPE_obj = (obj);                                                  \
         ypObject *_ypmt_TYPE_expected = (expected);                                        \
+        _assert_not_exception(_ypmt_TYPE_obj, "%s", #obj);                                 \
         _assert_type_is(_ypmt_TYPE_obj, _ypmt_TYPE_expected, "%s", "%s", #obj, #expected); \
     } while (0)
 
@@ -445,12 +491,28 @@ extern "C" {
                 "yp_type(" b_fmt ")", __VA_ARGS__);                                 \
     } while (0)
 
-// yp_type(a) == yp_type(b)
-#define assert_same_type(a, b)                                           \
-    do {                                                                 \
-        ypObject *_ypmt_TYPE_a = (a);                                    \
-        ypObject *_ypmt_TYPE_b = (b);                                    \
-        _assert_type_is(_ypmt_TYPE_a, _ypmt_TYPE_b, "%s", "%s", #a, #b); \
+// yp_type(a) == yp_type(b); neither a nor b are exceptions.
+#define assert_same_type(a, b)                                             \
+    do {                                                                   \
+        ypObject *_ypmt_TYPE_a = (a);                                      \
+        ypObject *_ypmt_TYPE_b = (b);                                      \
+        _assert_not_exception(_ypmt_TYPE_a, "%s", #a);                     \
+        _assert_not_exception(_ypmt_TYPE_b, "%s", #b);                     \
+        _assert_same_type(_ypmt_TYPE_a, _ypmt_TYPE_b, "%s", "%s", #a, #b); \
+    } while (0)
+
+#define _assert_eq_same_type(a, b, a_fmt, b_fmt, ...)       \
+    do {                                                    \
+        _assert_obj(a, eq, b, a_fmt, b_fmt, __VA_ARGS__);   \
+        _assert_same_type(a, b, a_fmt, b_fmt, __VA_ARGS__); \
+    } while (0)
+
+// Asserts that a and b are equal and of the same type.
+#define assert_eq_same_type(a, b)                                                   \
+    do {                                                                            \
+        ypObject *_ypmt_EQ_TYPE_a = (a);                                            \
+        ypObject *_ypmt_EQ_TYPE_b = (b);                                            \
+        _assert_eq_same_type(_ypmt_EQ_TYPE_a, _ypmt_EQ_TYPE_b, "%s", "%s", #a, #b); \
     } while (0)
 
 // XXX expected must be a yp_ssize_t.
@@ -484,10 +546,7 @@ extern "C" {
             ypObject *_ypmt_SEQ_actual = yp_getindexC(obj, _ypmt_SEQ_i);                        \
             _assert_not_exception(_ypmt_SEQ_actual, "yp_getindexC(" obj_fmt ", %" PRIssize ")", \
                     __VA_ARGS__, _ypmt_SEQ_i);                                                  \
-            _assert_same_type(_ypmt_SEQ_actual, items[_ypmt_SEQ_i],                             \
-                    "yp_getindexC(" obj_fmt ", %" PRIssize ")", "%s", __VA_ARGS__, _ypmt_SEQ_i, \
-                    item_strs[_ypmt_SEQ_i]);                                                    \
-            _assert_obj(_ypmt_SEQ_actual, eq, items[_ypmt_SEQ_i],                               \
+            _assert_eq_same_type(_ypmt_SEQ_actual, items[_ypmt_SEQ_i],                          \
                     "yp_getindexC(" obj_fmt ", %" PRIssize ")", "%s", __VA_ARGS__, _ypmt_SEQ_i, \
                     item_strs[_ypmt_SEQ_i]);                                                    \
             yp_decref(_ypmt_SEQ_actual);                                                        \
@@ -504,44 +563,42 @@ extern "C" {
         _assert_sequence(_ypmt_SEQ_obj, _ypmt_SEQ_items, "%s", _ypmt_SEQ_item_strs, #obj); \
     } while (0)
 
+extern int _assert_setlike_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t n,
+        ypObject **items, ypObject **actual, yp_ssize_t *items_i);
+
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
-#define _assert_set(obj, items, obj_fmt, item_strs, ...)                                           \
+#define _assert_setlike(obj, items, obj_fmt, item_strs, ...)                                       \
     do {                                                                                           \
         yp_ssize_t  _ypmt_SET_n = yp_lengthof_array(items);                                        \
-        yp_ssize_t  _ypmt_SET_i;                                                                   \
         int         _ypmt_SET_found[yp_lengthof_array(items)] = {0};                               \
         yp_uint64_t _ypmt_SET_mi_state;                                                            \
         ypObject   *_ypmt_SET_mi;                                                                  \
+        ypObject   *_ypmt_SET_actual;                                                              \
+        yp_ssize_t  _ypmt_SET_i;                                                                   \
                                                                                                    \
         _assert_len(obj, _ypmt_SET_n, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_SET_n);            \
         _assert_not_raises(_ypmt_SET_mi = yp_miniiter(obj, &_ypmt_SET_mi_state),                   \
                 "yp_miniiter(" obj_fmt ", &mi_state)", __VA_ARGS__);                               \
                                                                                                    \
-        while (1) {                                                                                \
-            ypObject *_ypmt_SET_actual = yp_miniiter_next(_ypmt_SET_mi, &_ypmt_SET_mi_state);      \
-            if (yp_isexceptionC2(_ypmt_SET_actual, yp_StopIteration)) break;                       \
+        while (_assert_setlike_helper(_ypmt_SET_mi, &_ypmt_SET_mi_state, _ypmt_SET_n, items,       \
+                &_ypmt_SET_actual /*new ref*/, &_ypmt_SET_i)) {                                    \
             _assert_not_exception(_ypmt_SET_actual,                                                \
                     "yp_miniiter_next(yp_miniiter(" obj_fmt ", &mi_state), &mi_state)",            \
                     __VA_ARGS__);                                                                  \
-                                                                                                   \
-            for (_ypmt_SET_i = 0; _ypmt_SET_i < _ypmt_SET_n; _ypmt_SET_i++) {                      \
-                ypObject *_ypmt_SET_eq = yp_eq(_ypmt_SET_actual, items[_ypmt_SET_i]);              \
-                _assert_not_exception(_ypmt_SET_eq, "yp_eq(<item in " obj_fmt ">, %s)",            \
-                        __VA_ARGS__, item_strs[_ypmt_SET_i]);                                      \
-                if (_ypmt_SET_eq == yp_False) continue;                                            \
-                if (_ypmt_SET_found[_ypmt_SET_i]) {                                                \
-                    munit_errorf("%s yielded twice from " obj_fmt, item_strs[_ypmt_SET_i],         \
-                            __VA_ARGS__);                                                          \
-                }                                                                                  \
-                _assert_same_type(_ypmt_SET_actual, items[_ypmt_SET_i], "<item in " obj_fmt ">",   \
-                        "%s", __VA_ARGS__, item_strs[_ypmt_SET_i]);                                \
-                _ypmt_SET_found[_ypmt_SET_i] = TRUE;                                               \
-                break;                                                                             \
-            }                                                                                      \
             if (_ypmt_SET_i >= _ypmt_SET_n) {                                                      \
                 munit_errorf("unexpected item yielded from " obj_fmt, __VA_ARGS__);                \
             }                                                                                      \
+            if (_ypmt_SET_found[_ypmt_SET_i]) {                                                    \
+                munit_errorf(                                                                      \
+                        "%s yielded twice from " obj_fmt, item_strs[_ypmt_SET_i], __VA_ARGS__);    \
+            }                                                                                      \
+            _ypmt_SET_found[_ypmt_SET_i] = TRUE;                                                   \
+                                                                                                   \
+            /* We already know from _assert_setlike_helper that _ypmt_SET_actual equals            \
+             * items[_ypmt_SET_i]. Now we need to check that they're the same type. */             \
+            _assert_same_type(_ypmt_SET_actual, items[_ypmt_SET_i], "<item in " obj_fmt ">", "%s", \
+                    __VA_ARGS__, item_strs[_ypmt_SET_i]);                                          \
                                                                                                    \
             yp_decref(_ypmt_SET_actual);                                                           \
         }                                                                                          \
@@ -558,41 +615,77 @@ extern "C" {
 // Asserts that obj is a set containing exactly the given items, in any order, without duplicates.
 // Items are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_miniiter.
 // TODO Once the order items are yielded is guaranteed, we can make the order important.
-#define assert_set(obj, ...)                                                          \
-    do {                                                                              \
-        ypObject *_ypmt_SET_obj = (obj);                                              \
-        ypObject *_ypmt_SET_items[] = {__VA_ARGS__};                                  \
-        char     *_ypmt_SET_item_strs[] = {STRINGIFY(__VA_ARGS__)};                   \
-        _assert_set(_ypmt_SET_obj, _ypmt_SET_items, "%s", _ypmt_SET_item_strs, #obj); \
+#define assert_setlike(obj, ...)                                                          \
+    do {                                                                                  \
+        ypObject *_ypmt_SET_obj = (obj);                                                  \
+        ypObject *_ypmt_SET_items[] = {__VA_ARGS__};                                      \
+        char     *_ypmt_SET_item_strs[] = {STRINGIFY(__VA_ARGS__)};                       \
+        _assert_setlike(_ypmt_SET_obj, _ypmt_SET_items, "%s", _ypmt_SET_item_strs, #obj); \
     } while (0)
+
+extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t n,
+        ypObject **items, ypObject **actual_key, ypObject **actual_value, yp_ssize_t *items_i);
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
-#define _assert_mapping(obj, items, obj_fmt, item_strs, ...)                                    \
-    do {                                                                                        \
-        yp_ssize_t _ypmt_MAP_k = yp_lengthof_array(items) / 2;                                  \
-        yp_ssize_t _ypmt_MAP_i;                                                                 \
-        _assert_len(obj, _ypmt_MAP_k, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_MAP_k);         \
-        for (_ypmt_MAP_i = 0; _ypmt_MAP_i < _ypmt_MAP_k; _ypmt_MAP_i++) {                       \
-            ypObject *_ypmt_MAP_key = items[_ypmt_MAP_i * 2];                                   \
-            ypObject *_ypmt_MAP_value = items[_ypmt_MAP_i * 2 + 1];                             \
-            char     *_ypmt_MAP_key_str = item_strs[_ypmt_MAP_i * 2];                           \
-            char     *_ypmt_MAP_value_str = item_strs[_ypmt_MAP_i * 2 + 1];                     \
-            ypObject *_ypmt_MAP_actual = yp_getitem(obj, _ypmt_MAP_key);                        \
-            _assert_not_exception(_ypmt_MAP_actual, "yp_getitem(" obj_fmt ", %s)", __VA_ARGS__, \
-                    _ypmt_MAP_key_str);                                                         \
-            _assert_same_type(_ypmt_MAP_actual, _ypmt_MAP_value, "yp_getitem(" obj_fmt ", %s)", \
-                    "%s", __VA_ARGS__, _ypmt_MAP_key_str, _ypmt_MAP_value_str);                 \
-            _assert_obj(_ypmt_MAP_actual, eq, _ypmt_MAP_value, "yp_getitem(" obj_fmt ", %s)",   \
-                    "%s", __VA_ARGS__, _ypmt_MAP_key_str, _ypmt_MAP_value_str);                 \
-            yp_decref(_ypmt_MAP_actual);                                                        \
-        }                                                                                       \
+#define _assert_mapping(obj, items, obj_fmt, item_strs, ...)                                       \
+    do {                                                                                           \
+        yp_ssize_t  _ypmt_MAP_k = yp_lengthof_array(items) / 2;                                    \
+        int         _ypmt_MAP_found[yp_lengthof_array(items) / 2] = {0};                           \
+        yp_uint64_t _ypmt_MAP_mi_state;                                                            \
+        ypObject   *_ypmt_MAP_mi;                                                                  \
+        ypObject   *_ypmt_MAP_actual_key;                                                          \
+        ypObject   *_ypmt_MAP_actual_value;                                                        \
+        yp_ssize_t  _ypmt_MAP_ki;                                                                  \
+                                                                                                   \
+        if (yp_lengthof_array(items) % 2 != 0) {                                                   \
+            munit_error("expected an even number of objects for the (key, value) pairs");          \
+        }                                                                                          \
+        _assert_len(obj, _ypmt_MAP_k, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_MAP_k);            \
+        _assert_not_raises(_ypmt_MAP_mi = yp_miniiter_items(obj, &_ypmt_MAP_mi_state),             \
+                "yp_miniiter_items(" obj_fmt ", &mi_state)", __VA_ARGS__);                         \
+                                                                                                   \
+        while (_assert_mapping_helper(_ypmt_MAP_mi, &_ypmt_MAP_mi_state, _ypmt_MAP_k, items,       \
+                &_ypmt_MAP_actual_key /*new ref*/, &_ypmt_MAP_actual_value /*new ref*/,            \
+                &_ypmt_MAP_ki)) {                                                                  \
+            _assert_not_exception(_ypmt_MAP_actual_key,                                            \
+                    "yp_miniiter_items_next(yp_miniiter_items(" obj_fmt                            \
+                    ", &mi_state), &mi_state)",                                                    \
+                    __VA_ARGS__);                                                                  \
+            if (_ypmt_MAP_ki >= _ypmt_MAP_k) {                                                     \
+                munit_errorf("unexpected item yielded from " obj_fmt, __VA_ARGS__);                \
+            }                                                                                      \
+            if (_ypmt_MAP_found[_ypmt_MAP_ki]) {                                                   \
+                munit_errorf("%s yielded twice from " obj_fmt, item_strs[_ypmt_MAP_ki * 2],        \
+                        __VA_ARGS__);                                                              \
+            }                                                                                      \
+            _ypmt_MAP_found[_ypmt_MAP_ki] = TRUE;                                                  \
+                                                                                                   \
+            /* We already know from _assert_mapping_helper that _ypmt_MAP_actual_key equals        \
+             * items[_ypmt_MAP_ki * 2]. Now we need to check that they're the same type. */        \
+            _assert_same_type(_ypmt_MAP_actual_key, items[_ypmt_MAP_ki * 2],                       \
+                    "<key in " obj_fmt ">", "%s", __VA_ARGS__, item_strs[_ypmt_MAP_ki * 2]);       \
+            _assert_eq_same_type(_ypmt_MAP_actual_value, items[_ypmt_MAP_ki * 2 + 1],              \
+                    "<value " obj_fmt "[%s]>", "%s", __VA_ARGS__, item_strs[_ypmt_MAP_ki * 2],     \
+                    item_strs[_ypmt_MAP_ki * 2 + 1]);                                              \
+                                                                                                   \
+            yp_decref(_ypmt_MAP_actual_key);                                                       \
+            yp_decref(_ypmt_MAP_actual_value);                                                     \
+        }                                                                                          \
+                                                                                                   \
+        for (_ypmt_MAP_ki = 0; _ypmt_MAP_ki < _ypmt_MAP_k; _ypmt_MAP_ki++) {                       \
+            if (!_ypmt_MAP_found[_ypmt_MAP_ki]) {                                                  \
+                munit_errorf(                                                                      \
+                        "%s not yielded from " obj_fmt, item_strs[_ypmt_MAP_ki * 2], __VA_ARGS__); \
+            }                                                                                      \
+        }                                                                                          \
+                                                                                                   \
+        yp_decref(_ypmt_MAP_mi);                                                                   \
     } while (0)
 
 // Asserts that obj is a mapping containing exactly the given key/value pairs, in any order, without
 // duplicate keys. Values are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC
-// and yp_getitem.
-// TODO Compare keys by type as well, just like assert_set does.
+// and yp_miniiter_items.
 #define assert_mapping(obj, ...)                                                          \
     do {                                                                                  \
         ypObject *_ypmt_MAP_obj = (obj);                                                  \
@@ -657,13 +750,15 @@ extern "C" {
         UNPACK tear_down;                                                                   \
     } while (0)
 
-// XXX yp_SyntaxError is chosen as nohtyP.c neither throws nor catches it.
+// XXX yp_SyntaxError is chosen as nohtyP.c neither raises nor catches it.
 #define _faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down,      \
         exc_suffix, statement_str)                                                                \
     do {                                                                                          \
         yp_ssize_t _ypmt_FLT_ITR_len = yp_lenC_not_raises(iter_supplier);                         \
         ypObject  *_ypmt_FLT_ITR_expected[] = {yp_SyntaxError};                                   \
-        assert_ssizeC(_ypmt_FLT_ITR_len, >, 1);                                                   \
+        if (_ypmt_FLT_ITR_len < 2) {                                                              \
+            munit_error("iter_supplier must contain at least two entries");                       \
+        }                                                                                         \
         /* x is an iterator that fails at the start. */                                           \
         _faulty_iter_test_raises(setup, iter_name,                                                \
                 new_faulty_iter(iter_supplier, 0, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,  \
@@ -688,7 +783,7 @@ extern "C" {
                 statement, assertion, tear_down, "hint_max", exc_suffix, statement_str);       */ \
     } while (0)
 
-// Executes a series of tests using a "faulty iterator" that either throws an exception during
+// Executes a series of tests using a "faulty iterator" that either raises an exception during
 // iteration or provides a misleading length hint. The faulty iterator is assigned to iter_name and
 // yields values from iter_supplier, which is evaluated once but iterated over multiple times;
 // iter_supplier must contain at least two entries. statement is executed for each test, and should
@@ -697,7 +792,7 @@ extern "C" {
 // local variable definitions. To be used like:
 //
 //     faulty_iter_tests(ypObject * so, x, yp_tupleN(N(items[0], items[1])), so = yp_set(x),
-//             assert_set(so, items[0], items[1]), yp_decref(so));
+//             assert_setlike(so, items[0], items[1]), yp_decref(so));
 #define faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down)        \
     do {                                                                                           \
         ypObject *_ypmt_FLT_ITR_supplier = (iter_supplier);                                        \
@@ -744,12 +839,17 @@ extern void pprint(FILE *f, ypObject *obj);
 
 
 typedef ypObject *(*objvoidfunc)(void);
+typedef ypObject *(*objobjfunc)(ypObject *);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef void (*voidarrayfunc)(yp_ssize_t, ypObject **);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
 typedef ypObject *(*rand_obj_supplier_t)(const rand_obj_supplier_memo_t *);
 
-// Any methods or arguments here that don't apply to a given type will fail the test.
+// Describes a single nohtyP type in the context of these tests. Allows for generic tests to be
+// written that apply to an entire classification of types (i.e. test_sequence tests all sequence
+// objects). Any methods or arguments here that don't apply to a given type will fail the test. May
+// also be used to describe special-purpose objects (i.e. fixture_type_set_dirty is a set containing
+// deleted items).
 typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
     char           *name;   // The name of the type (i.e. int, bytearray, dict).
@@ -759,6 +859,8 @@ typedef struct _fixture_type_t {
 
     rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
 
+    objobjfunc new_;  // The object converter, aka the single-argument constructor.
+
     // Functions for iterables, where rand_items returns objects that can be accepted by newN and
     // subsequently yielded by yp_iter. (For mappings, newN creates an object with the given keys
     // and random, unique values.)
@@ -766,24 +868,27 @@ typedef struct _fixture_type_t {
     voidarrayfunc rand_items;  // Fills an array with n random, unique objects.
 
     // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
-    // yp_getitem returns values.
-    objvarargfunc newK;        // Creates an object to hold the given key/values (i.e. yp_dictK).
-    objvoidfunc   rand_key;    // Creates a random key to store in the mapping.
-    objvoidfunc   rand_value;  // Creates a random value to store in the mapping.
+    // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys).
+    objvarargfunc newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
+    voidarrayfunc rand_values;  // Fills an array with n random, unique objects for values.
 
     // Flags to describe the properties of the type.
     int is_mutable;
     int is_numeric;
     int is_iterable;
-    int is_collection;  // FIXME nohtyP.h calls this "container", but Python abc is collection
+    int is_collection;  // TODO nohtyP.h calls this "container", but Python abc is collection
     int is_sequence;
     int is_string;
     int is_setlike;
     int is_mapping;
     int is_callable;
-    int is_patterned;  // i.e. range doesn't store values, it stores a pattern
+    int is_patterned;            // i.e. range doesn't store values, it stores a pattern
+    int original_object_return;  // A collection that *always* returns the object that was stored
+    int hashable_items_only;     // A collection that *requires* items to be hashable
 } fixture_type_t;
 
+// TODO Versions of each of these that build as the mutable type and then freezes, to test that
+// the freezing process still yields a viable object.
 extern fixture_type_t *fixture_type_type;
 extern fixture_type_t *fixture_type_NoneType;
 extern fixture_type_t *fixture_type_bool;
@@ -805,30 +910,46 @@ extern fixture_type_t *fixture_type_frozenset_dirty;
 extern fixture_type_t *fixture_type_set_dirty;
 extern fixture_type_t *fixture_type_frozendict;
 extern fixture_type_t *fixture_type_dict;
+extern fixture_type_t *fixture_type_frozendict_dirty;
+extern fixture_type_t *fixture_type_dict_dirty;
 extern fixture_type_t *fixture_type_function;
 
 typedef struct _fixture_t {
     fixture_type_t *type;  // The primary type under test.
 } fixture_t;
 
-// The number of elements in fixture_types_all (ignoring the null terminator).
-#define FIXTURE_TYPES_ALL_LEN 22
+// Collects related feature types together (i.e. fixture_types_mutable are all the mutable types).
+typedef struct _fixture_types_t {
+    yp_ssize_t       len;    // The number of types.
+    fixture_type_t **types;  // An array of types. Null-terminated.
+} fixture_types_t;
 
 // "All", except invalidated and exception.
-extern fixture_type_t *fixture_types_all[];
+extern fixture_types_t *fixture_types_all;
 
-extern fixture_type_t *fixture_types_mutable[];
-extern fixture_type_t *fixture_types_immutable[];
-extern fixture_type_t *fixture_types_numeric[];
-extern fixture_type_t *fixture_types_iterable[];
-extern fixture_type_t *fixture_types_collection[];
-extern fixture_type_t *fixture_types_sequence[];
-extern fixture_type_t *fixture_types_string[];
-extern fixture_type_t *fixture_types_setlike[];
-extern fixture_type_t *fixture_types_mapping[];
+extern fixture_types_t *fixture_types_mutable;
+extern fixture_types_t *fixture_types_numeric;
+extern fixture_types_t *fixture_types_iterable;
+extern fixture_types_t *fixture_types_collection;
+extern fixture_types_t *fixture_types_sequence;
+extern fixture_types_t *fixture_types_string;
+extern fixture_types_t *fixture_types_setlike;
+extern fixture_types_t *fixture_types_mapping;
+extern fixture_types_t *fixture_types_immutable;
+extern fixture_types_t *fixture_types_not_numeric;
+extern fixture_types_t *fixture_types_not_iterable;
+extern fixture_types_t *fixture_types_not_collection;
+extern fixture_types_t *fixture_types_not_sequence;
+extern fixture_types_t *fixture_types_not_string;
+extern fixture_types_t *fixture_types_not_setlike;
+extern fixture_types_t *fixture_types_not_mapping;
+extern fixture_types_t *fixture_types_immutable_not_str;
+extern fixture_types_t *fixture_types_immutable_paired;
 
 // Arrays of MunitParameterEnum values for "type" and similar parameters (i.e. the names of types).
+// Can't be included in fixture_types_t because the compiler requires this to be a constant.
 extern char *param_values_types_all[];
+extern char *param_values_types_mutable[];
 extern char *param_values_types_numeric[];
 extern char *param_values_types_iterable[];
 extern char *param_values_types_collection[];
@@ -836,10 +957,35 @@ extern char *param_values_types_sequence[];
 extern char *param_values_types_string[];
 extern char *param_values_types_setlike[];
 extern char *param_values_types_mapping[];
+extern char *param_values_types_immutable[];
+extern char *param_values_types_not_numeric[];
+extern char *param_values_types_not_iterable[];
+extern char *param_values_types_not_collection[];
+extern char *param_values_types_not_sequence[];
+extern char *param_values_types_not_string[];
+extern char *param_values_types_not_setlike[];
+extern char *param_values_types_not_mapping[];
+extern char *param_values_types_immutable_not_str[];
+extern char *param_values_types_immutable_paired[];
+
+// Returns the test fixture type that corresponds with the type of the object. object cannot be
+// invalidated or an exception.
+// TODO Support invalidated and exception types?
+extern fixture_type_t *fixture_type_from_object(ypObject *object);
+
+// Returns true iff calling yp_hashC on object succeeds. Will assert on an unexpected exception.
+// Recall that calling yp_hashC successfully may cache the hash in object.
+extern int object_is_hashable(ypObject *object);
 
 
 extern char param_key_type[];
 
+
+// Returned by rand_obj_any_hashability_pair.
+typedef struct _hashability_pair_t {
+    ypObject *hashable;
+    ypObject *unhashable;
+} hashability_pair_t;
 
 // Returns a random object of any type.
 extern ypObject *rand_obj_any(void);
@@ -851,7 +997,13 @@ extern ypObject *rand_obj_any_mutable(void);
 extern ypObject *rand_obj_any_hashable(void);
 
 // Returns a random hashable object of any type except str.
-extern ypObject *rand_obj_hashable_not_str(void);
+extern ypObject *rand_obj_any_hashable_not_str(void);
+
+// Returns two random objects of any type that compare equal; one is hashable and the other is not.
+extern hashability_pair_t rand_obj_any_hashability_pair(void);
+
+// Returns a random object of any non-iterable type.
+extern ypObject *rand_obj_any_not_iterable(void);
 
 // Returns a random object of the given type.
 extern ypObject *rand_obj(fixture_type_t *type);
@@ -865,6 +1017,11 @@ extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array);
 // Fills array with n random, unique objects of any type.
 extern void rand_objs_any(yp_ssize_t n, ypObject **array);
 
+// Returns an object of the given type containing the n (key, value) pairs as 2-tuples. The object
+// is constructed by calling type->new_ with a list of the pairs.
+extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...);
+extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args);
+
 // Returns an iterator that yields values from supplier (an iterable) until n values have been
 // yielded, after which the given exception is raised. The iterator is initialized with the given
 // length_hint, which may be different than the number of values actually yielded.
@@ -875,10 +1032,7 @@ extern ypObject *new_faulty_iter(
 // times. n must be an integer literal. Example:
 //
 //      ypObject *items[] = obj_array_init(5, rand_obj_any());
-#define obj_array_init(n, expression)  \
-    {                                  \
-        _COMMA_REPEAT##n((expression)) \
-    }
+#define obj_array_init(n, expression) {_COMMA_REPEAT##n((expression))}
 
 // Fills the ypObject * array using the given filler. Only call for arrays of fixed size (uses
 // yp_lengthof_array). Example:
@@ -928,12 +1082,16 @@ SUITE_OF_SUITES_DECLS(munit_test);
 SUITE_OF_TESTS_DECLS(test_unittest);
 
 SUITE_OF_SUITES_DECLS(test_objects);
+SUITE_OF_TESTS_DECLS(test_exception);
+SUITE_OF_TESTS_DECLS(test_frozendict);
 SUITE_OF_TESTS_DECLS(test_frozenset);
 SUITE_OF_TESTS_DECLS(test_function);
 
 SUITE_OF_SUITES_DECLS(test_protocols);
+SUITE_OF_TESTS_DECLS(test_all);
 SUITE_OF_TESTS_DECLS(test_collection);
 SUITE_OF_TESTS_DECLS(test_iterable);
+SUITE_OF_TESTS_DECLS(test_mapping);
 SUITE_OF_TESTS_DECLS(test_sequence);
 SUITE_OF_TESTS_DECLS(test_setlike);
 SUITE_OF_TESTS_DECLS(test_string);

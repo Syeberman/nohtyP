@@ -31,12 +31,22 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
         yp_decrefN(N(self));
     }
 
-    // Item not in self.
+    // x not in self.
     {
         ypObject *self = type->newN(N(items[0], items[1]));
         assert_obj(yp_contains(self, items[2]), is, yp_False);
         assert_obj(yp_in(items[2], self), is, yp_False);
         assert_obj(yp_not_in(items[2], self), is, yp_True);
+        yp_decrefN(N(self));
+    }
+
+    // Previously-deleted item.
+    if (type->is_mutable) {
+        ypObject *self = type->newN(N(items[0]));
+        assert_not_raises_exc(yp_clear(self, &exc));
+        assert_obj(yp_contains(self, items[0]), is, yp_False);
+        assert_obj(yp_in(items[0], self), is, yp_False);
+        assert_obj(yp_not_in(items[0], self), is, yp_True);
         yp_decrefN(N(self));
     }
 
@@ -49,13 +59,26 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
         yp_decrefN(N(self));
     }
 
+    // x is self. Recall `"abc" in "abc"` is True for strings.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        assert_obj(yp_contains(self, self), is, type->is_string ? yp_True : yp_False);
+        assert_obj(yp_in(self, self), is, type->is_string ? yp_True : yp_False);
+        assert_obj(yp_not_in(self, self), is, type->is_string ? yp_False : yp_True);
+        yp_decrefN(N(self));
+    }
+
     // Exception passthrough.
     {
         ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises(yp_contains(self, yp_SyntaxError), yp_SyntaxError);
-        assert_raises(yp_in(yp_SyntaxError, self), yp_SyntaxError);
-        assert_raises(yp_not_in(yp_SyntaxError, self), yp_SyntaxError);
-        yp_decrefN(N(self));
+        ypObject *empty = type->newN(0);
+        assert_isexception(yp_contains(self, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_in(yp_SyntaxError, self), yp_SyntaxError);
+        assert_isexception(yp_not_in(yp_SyntaxError, self), yp_SyntaxError);
+        assert_isexception(yp_contains(empty, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_in(yp_SyntaxError, empty), yp_SyntaxError);
+        assert_isexception(yp_not_in(yp_SyntaxError, empty), yp_SyntaxError);
+        yp_decrefN(N(self, empty));
     }
 
     obj_array_decref(items);
