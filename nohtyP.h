@@ -1828,7 +1828,6 @@ ypAPI ypObject *const yp_InvalidatedError;
 // Returns true (non-zero) if x is an exception that matches exception, else false. This takes into
 // account the exception heirarchy, so is the preferred way to test for specific exceptions. Always
 // succeeds: if x is invalidated or exception is not an exception, false is returned.
-// FIXME Test/handle if exception is not an exception
 ypAPI int yp_isexceptionC2(ypObject *x, ypObject *exception);
 
 // Returns true (non-zero) if x is an exception that matches any of the given exceptions, else

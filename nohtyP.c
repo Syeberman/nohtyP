@@ -4160,21 +4160,24 @@ _yp_IMMORTAL_EXCEPTION_SUPERPTR(yp_BaseException, NULL);
 
 // yp_isexceptionC defined above
 
+// x must be an exception.
 static int _yp_isexceptionC2(ypObject *x, ypObject *exc)
 {
+    yp_ASSERT1(yp_IS_EXCEPTION_C(x));
     do {
-        if (x == exc) return 1;  // x is a (sub)exception of exc
+        if (x == exc) return TRUE;  // x is a (sub)exception of exc
         x = _ypException_SUPER(x);
     } while (x != NULL);
-    return 0;  // neither x nor its superexceptions match exc
+    return FALSE;  // neither x nor its superexceptions match exc
 }
 
 int yp_isexceptionC2(ypObject *x, ypObject *exc)
 {
-    if (!yp_IS_EXCEPTION_C(x)) return 0;
+    if (!yp_IS_EXCEPTION_C(x)) return FALSE;
     return _yp_isexceptionC2(x, exc);
 }
 
+// x must be an exception.
 static int _yp_isexceptionCNV(ypObject *x, int n, va_list args)
 {
     for (/*n already set*/; n > 0; n--) {
@@ -4190,7 +4193,7 @@ int yp_isexceptionCN(ypObject *x, int n, ...)
     va_list args;
     int     result;
 
-    if (!yp_IS_EXCEPTION_C(x)) return 0;
+    if (!yp_IS_EXCEPTION_C(x)) return FALSE;
 
     va_start(args, n);
     result = _yp_isexceptionCNV(x, n, args);
@@ -4201,7 +4204,7 @@ int yp_isexceptionCN(ypObject *x, int n, ...)
 
 int yp_isexceptionCNV(ypObject *x, int n, va_list args)
 {
-    if (!yp_IS_EXCEPTION_C(x)) return 0;
+    if (!yp_IS_EXCEPTION_C(x)) return FALSE;
     return _yp_isexceptionCNV(x, n, args);
 }
 
