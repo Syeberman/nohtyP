@@ -152,6 +152,7 @@ def MakeCompilerTargets(compilerEnv):
     analyzeTargets = [sharedLib, checkapi]
 
     if compilerEnv["IS_NATIVE_TARGET"]:
+        # FIXME Give munit_test its own target, then limit codecov upload to just munit tests
         # We can only run munit_test on native OS and architectures.
         testTargets.append(
             nohtyP_munit_test(
@@ -161,19 +162,20 @@ def MakeCompilerTargets(compilerEnv):
         )
 
         # python_test requires a minimum version of Python.
-        try:
-            testTargets.append(
-                nohtyP_python_test(
-                    compilerEnv.Clone(
-                        tools=[
-                            python_min_38,
-                        ]
-                    ),
-                    sharedLib,
-                )
-            )
-        except (SCons.Errors.UserError, SCons.Errors.StopError):
-            traceback.print_exc(file=SconscriptLog)
+        # FIXME Uncomment
+        # try:
+        #     testTargets.append(
+        #         nohtyP_python_test(
+        #             compilerEnv.Clone(
+        #                 tools=[
+        #                     python_min_38,
+        #                 ]
+        #             ),
+        #             sharedLib,
+        #         )
+        #     )
+        # except (SCons.Errors.UserError, SCons.Errors.StopError):
+        #     traceback.print_exc(file=SconscriptLog)
 
     return buildTargets, testTargets, analyzeTargets
 

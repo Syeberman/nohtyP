@@ -220,6 +220,7 @@ def ApplyGCCOptions(env, version):
             #   test_function.c: In function 'test_t_function_call':
             #   test_function.c:2892:1: internal error: in get_insn_template, at final.c:2086
             #   libbacktrace could not find executable to open
+            # FIXME Should I use -O0 everywhere as gcovr recommends? Does that improve coverage?
             "-Og" if version >= 8.0 else "-O0",
             # Runtime check: int overflow
             "-ftrapv",
