@@ -226,9 +226,11 @@ def ApplyGCCOptions(env, version):
             # Runtime check: stack overflow
             # XXX Not supported on Windows: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90458#c4
             # TODO Stack overflow detection should possibly always be enabled.
-            "-fstack-clash-protection"
-            if version >= 8 and _platform_name != "win32"
-            else "-fstack-check",
+            (
+                "-fstack-clash-protection"
+                if version >= 8 and _platform_name != "win32"
+                else "-fstack-check"
+            ),
             # Runtime check: buffer overflow (needs -fmudflap to linker)
             # TODO Not supported on MinGW/Windows, apparently
             # "-fmudflapth",
@@ -290,9 +292,11 @@ def ApplyGCCOptions(env, version):
         # not available by default. So link these libraries statically.
         "-static" if env["TARGET_OS"] == "win32" else "",
         # Create a mapfile (.map)
-        "-Wl,-map,${TARGET.base}.map"
-        if _platform_name == "darwin"
-        else "-Wl,-Map,${TARGET.base}.map",
+        (
+            "-Wl,-map,${TARGET.base}.map"
+            if _platform_name == "darwin"
+            else "-Wl,-Map,${TARGET.base}.map"
+        ),
         # TODO Version stamp?
     )
     if env["TARGET_ARCH"] == "x86":
@@ -376,14 +380,24 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
         if not env.WhereIs("$CC"):
             raise SCons.Errors.StopError(f"{gcc_name_arch} configuration failed")
 
-        def check_version(env, output, unique=True):
+        def check_cc_version(env, output, unique=True):
             output = output.strip()
             if re_version.fullmatch(output) is None:
                 raise SCons.Errors.StopError(
                     f"tried finding {gcc_name}, found {output} instead"
                 )
 
-        env.ParseConfig("$CC -dumpfullversion -dumpversion", check_version)
+        def check_cov_version(env, output, unique=True):
+            # First line: gcov (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 13.2.0
+            output = output.splitlines()[0].strip().split()[-1]
+            if re_version.fullmatch(output) is None:
+                raise SCons.Errors.StopError(
+                    f"tried finding gcov for {gcc_name}, found {output} instead"
+                )
+
+        env.ParseConfig("$CC -dumpfullversion -dumpversion", check_cc_version)
+        if env["CONFIGURATION"] == "coverage":
+            env.ParseConfig("$COV -v", check_cov_version)
 
         ApplyGCCOptions(env, numericVersion)
 
