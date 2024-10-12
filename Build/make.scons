@@ -99,6 +99,9 @@ def nohtyP_munit_test(env, munit_test):
     munit_target = "$VTOP/munit_test.log"
     env.Replace(MUNIT_TEST=GetProgram(env, munit_test), MUNIT_TARGET=munit_target)
 
+    # FIXME Fix the below test. rand_obj_any_hashability_pair is choosing the same object as type->rand_items
+    # munit_action = "$MUNIT_TEST --seed 0xdfbdc9fb --param type frozenset_dirty /test_protocols/test_setlike/test_issuperset 2> $MUNIT_TARGET"
+
     # Assertion failures and status updates go to stderr (see MUNIT_OUTPUT_FILE above).
     munit_action = "$MUNIT_TEST 2> $MUNIT_TARGET"
     if env.subst("$CONFIGURATION") == "coverage":
