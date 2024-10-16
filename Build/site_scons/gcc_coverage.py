@@ -99,7 +99,6 @@ def generate_CoverageBuilder(env):
         "--branch-counts",
         "--branch-probabilities",
         "--demangled-names",
-        # "--hash-filenames",
         "--preserve-paths",
     ]
     env["COVCOM"] = "$COV $COVFLAGS --stdout $SOURCE > $TARGET"
