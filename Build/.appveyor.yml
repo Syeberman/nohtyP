@@ -181,6 +181,7 @@ test_script:
         throw "tests failed"
       }
   # FIXME Are create-commit and create-report idempotent?
+  # FIXME gcovr.cfg?
   - pwsh: |
       if (${env:CONFIGURATION} -ne "Debug") { return }
       if (${env:YP_CI_CODECOV_UPLOAD} -ne "true") { return }

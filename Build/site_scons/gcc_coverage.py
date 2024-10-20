@@ -55,7 +55,7 @@ def CoverageAction(target, source, env):
 
     # Process the data files into the output format. Note that CoverageDataFiles may return a
     # different list than before.
-    # FIXME Write the .gcov file in a temporary directory? Use with --stdout.
+    # FIXME Write the .gcov file in a temporary directory?
     outFiles = []
     for dataFile in CoverageDataFiles(env):
         outFile = env.ReplaceIxes(
@@ -98,7 +98,6 @@ def generate_CoverageBuilder(env):
     env["COVPREFIX"] = ""
     env["COVSUFFIX"] = ".gcov.tar.gz"
     env["COVBRANCHFLAGS"] = [  # Flags to add to COVFLAGS to enable branch coverage.
-        # FIXME It's these two --branch-* options that will disable branch coverage.
         "--branch-counts",
         "--branch-probabilities",
     ]
