@@ -118,7 +118,7 @@ def _AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTarget
     configuration: str = compilerEnv["CONFIGURATION"]
     is_install_target: str = compilerEnv["IS_INSTALL_TARGET"]
 
-    # TODO Handle this differently?
+    # FIXME Handle this differently? I forget why this was here.
     if configuration == "coverage":
         buildTargets += testTargets
 

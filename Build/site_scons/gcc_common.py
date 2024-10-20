@@ -213,14 +213,13 @@ def ApplyGCCOptions(env, version):
         # Source/assembly listing (.s) TODO preprocessed?
         # "-Wa,-alns=${TARGET.base}.s",
     )
-    if env["CONFIGURATION"] in ("debug", "coverage"):
+    if env["CONFIGURATION"] == "debug":
         addCcFlags(
             # Disable (non-debuggable) optimizations
             # gcc 7.0 (and previous) on Linux, Windows, and Mac all crash with -Og:
             #   test_function.c: In function 'test_t_function_call':
             #   test_function.c:2892:1: internal error: in get_insn_template, at final.c:2086
             #   libbacktrace could not find executable to open
-            # FIXME Should I use -O0 everywhere as gcovr recommends? Does that improve coverage?
             "-Og" if version >= 8.0 else "-O0",
             # Runtime check: int overflow
             "-ftrapv",
@@ -236,6 +235,15 @@ def ApplyGCCOptions(env, version):
             # TODO Not supported on MinGW/Windows, apparently
             # "-fmudflapth",
         )
+    elif env["CONFIGURATION"] == "coverage":
+        addCcFlags(
+            # Disable all optimizations
+            "-O0",
+            # Instrument code for coverage analysis
+            "--coverage",
+            # Use absolute path names in the .gcno files
+            "-fprofile-abs-path",
+        )
     else:
         addCcFlags(
             # Optimize for speed
@@ -247,11 +255,6 @@ def ApplyGCCOptions(env, version):
             # Optimize whole program (needs -flto to linker): conflicts with -g
             # https://gcc.gnu.org/onlinedocs/gcc-4.9.0/gcc/Optimize-Options.html
             # "-flto",
-        )
-    if env["CONFIGURATION"] == "coverage":
-        addCcFlags(
-            "--coverage",
-            "-fprofile-abs-path",
         )
 
     # Disable frame-pointer omission (ie frame pointers will be available on all builds)
@@ -303,14 +306,20 @@ def ApplyGCCOptions(env, version):
     if env["TARGET_ARCH"] == "x86":
         # Large address aware (>2GB)
         addLinkFlags("-Wl,--large-address-aware")
-    if env["CONFIGURATION"] in ("debug", "coverage"):
+    if env["CONFIGURATION"] == "debug":
         addLinkFlags(
             # Disable (non-debuggable) optimizations
             "-Og" if version >= 4.8 else "-O0",
             # Runtime check: buffer overflow (needs -fmudflap* to compiler)
             # TODO Not supported on MinGW/Windows, apparently
             # "-fmudflap",
-            "--coverage" if env["CONFIGURATION"] == "coverage" else "",
+        )
+    if env["CONFIGURATION"] == "coverage":
+        addLinkFlags(
+            # Disable all optimizations
+            "-O0",
+            # Instrument code for coverage analysis
+            "--coverage",
         )
     else:
         addLinkFlags(
