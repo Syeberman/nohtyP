@@ -46,6 +46,7 @@ def CoverageAction(target, source, env):
     archive = target[0]
 
     # Remove existing data files before running the tests.
+    # FIXME Also remove .gcov?
     env.Execute(quietDelete(CoverageDataFiles(env)))
 
     # Run the tests. This creates new data files. This is an input to the builder.
@@ -54,6 +55,7 @@ def CoverageAction(target, source, env):
 
     # Process the data files into the output format. Note that CoverageDataFiles may return a
     # different list than before.
+    # FIXME Write the .gcov file in a temporary directory? Use with --stdout.
     outFiles = []
     for dataFile in CoverageDataFiles(env):
         outFile = env.ReplaceIxes(
@@ -95,10 +97,19 @@ def generate_CoverageBuilder(env):
     env["COVOUTSUFFIX"] = ".gcov"
     env["COVPREFIX"] = ""
     env["COVSUFFIX"] = ".gcov.tar.gz"
-    env["COVFLAGS"] = [
+    env["COVBRANCHFLAGS"] = [  # Flags to add to COVFLAGS to enable branch coverage.
+        # FIXME It's these two --branch-* options that will disable branch coverage.
         "--branch-counts",
         "--branch-probabilities",
+    ]
+    env["COVFLAGS"] = [
+        # FIXME --conditions? Requires gcc with -fcondition-coverage.
+        # FIXME --source-prefix?
         "--demangled-names",
         "--preserve-paths",
+        # FIXME "Exclude functions matching regex", added in GCC 14: will this ignore noreturn
+        # assert_* branches?
+        # "--exclude ^munit_errorf_ex$"
     ]
+    # FIXME Changes to covcom don't trigger recompilation
     env["COVCOM"] = "$COV $COVFLAGS --stdout $SOURCE > $TARGET"
