@@ -191,7 +191,6 @@ def MakeCompilerTargets(compilerEnv):
     analyzeTargets = [sharedLib, checkapi]
 
     if compilerEnv["IS_NATIVE_TARGET"]:
-        # FIXME Give munit_test its own target, then limit codecov upload to just munit tests
         # We can only run munit_test on native OS and architectures.
         testTargets.append(
             nohtyP_munit_test(
