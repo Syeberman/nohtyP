@@ -9,8 +9,9 @@ weaknesses in handling "exceptions". nohtyP is tested against Python's test suit
 conformance.
 
 [![][AppVeyor badge]][AppVeyor log]
+[![][Codecov badge]][Codecov project]
 
-CI is run against Linux, MacOS, and Windows with the generous support of [AppVeyor].
+CI is run against Linux, MacOS, and Windows with the generous support of [AppVeyor] and [Codecov].
 
 
 Build Instructions
@@ -97,3 +98,6 @@ All trademarks referenced herein are property of their respective holders.
 [AppVeyor badge]: https://ci.appveyor.com/api/projects/status/8t43r157h40vmfu6/branch/main?svg=true
 [AppVeyor log]: https://ci.appveyor.com/project/Syeberman/nohtyp/branch/main
 [AppVeyor]: http://ci.appveyor.com
+[Codecov badge]: https://codecov.io/github/Syeberman/nohtyP/branch/main/graph/badge.svg?token=fYVEwGJz7W
+[Codecov project]: https://app.codecov.io/github/Syeberman/nohtyP/tree/main
+[Codecov]: https://about.codecov.io/

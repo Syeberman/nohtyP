@@ -180,8 +180,8 @@ test_script:
         Write-Error ${PSItem}
         throw "tests failed"
       }
-  # FIXME Are create-commit and create-report idempotent?
   # FIXME gcovr.cfg?
+  # FIXME Tag upload with OS
   - pwsh: |
       if (${env:CONFIGURATION} -ne "Debug") { return }
       if (${env:YP_CI_CODECOV_UPLOAD} -ne "true") { return }

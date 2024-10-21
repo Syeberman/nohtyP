@@ -19,13 +19,11 @@ coverage:
     patch: true
     project: true
 
-# FIXME Double-check codecov is interpreting regexes properly
 component_management:
   individual_components:
     - component_id: nohtyP
       paths:
         - ^nohtyP\.c$
-    # FIXME No branch coverage for munit_test, only line coverage
     - component_id: munit_test
       paths:
         - ^Lib/munit_test/.*$
