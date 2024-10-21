@@ -36,6 +36,43 @@ static MunitResult test_PRI_formats(const MunitParameter params[], fixture_t *fi
     return MUNIT_OK;
 }
 
+static MunitResult test_assert_setlike_helper(const MunitParameter params[], fixture_t *fixture)
+{
+    // "yp_miniiter_next failed with an exception"
+    {
+        ypObject   *not_iterable = rand_obj_any_not_iterable();
+        yp_uint64_t mi_state = 0;
+        ypObject   *actual;
+        assert_true(_assert_setlike_helper(not_iterable, &mi_state, 0, NULL, &actual, NULL));
+        assert_isexception(actual, yp_TypeError);
+        yp_decref(not_iterable);
+    }
+
+    // FIXME A few more tests.
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_assert_mapping_helper(const MunitParameter params[], fixture_t *fixture)
+{
+    // "yp_miniiter_items_next failed with an exception"
+    {
+        ypObject   *not_iterable = rand_obj_any_not_iterable();
+        yp_uint64_t mi_state = 0;
+        ypObject   *actual_key;
+        ypObject   *actual_value;
+        assert_true(_assert_mapping_helper(
+                not_iterable, &mi_state, 0, NULL, &actual_key, &actual_value, NULL));
+        assert_isexception(actual_key, yp_TypeError);
+        // actual_value is undefined
+        yp_decref(not_iterable);
+    }
+
+    // FIXME A few more tests.
+
+    return MUNIT_OK;
+}
+
 // Ensure the various fixture_types_* arrays were initialzed properly.
 static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *fixture)
 {
@@ -314,7 +351,16 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
         assert_type_is(type->falsy, type->type);
     }
     assert_not_null(type->pair);
+
     // Property flags are tested implicitly by test_fixture_types.
+
+    // new_ is used by collection types.
+    if (type->is_collection && type != fixture_type_range) {
+        ypObject *x = rand_obj(type);
+        ypObject *self = type->new_(x);
+        assert_type_is(self, type->type);
+        yp_decrefN(N(self, x));
+    }
 
     return MUNIT_OK;
 }
@@ -351,6 +397,32 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
         yp_decref(hashable_of_type);
     }
 
+    // Ensure generated functions are callable.
+    if (type == fixture_type_function) {
+        ypObject *function = rand_obj(type);
+        ypObject *result;
+        assert_not_raises(result = yp_callN(function, 0));
+        yp_decrefN(N(result, function));
+    }
+
+    // Ensure fixture_type_from_object returns the correct type.
+    {
+        ypObject       *of_type = rand_obj(type);
+        fixture_type_t *type_from_object = fixture_type_from_object(of_type);
+        if (type == fixture_type_frozenset_dirty) {
+            assert_ptr(type_from_object, ==, fixture_type_frozenset);
+        } else if (type == fixture_type_set_dirty) {
+            assert_ptr(type_from_object, ==, fixture_type_set);
+        } else if (type == fixture_type_frozendict_dirty) {
+            assert_ptr(type_from_object, ==, fixture_type_frozendict);
+        } else if (type == fixture_type_dict_dirty) {
+            assert_ptr(type_from_object, ==, fixture_type_dict);
+        } else {
+            assert_ptr(type_from_object, ==, type);
+        }
+        yp_decref(of_type);
+    }
+
     return MUNIT_OK;
 }
 
@@ -358,9 +430,11 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
 static MunitParameterEnum test_types_all_params[] = {
         {param_key_type, param_values_types_all}, {NULL}};
 
-MunitTest test_unittest_tests[] = {TEST(test_PRI_formats, NULL), TEST(test_fixture_types, NULL),
-        TEST(test_param_values_types, NULL), TEST(test_fixture_type, test_types_all_params),
-        TEST(test_rand_obj, test_types_all_params), {NULL}};
+MunitTest test_unittest_tests[] = {TEST(test_PRI_formats, NULL),
+        TEST(test_assert_setlike_helper, NULL), TEST(test_assert_mapping_helper, NULL),
+        TEST(test_fixture_types, NULL), TEST(test_param_values_types, NULL),
+        TEST(test_fixture_type, test_types_all_params), TEST(test_rand_obj, test_types_all_params),
+        {NULL}};
 
 
 extern void test_unittest_initialize(void) {}

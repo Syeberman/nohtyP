@@ -108,6 +108,8 @@ static fixture_type_t fixture_type_dict_dirty_struct;
 static fixture_type_t fixture_type_function_struct;
 
 
+// GCOVR_EXCL_START
+
 static ypObject *objobjfunc_error(ypObject *x)
 {
     munit_error("unsupported operation");
@@ -124,6 +126,8 @@ static void voidarrayfunc_error(yp_ssize_t n, ypObject **array)
 {
     munit_error("unsupported operation");
 }
+
+// GCOVR_EXCL_STOP
 
 
 // Returns a random yp_int_t value. Prioritizes zero and small numbers.
@@ -280,6 +284,7 @@ static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
 // Returns an object, as returned by supplier, that is unequal among the n objects in array.
 static ypObject *rand_obj_unique3(yp_ssize_t n, ypObject **array, objvoidfunc supplier)
 {
+    // GCOVR_EXCL_START  FIXME I need to rethink how to ensure uniqueness in these tests.
     yp_ssize_t max_dups = 5;  // Ensure we don't loop indefinitely with a bad supplier.
     while (TRUE) {
         ypObject *obj = supplier();  // new ref
@@ -291,6 +296,7 @@ static ypObject *rand_obj_unique3(yp_ssize_t n, ypObject **array, objvoidfunc su
             return obj;  // Unique, so keep it.
         }
     }
+    // GCOVR_EXCL_STOP
 }
 
 extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array)
@@ -2082,7 +2088,8 @@ extern void malloc_tracker_free(void *p)
 static void malloc_tracker_fixture_tear_down(void)
 {
     if (malloc_tracker.len > 0) {
-        munit_errorf("memory leak: %p", malloc_tracker.mallocs[malloc_tracker.len - 1]);
+        munit_errorf("memory leak: %p",  // GCOVR_EXCL_LINE
+                malloc_tracker.mallocs[malloc_tracker.len - 1]);
     }
 }
 
@@ -2099,7 +2106,7 @@ static fixture_type_t *fixture_get_type(const MunitParameter params[])
         if (strcmp((*type)->name, type_name) == 0) return *type;
     }
 
-    munit_errorf("fixture_get_type: unknown type %s", type_name);
+    munit_errorf("fixture_get_type: unknown type %s", type_name);  // GCOVR_EXCL_LINE
     return NULL;
 }
 

@@ -76,9 +76,26 @@ static MunitResult test_isexceptionCN(const MunitParameter params[], fixture_t *
     return MUNIT_OK;
 }
 
+static int isexceptionC2_to_isexception_arrayC(ypObject *x, ypObject *exception)
+{
+    ypObject *array[] = {exception};
+    return yp_isexception_arrayC(x, 1, array);
+}
 
-MunitTest test_exception_tests[] = {
-        TEST(test_isexceptionC2, NULL), TEST(test_isexceptionCN, NULL), {NULL}};
+// yp_isexception_arrayC is a unittest.h function, but it's useful to test it here.
+static MunitResult test_isexception_arrayC(const MunitParameter params[], fixture_t *fixture)
+{
+    // Shared tests.
+    _test_isexceptionC2(isexceptionC2_to_isexception_arrayC);
+
+    // TODO Multiple exceptions (n > 1).
+
+    return MUNIT_OK;
+}
+
+
+MunitTest test_exception_tests[] = {TEST(test_isexceptionC2, NULL), TEST(test_isexceptionCN, NULL),
+        TEST(test_isexception_arrayC, NULL), {NULL}};
 
 
 extern void test_exception_initialize(void) {}

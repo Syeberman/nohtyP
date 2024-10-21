@@ -2417,7 +2417,7 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
         yp_decref(so);
     }
 
-tear_down:
+tear_down:  // GCOVR_EXCL_LINE (I'm not sure why this is showing as not covered)
     obj_array_decref(items);
     return MUNIT_OK;
 }
