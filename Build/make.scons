@@ -1,11 +1,12 @@
 from pathlib import Path
+import traceback
 
 import SCons.Defaults
 import SCons.Errors
 import SCons.Tool
 import SCons.Util
 from site_scons.build_environments import AddBuildTargets
-from site_scons.root_environment import MakeRootEnv
+from site_scons.root_environment import MakeRootEnv, SconscriptLog
 from site_scons.utilities import GetImportLibrary, GetProgram, GetSharedLibrary
 
 # TODO support scons -h for build options
@@ -204,20 +205,19 @@ def MakeCompilerTargets(compilerEnv):
         )
 
         # python_test requires a minimum version of Python.
-        # FIXME Uncomment
-        # try:
-        #     testTargets.append(
-        #         nohtyP_python_test(
-        #             compilerEnv.Clone(
-        #                 tools=[
-        #                     python_min_38,
-        #                 ]
-        #             ),
-        #             sharedLib,
-        #         )
-        #     )
-        # except (SCons.Errors.UserError, SCons.Errors.StopError):
-        #     traceback.print_exc(file=SconscriptLog)
+        try:
+            testTargets.append(
+                nohtyP_python_test(
+                    compilerEnv.Clone(
+                        tools=[
+                            python_min_38,
+                        ]
+                    ),
+                    sharedLib,
+                )
+            )
+        except (SCons.Errors.UserError, SCons.Errors.StopError):
+            traceback.print_exc(file=SconscriptLog)
 
     return buildTargets, testTargets, analyzeTargets
 
