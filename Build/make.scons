@@ -132,7 +132,11 @@ def nohtyP_python_test(env, sharedLib):
 # Runs the munit_test suite.
 def nohtyP_munit_test(env, munit_test):
     munit_target = "$VTOP/munit_test.log"
-    env.Replace(MUNIT_TEST=GetProgram(env, munit_test), MUNIT_TARGET=munit_target)
+    env.Replace(MUNIT_TEST=GetProgram(env, munit_test), MUNIT_TARGET=munit_target, MUNIT_FLAGS=[])
+
+    # Use a fixed seed for coverage analysis so we aren't trying to hit a moving target.
+    if env.subst("$CONFIGURATION") == "coverage":
+        env.Append(MUNIT_FLAGS=["--seed 0x69d6ab6c"])
 
     # FIXME Fix the below test. rand_obj_any_hashability_pair is choosing the same object as type->rand_items
     # munit_action = "$MUNIT_TEST --seed 0xdfbdc9fb --param type frozenset_dirty /test_protocols/test_setlike/test_issuperset 2> $MUNIT_TARGET"
@@ -143,7 +147,7 @@ def nohtyP_munit_test(env, munit_test):
         cov_target="$VTOP/munit_test",
         cmd_target=munit_target,
         cmd_source=munit_test,
-        cmd_action="$MUNIT_TEST 2> $MUNIT_TARGET",
+        cmd_action="$MUNIT_TEST $MUNIT_FLAGS 2> $MUNIT_TARGET",
     )
 
     env.Clean(munit_test, testLogs)
