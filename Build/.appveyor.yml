@@ -182,6 +182,7 @@ test_script:
       }
   # FIXME gcovr.cfg?
   # FIXME Tag upload with OS
+  # FIXME Excluded lines: https://github.com/gcovr/gcovr/issues/1008
   - pwsh: |
       if (${env:CONFIGURATION} -ne "Debug") { return }
       if (${env:YP_CI_CODECOV_UPLOAD} -ne "true") { return }
