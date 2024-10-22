@@ -4,7 +4,7 @@ comment:
   show_carryforward_flags: false
 
 github_checks:
-  annotations: true
+  annotations: false
 
 coverage:
   precision: 2
