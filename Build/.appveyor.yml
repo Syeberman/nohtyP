@@ -14,14 +14,13 @@ deploy: off
 
 image:
   - Ubuntu2204
-  # FIXME Uncomment
-  # - macOS-Sonoma
-  # - Visual Studio 2022
-  # # TODO Support Visual Studio 2019 (msvs_160:win32)
-  # # - Visual Studio 2019
-  # - Ubuntu
-  # - Visual Studio 2017
-  # - Visual Studio 2015
+  - macOS-Sonoma
+  - Visual Studio 2022
+  # TODO Support Visual Studio 2019 (msvs_160:win32)
+  # - Visual Studio 2019
+  - Ubuntu
+  - Visual Studio 2017
+  - Visual Studio 2015
 
 platform:
   - x64
@@ -29,8 +28,7 @@ platform:
 
 configuration:
   - Debug
-  # FIXME Uncomment
-  # - Build
+  - Build
 
 matrix:
   fast_finish: true
@@ -56,15 +54,14 @@ for:
       only:
         - image: Ubuntu2204
     environment:
-      # FIXME Uncomment
-      # YP_COMPILER_OSES: gcc_11:posix gcc_10:posix gcc_9:posix
-      YP_COMPILER_OSES: gcc_11:posix
-      YP_CI_CODECOV_UPLOAD: true
+      YP_COMPILER_OSES: gcc_11:posix gcc_10:posix gcc_9:posix
+      YP_CI_CODECOV_UPLOAD: posix
   - matrix:
       only:
         - image: macOS-Sonoma
     environment:
       YP_COMPILER_OSES: gcc_12:darwin gcc_11:darwin gcc_10:darwin
+      YP_CI_CODECOV_UPLOAD: darwin
   - matrix:
       only:
         - image: Visual Studio 2022
@@ -74,6 +71,7 @@ for:
       # TODO Qt contains MinGW builds (MinGW 9.0.0 64 bit: C:\Qt\6.5.3\mingw_64)
       # TODO Qt contains MinGW builds (MinGW 8.1.0: C:\Qt\Tools\mingw810_32)
       YP_COMPILER_OSES: gcc_8:win32
+      YP_CI_CODECOV_UPLOAD: win32
   - matrix:
       only:
         - image: Visual Studio 2019
@@ -181,11 +179,10 @@ test_script:
         throw "tests failed"
       }
   # FIXME gcovr.cfg?
-  # FIXME Tag upload with OS
   # FIXME Excluded lines: https://github.com/gcovr/gcovr/issues/1008
   - pwsh: |
       if (${env:CONFIGURATION} -ne "Debug") { return }
-      if (${env:YP_CI_CODECOV_UPLOAD} -ne "true") { return }
+      if (${env:YP_CI_CODECOV_UPLOAD} -eq "") { return }
 
       Build/make coverage
       if (! $?) { throw "Build/make coverage returned an error" }
@@ -195,7 +192,7 @@ test_script:
       gcovr --lcov coverage.codecov/munit_test.lcov --use-gcov-files coverage.codecov/munit_test.gcov/ --gcov-ignore-parse-errors
       if (! $?) { throw "gcovr returned an error" }
 
-      codecovcli upload-process --file coverage.codecov/munit_test.lcov --name "AppVeyor ${env:APPVEYOR_BUILD_VERSION}" --flag munit_test --fail-on-error --plugin noop --disable-search
+      codecovcli upload-process --file coverage.codecov/munit_test.lcov --name "AppVeyor ${env:APPVEYOR_BUILD_VERSION}" --flag munit_test --flag ${env:YP_CI_CODECOV_UPLOAD} --fail-on-error --plugin noop --disable-search
       if (! $?) { throw "codecovcli returned an error" }
   # FIXME Remove this
   - pwsh: |
