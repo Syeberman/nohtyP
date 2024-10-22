@@ -407,7 +407,7 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
 
         env.ParseConfig("$CC -dumpfullversion -dumpversion", check_cc_version)
         if env["CONFIGURATION"] == "coverage":
-            env.ParseConfig("$COV -v", check_cov_version)
+            env.ParseConfig("$COV --version", check_cov_version)
 
         ApplyGCCOptions(env, numericVersion)
 
