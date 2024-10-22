@@ -194,6 +194,3 @@ test_script:
 
       codecovcli upload-process --file coverage.codecov/munit_test.lcov --name "AppVeyor ${env:APPVEYOR_BUILD_VERSION}" --flag munit_test --flag ${env:YP_CI_CODECOV_UPLOAD} --fail-on-error --plugin noop --disable-search
       if (! $?) { throw "codecovcli returned an error" }
-  # FIXME Remove this
-  - pwsh: |
-      Write-Output "Yes, this runs after a return"
