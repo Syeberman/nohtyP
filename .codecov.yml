@@ -1,3 +1,11 @@
+comment:
+  behavior: default
+  layout: reach,diff,flags,components,tree
+  show_carryforward_flags: false
+
+github_checks:
+  annotations: false
+
 coverage:
   precision: 2
   range:
@@ -10,3 +18,16 @@ coverage:
       flag_coverage_not_uploaded_behavior: include
     patch: true
     project: true
+
+component_management:
+  individual_components:
+    - component_id: nohtyP
+      paths:
+        - ^nohtyP\.c$
+    - component_id: munit_test
+      paths:
+        - ^Lib/munit_test/.*$
+
+ignore:
+  - ^Tools/.*$
+  - ^Lib/munit_test/unittest_pprint.c$

@@ -1393,7 +1393,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     obj_array_fill(items, type->rand_items);
 
     // Shared tests.
-    _test_setindexC(fixture->type, yp_setindexC);
+    _test_setindexC(fixture->type, setindexC_to_setitem);
 
     // Remaining tests only apply to mutable objects.
     if (!type->is_mutable) goto tear_down;

@@ -215,6 +215,7 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
 
         // x is a proper superset.
         ead(x, x_type->newN(N(items[0], pair.unhashable, items[1])),
+                /* FIXME debugging for seed 0xdfbdc9fb pprint(stderr, so); pprint(stderr, x); */
                 assert_obj(any_cmp(so, x), is, x_superset));
         ead(x, x_type->newN(N(items[0], pair.hashable, unhashable)),
                 assert_obj(any_cmp(so, x), is, x_superset));
@@ -2417,7 +2418,7 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
         yp_decref(so);
     }
 
-tear_down:
+tear_down:  // GCOVR_EXCL_LINE (I'm not sure why this is showing as not covered)
     obj_array_decref(items);
     return MUNIT_OK;
 }
