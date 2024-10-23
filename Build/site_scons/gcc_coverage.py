@@ -24,6 +24,7 @@ quietDelete = SCons.Action.ActionFactory(SCons.Defaults.Delete.actfunc, lambda x
 # COVDATAPREFIX/COVDATASUFFIX - prefix/suffix for coverage data files (i.e. .gcda)
 # COVOUTPREFIX/COVOUTSUFFIX - prefix/suffix for analyzed coverage files (i.e. .gcov)
 # COVPREFIX/COVSUFFIX - prefix/suffix for target archive (i.e. .gcov.tar.gz)
+# COVBRANCHFLAGS - Flags to add to $COVFLAGS if you want branch coverage
 # COVFLAGS - list of flags to pass to $COV
 # COVCOM - command line used to generate analyzed coverage files
 
@@ -68,7 +69,6 @@ def CoverageAction(target, source, env):
 
     # Process the data files into the output format. Note that CoverageDataFiles may return a
     # different list than before.
-    # FIXME Write the .gcov file in a temporary directory?
     outFiles = []
     for dataFile in CoverageDataFiles(env):
         outFile = env.ReplaceIxes(
@@ -105,23 +105,19 @@ def generate_CoverageBuilder(env):
     env["COVNOTEPREFIX"] = ""
     env["COVNOTESUFFIX"] = ".gcno"
     env["COVDATAPREFIX"] = ""
-    env["COVDATASUFFIX"] = ".gcda"  # Files to clean to reset coverage.
+    env["COVDATASUFFIX"] = ".gcda"
     env["COVOUTPREFIX"] = ""
     env["COVOUTSUFFIX"] = ".gcov"
     env["COVPREFIX"] = ""
     env["COVSUFFIX"] = ".gcov.tar.gz"
-    env["COVBRANCHFLAGS"] = [  # Flags to add to COVFLAGS to enable branch coverage.
+    env["COVBRANCHFLAGS"] = [
         "--branch-counts",
         "--branch-probabilities",
     ]
     env["COVFLAGS"] = [
-        # FIXME --conditions? Requires gcc with -fcondition-coverage.
-        # FIXME --source-prefix?
+        # TODO --conditions? Requires gcc with -fcondition-coverage.
         "--demangled-names",
         "--preserve-paths",
-        # FIXME "Exclude functions matching regex", added in GCC 14: will this ignore noreturn
-        # assert_* branches?
-        # "--exclude ^munit_errorf_ex$"
     ]
     # FIXME Changes to covcom don't trigger recompilation
     env["COVCOM"] = "$COV $COVFLAGS --stdout $SOURCE > $TARGET"
