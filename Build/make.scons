@@ -133,11 +133,15 @@ def nohtyP_python_test(env, sharedLib):
 # Runs the munit_test suite.
 def nohtyP_munit_test(env, munit_test):
     munit_target = "$VTOP/munit_test.log"
-    env.Replace(MUNIT_TEST=GetProgram(env, munit_test), MUNIT_TARGET=munit_target, MUNIT_FLAGS=[])
+    env.Replace(
+        MUNIT_TEST=GetProgram(env, munit_test),
+        MUNIT_TARGET=munit_target,
+        MUNIT_FLAGS=[],
+    )
 
     # Use a fixed seed for coverage analysis so we aren't trying to hit a moving target.
     if env.subst("$CONFIGURATION") == "coverage":
-        env.Append(MUNIT_FLAGS=["--seed 0x69d6ab6c"])
+        env.Append(MUNIT_FLAGS=[["--seed", "0x69d6ab6c"]])
 
     # Assertion failures and status updates go to stderr (see MUNIT_OUTPUT_FILE above).
     testLogs = CoverageCommand(
@@ -205,6 +209,7 @@ def MakeCompilerTargets(compilerEnv):
         )
 
         # python_test requires a minimum version of Python.
+        # FIXME Since we don't include this in coverage reports, it'd be nice to remove this.
         try:
             testTargets.append(
                 nohtyP_python_test(

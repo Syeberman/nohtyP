@@ -45,11 +45,12 @@ typedef union {
 static void _test_newK(
         fixture_type_t *type, ypObject *(*any_newK)(int, ...), int test_exception_passthrough)
 {
-    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    uniqueness_t      *uq = uniqueness_new();
+    hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Basic newK.
     {
@@ -85,7 +86,7 @@ static void _test_newK(
 
     // Unhashable key.
     {
-        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        ypObject *unhashable = rand_obj_any_mutable(uq);
         assert_raises(any_newK(K(unhashable, values[0])), yp_TypeError);
         assert_raises(any_newK(K(keys[0], values[0], unhashable, values[1])), yp_TypeError);
         assert_raises(any_newK(K(keys[0], values[0], keys[1], values[1], unhashable, values[2])),
@@ -116,6 +117,7 @@ static void _test_newK(
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(pair.unhashable, pair.hashable));
+    uniqueness_dealloc(uq);
 }
 
 static void _test_new(
@@ -124,12 +126,13 @@ static void _test_new(
     fixture_type_t    *x_types[] = x_types_init();
     fixture_type_t    *friend_types[] = friend_types_init();
     fixture_type_t   **x_type;
-    hashability_pair_t pair = rand_obj_any_hashability_pair();
-    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    uniqueness_t      *uq = uniqueness_new();
+    hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
+    ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Basic new.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
@@ -163,7 +166,7 @@ static void _test_new(
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (!(*x_type)->hashable_items_only) {
-            ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+            ypObject *unhashable = rand_obj_any_mutable(uq);
             ead(x, new_itemsK(*x_type, K(unhashable, values[0])),
                     assert_raises(any_new(x), yp_TypeError));
             ead(x, new_itemsK(*x_type, K(keys[0], values[0], unhashable, values[1])),
@@ -226,6 +229,7 @@ static void _test_new(
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
+    uniqueness_dealloc(uq);
 }
 
 static ypObject *newK_to_frozendictKV(int n, ...)
@@ -381,13 +385,14 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     fixture_type_t **x_type;
     ypObject *(*newK_to_call_args_type)(int, ...);
     ypObject *(*new_to_call_args_type)(ypObject *);
-    ypObject *str_rand = rand_obj(fixture_type_str);
-    ypObject *str_cls = yp_str_frombytesC2(-1, "cls");
-    ypObject *str_object = yp_str_frombytesC2(-1, "object");
-    ypObject *keys[4];
-    ypObject *values[4];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *str_rand = rand_obj(uq, fixture_type_str);
+    ypObject     *str_cls = yp_str_frombytesC2(-1, "cls");
+    ypObject     *str_object = yp_str_frombytesC2(-1, "object");
+    ypObject     *keys[4];
+    ypObject     *values[4];
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     if (type->type == yp_t_frozendict) {
         newK_to_call_args_type = newK_to_call_args_t_frozendict;
@@ -516,17 +521,19 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(str_object, str_cls, str_rand));
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypObject *, int, ...),
         int                                 test_exception_passthrough)
 {
-    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    uniqueness_t      *uq = uniqueness_new();
+    hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Basic fromkeysN.
     {
@@ -562,7 +569,7 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
 
     // Unhashable key.
     {
-        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        ypObject *unhashable = rand_obj_any_mutable(uq);
         assert_raises(any_fromkeysN(values[0], N(unhashable)), yp_TypeError);
         assert_raises(any_fromkeysN(values[0], N(keys[0], unhashable)), yp_TypeError);
         assert_raises(any_fromkeysN(values[0], N(keys[0], keys[1], unhashable)), yp_TypeError);
@@ -590,6 +597,7 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(pair.unhashable, pair.hashable));
+    uniqueness_dealloc(uq);
 }
 
 static void _test_fromkeys(fixture_type_t *type, ypObject *(*any_fromkeys)(ypObject *, ypObject *),
@@ -597,12 +605,13 @@ static void _test_fromkeys(fixture_type_t *type, ypObject *(*any_fromkeys)(ypObj
 {
     fixture_type_t    *x_types[] = x_types_init();
     fixture_type_t   **x_type;
-    hashability_pair_t pair = rand_obj_any_hashability_pair();
-    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    uniqueness_t      *uq = uniqueness_new();
+    hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
+    ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Basic fromkeys.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
@@ -635,7 +644,7 @@ static void _test_fromkeys(fixture_type_t *type, ypObject *(*any_fromkeys)(ypObj
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (!(*x_type)->hashable_items_only) {
-            ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+            ypObject *unhashable = rand_obj_any_mutable(uq);
             ead(x, (*x_type)->newN(N(unhashable)),
                     assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
             ead(x, (*x_type)->newN(N(keys[0], unhashable)),
@@ -684,6 +693,7 @@ static void _test_fromkeys(fixture_type_t *type, ypObject *(*any_fromkeys)(ypObj
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
+    uniqueness_dealloc(uq);
 }
 
 static ypObject *fromkeysN_to_frozendict_fromkeysNV(ypObject *value, int n, ...)
@@ -793,10 +803,11 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     define_frozendict_mi_state(nokv_itemsleft_2_index_0, 0, 0, 2, 0);  // keys=0, values=0
     define_frozendict_mi_state(k_itemsleft_1_index_0, 1, 0, 1, 0);
     define_frozendict_mi_state(k_itemsleft_0_index_0, 1, 0, 0, 0);
-    ypObject *keys[4];
-    ypObject *values[4];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *keys[4];
+    ypObject     *values[4];
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Corrupted states.
     {
@@ -876,6 +887,7 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
 
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 

@@ -8,8 +8,8 @@
 
 static void _test_isexceptionC2(int (*any_isexceptionC2)(ypObject *, ypObject *))
 {
-    ypObject *objects[2];
-    obj_array_fill(objects, rand_objs_any);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *objects[] = obj_array_init(2, rand_obj_any(uq));
 
     // x is not an exception.
     assert_false(any_isexceptionC2(objects[0], yp_BaseException));
@@ -37,6 +37,7 @@ static void _test_isexceptionC2(int (*any_isexceptionC2)(ypObject *, ypObject *)
     assert_false(any_isexceptionC2(yp_ValueError, objects[1]));
 
     obj_array_decref(objects);
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_isexceptionC2(const MunitParameter params[], fixture_t *fixture)

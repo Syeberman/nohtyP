@@ -40,7 +40,7 @@ static MunitResult test_assert_setlike_helper(const MunitParameter params[], fix
 {
     // "yp_miniiter_next failed with an exception"
     {
-        ypObject   *not_iterable = rand_obj_any_not_iterable();
+        ypObject   *not_iterable = rand_obj_any_not_iterable(NULL);
         yp_uint64_t mi_state = 0;
         ypObject   *actual;
         assert_true(_assert_setlike_helper(not_iterable, &mi_state, 0, NULL, &actual, NULL));
@@ -57,7 +57,7 @@ static MunitResult test_assert_mapping_helper(const MunitParameter params[], fix
 {
     // "yp_miniiter_items_next failed with an exception"
     {
-        ypObject   *not_iterable = rand_obj_any_not_iterable();
+        ypObject   *not_iterable = rand_obj_any_not_iterable(NULL);
         yp_uint64_t mi_state = 0;
         ypObject   *actual_key;
         ypObject   *actual_value;
@@ -356,7 +356,7 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
 
     // new_ is used by collection types.
     if (type->is_collection && type != fixture_type_range) {
-        ypObject *x = rand_obj(type);
+        ypObject *x = rand_obj(NULL, type);
         ypObject *self = type->new_(x);
         assert_type_is(self, type->type);
         yp_decrefN(N(self, x));
@@ -365,41 +365,66 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
     return MUNIT_OK;
 }
 
+// Most of these tests are not actually dependent on type.
 static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
 
     {
-        ypObject *any = rand_obj_any();  // not dependent on type
+        ypObject *any = rand_obj_any(NULL);
         assert_not_exception(any);
         yp_decref(any);
     }
 
     {
-        ypObject *hashable = rand_obj_any_hashable();  // not dependent on type
+        ypObject *mutable = rand_obj_any_mutable(NULL);
+        assert_not_exception(mutable);
+        assert_raises_exc(yp_hashC(mutable, &exc), yp_TypeError);
+        yp_decref(mutable);
+    }
+
+    {
+        ypObject *hashable = rand_obj_any_hashable(NULL);
         assert_not_exception(hashable);
         assert_not_raises_exc(yp_hashC(hashable, &exc));
         yp_decref(hashable);
     }
 
     {
-        ypObject *of_type = rand_obj(type);
+        ypObject *hashable_not_str = rand_obj_any_hashable_not_str(NULL);
+        assert_not_exception(hashable_not_str);
+        assert_not_raises_exc(yp_hashC(hashable_not_str, &exc));
+        assert_obj(yp_type(hashable_not_str), is_not, yp_t_str);
+        yp_decref(hashable_not_str);
+    }
+
+    {
+        hashability_pair_t pair = rand_obj_any_hashability_pair(NULL);
+        assert_not_exception(pair.hashable);
+        assert_not_exception(pair.unhashable);
+        assert_not_raises_exc(yp_hashC(pair.hashable, &exc));
+        assert_raises_exc(yp_hashC(pair.unhashable, &exc), yp_TypeError);
+        assert_obj(pair.hashable, eq, pair.unhashable);
+        yp_decrefN(N(pair.hashable, pair.unhashable));
+    }
+
+    {
+        ypObject *not_iterable = rand_obj_any_not_iterable(NULL);
+        assert_not_exception(not_iterable);
+        assert_raises(yp_iter(not_iterable), yp_TypeError);
+        yp_decref(not_iterable);
+    }
+
+    {
+        ypObject *of_type = rand_obj(NULL, type);
         assert_not_exception(of_type);
         assert_type_is(of_type, type->type);
         yp_decref(of_type);
     }
 
-    if (!type->is_mutable) {
-        ypObject *hashable_of_type = rand_obj_hashable(type);
-        assert_not_exception(hashable_of_type);
-        assert_type_is(hashable_of_type, type->type);
-        assert_not_raises_exc(yp_hashC(hashable_of_type, &exc));
-        yp_decref(hashable_of_type);
-    }
-
     // Ensure generated functions are callable.
     if (type == fixture_type_function) {
-        ypObject *function = rand_obj(type);
+        ypObject *function = rand_obj(NULL, type);
         ypObject *result;
         assert_not_raises(result = yp_callN(function, 0));
         yp_decrefN(N(result, function));
@@ -407,7 +432,7 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
 
     // Ensure fixture_type_from_object returns the correct type.
     {
-        ypObject       *of_type = rand_obj(type);
+        ypObject       *of_type = rand_obj(NULL, type);
         fixture_type_t *type_from_object = fixture_type_from_object(of_type);
         if (type == fixture_type_frozenset_dirty) {
             assert_ptr(type_from_object, ==, fixture_type_frozenset);
@@ -426,6 +451,82 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
+// In order to trigger duplicates in rand_obj, we manipulate the random seed. As such, these tests
+// are separate from test_rand_obj. Most of these tests are not actually dependent on type.
+static MunitResult test_rand_obj_uniqueness(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    munit_uint32_t  seed = munit_rand_uint32();
+
+    // By resetting the seed between executions of statement, we ensure statement will create the
+    // same object at first, detect the duplicate, then create a new object.
+#define test_uniqueness(statement)           \
+    do {                                     \
+        uniqueness_t *uq = uniqueness_new(); \
+        ypObject     *first;                 \
+        ypObject     *second;                \
+        munit_rand_seed(seed);               \
+        first = (statement);                 \
+        munit_rand_seed(seed);               \
+        second = (statement);                \
+        assert_obj(first, ne, second);       \
+        yp_decrefN(2, first, second);        \
+        uniqueness_dealloc(uq);              \
+    } while (0)
+
+    test_uniqueness(rand_obj_any(uq));
+    test_uniqueness(rand_obj_any_mutable(uq));
+    test_uniqueness(rand_obj_any_hashable(uq));
+    test_uniqueness(rand_obj_any_hashable_not_str(uq));
+    test_uniqueness(rand_obj_any_not_iterable(uq));
+    if (type != fixture_type_NoneType && type != fixture_type_bool) {
+        // rand_obj cannot ensure uniqueness for None and bool.
+        test_uniqueness(rand_obj(uq, type));
+    }
+
+#undef test_uniqueness
+
+    {
+        uniqueness_t      *uq = uniqueness_new();
+        hashability_pair_t first;
+        hashability_pair_t second;
+        munit_rand_seed(seed);
+        first = rand_obj_any_hashability_pair(uq);
+        munit_rand_seed(seed);
+        second = rand_obj_any_hashability_pair(uq);
+        assert_obj(first.hashable, ne, second.hashable);
+        assert_obj(first.unhashable, ne, second.unhashable);
+        assert_obj(first.hashable, eq, first.unhashable);
+        assert_obj(second.hashable, eq, second.unhashable);
+        yp_decrefN(4, first.hashable, first.unhashable, second.hashable, second.unhashable);
+        uniqueness_dealloc(uq);
+    }
+
+#define test_uniqueness_array(statement)         \
+    do {                                         \
+        uniqueness_t *uq = uniqueness_new();     \
+        ypObject     *first[1];                  \
+        ypObject     *second[1];                 \
+        munit_rand_seed(seed);                   \
+        obj_array_fill(first, uq, (statement));  \
+        munit_rand_seed(seed);                   \
+        obj_array_fill(second, uq, (statement)); \
+        assert_obj(first[0], ne, second[0]);     \
+        yp_decrefN(2, first[0], second[0]);      \
+        uniqueness_dealloc(uq);                  \
+    } while (0)
+
+    if (type->is_collection) {
+        test_uniqueness_array(type->rand_items);
+    }
+    if (type->is_mapping) {
+        test_uniqueness_array(type->rand_values);
+    }
+
+#undef test_uniqueness_array
+
+    return MUNIT_OK;
+}
 
 static MunitParameterEnum test_types_all_params[] = {
         {param_key_type, param_values_types_all}, {NULL}};
@@ -434,7 +535,7 @@ MunitTest test_unittest_tests[] = {TEST(test_PRI_formats, NULL),
         TEST(test_assert_setlike_helper, NULL), TEST(test_assert_mapping_helper, NULL),
         TEST(test_fixture_types, NULL), TEST(test_param_values_types, NULL),
         TEST(test_fixture_type, test_types_all_params), TEST(test_rand_obj, test_types_all_params),
-        {NULL}};
+        TEST(test_rand_obj_uniqueness, test_types_all_params), {NULL}};
 
 
 extern void test_unittest_initialize(void) {}

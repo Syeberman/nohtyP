@@ -3,9 +3,8 @@
 
 // TODO We go to the trouble of having fixture_type_t.rand_items/etc to allow the type to control
 // what types of items are stored inside it. But then we use functions like
-// rand_obj_any_hashability_pair, rand_obj_any_mutable_unique, etc that could return objects that
-// aren't supported by the types under test. If this becomes a problem the tests will fail, but it
-// may become a problem.
+// rand_obj_any_hashability_pair, etc that could return objects that aren't supported by the types
+// under test. If this becomes a problem the tests will fail, but it may become a problem.
 
 
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
@@ -71,6 +70,18 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
 }
 
 
+static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
+{
+    yp_ssize_t i;
+    ypObject  *result;
+    for (i = 0; i < n; i++) {
+        assert_not_raises(result = yp_eq(array[i], x));
+        if (result == yp_True) return TRUE;
+    }
+    return FALSE;
+}
+
+
 // If something should happen 2 in 23 times: RAND_BOOL_FRACTION(2, 23)
 // TODO Better name? Better argument names?
 #define RAND_BOOL_FRACTION(numerator, denominator) \
@@ -122,7 +133,7 @@ static ypObject *objvarargfunc_error(int n, ...)
     return yp_SystemError;
 }
 
-static void voidarrayfunc_error(yp_ssize_t n, ypObject **array)
+static void rand_objs_func_error(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
     munit_error("unsupported operation");
 }
@@ -179,13 +190,90 @@ static fixture_type_t *rand_choice_fixture_types(fixture_types_t *types)
 }
 
 
+#define UNIQUENESS_MAX_LEN 100
+#define UNIQUENESS_MAX_DUPLICATES 20
+
+typedef struct _uniqueness_t {
+    yp_ssize_t duplicates;                // Number of duplicates encountered.
+    yp_ssize_t len;                       // Number of objects.
+    ypObject  *objs[UNIQUENESS_MAX_LEN];  // Owned references.
+} uniqueness_t;
+
+extern uniqueness_t *uniqueness_new(void)
+{
+    uniqueness_t *uq = malloc(sizeof(uniqueness_t));
+    uq->duplicates = 0;
+    uq->len = 0;
+    return uq;
+}
+
+// Our tests rely on having a set of objects that are unique from one another but that are otherwise
+// random. When such objects are created, call uniqueness_push_array to ensure they are all
+// unique. If any of the n objs are equal to the objects stored in uq, false is returned; otherwise,
+// all objs are added to uq and true is returned. This fails the test if the number of duplicates
+// encountered becomes too large. To test each object individually, call uniqueness_push.
+static int uniqueness_push_array(uniqueness_t *uq, yp_ssize_t n, ypObject **objs)
+{
+    yp_ssize_t i;
+
+    // In contexts where uniqueness is not required, use NULL for uq.
+    if (uq == NULL || n < 1) return TRUE;
+
+    for (i = 0; i < n; i++) {
+        if (array_contains(uq->len, uq->objs, objs[i])) {
+            uq->duplicates++;
+            if (uq->duplicates > UNIQUENESS_MAX_DUPLICATES) {
+                munit_error("too many duplicate objects encountered");  // GCOVR_EXCL_LINE
+            }
+            return FALSE;
+        }
+    }
+
+    // Increase the size of the object array as necessary.
+    assert_ssizeC(uq->len + n, <=, UNIQUENESS_MAX_LEN);
+
+    // TODO Mutable values will change while we have a reference to them. Should we make immutable
+    // copies here? Should they be deep copies for any nested mutables?
+    for (i = 0; i < n; i++) {
+        uq->objs[uq->len] = yp_incref(objs[i]);
+        uq->len++;
+    }
+    return TRUE;
+}
+
+// A version of uniqueness_push_array that accepts a single object.
+static int uniqueness_push(uniqueness_t *uq, ypObject *obj)
+{
+    ypObject *array[] = {obj};
+    return uniqueness_push_array(uq, 1, array);
+}
+
+extern void uniqueness_dealloc(uniqueness_t *uq)
+{
+    while (uq->len > 0) {
+        yp_decref(uq->objs[uq->len - 1]);
+        uq->len--;
+    }
+    free(uq);
+}
+
+// A convenience macro to execute statement repeatedly until uniqueness_push indicates a unique
+// object was produced, at which point that object is returned.
+#define _return_unique(uq, statement)               \
+    do {                                            \
+        ypObject *obj = (statement); /* new ref */  \
+        if (uniqueness_push((uq), obj)) return obj; \
+        yp_decref(obj); /* loop until unique */     \
+    } while (1)
+
+
 typedef struct _rand_obj_supplier_memo_t {
     yp_ssize_t depth;          // The maximum depth of objects.
     int        only_hashable;  // If true, only hashable objects are returned.
 } rand_obj_supplier_memo_t;
 
 // "Any" may be limited by memo.
-static ypObject *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_any_hashable_memo(const rand_obj_supplier_memo_t *memo)
 {
     rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/TRUE};
     assert_ssizeC(sub_memo.depth, >=, 0);
@@ -193,10 +281,10 @@ static ypObject *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 }
 
 // "Any" may be limited by memo (i.e. we might only return hashable types).
-static ypObject *rand_obj_any1(const rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_any_memo(const rand_obj_supplier_memo_t *memo)
 {
     if (memo->only_hashable) {
-        return rand_obj_any_hashable1(memo);
+        return rand_obj_any_hashable_memo(memo);
     } else {
         rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/FALSE};
         assert_ssizeC(sub_memo.depth, >=, 0);
@@ -205,10 +293,10 @@ static ypObject *rand_obj_any1(const rand_obj_supplier_memo_t *memo)
 }
 
 // Returns a 2-tuple of a hashable key and any value. Recall that "any" may be limited by memo.
-static ypObject *rand_obj_any_keyvalue1(const rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_any_keyvalue_memo(const rand_obj_supplier_memo_t *memo)
 {
-    ypObject *key = rand_obj_any_hashable1(memo);
-    ypObject *value = rand_obj_any1(memo);
+    ypObject *key = rand_obj_any_hashable_memo(memo);
+    ypObject *value = rand_obj_any_memo(memo);
     ypObject *result = yp_tupleN(2, key, value);
     yp_decrefN(N(key, value));
     assert_not_exception(result);
@@ -216,12 +304,18 @@ static ypObject *rand_obj_any_keyvalue1(const rand_obj_supplier_memo_t *memo)
 }
 
 // XXX Interesting. 0 is a falsy byte, but '\x00' is not a falsy char.
-static ypObject *rand_obj_byte(void) { return yp_intC(munit_rand_int_range(0, 255)); }
+static ypObject *rand_obj_byte(uniqueness_t *uq)
+{
+    _return_unique(uq, yp_intC(munit_rand_int_range(0, 255)));
+}
 
 // TODO Return more than just latin-1 characters
-static ypObject *rand_obj_chr(void) { return yp_chrC(munit_rand_int_range(0, 255)); }
+static ypObject *rand_obj_chr(uniqueness_t *uq)
+{
+    _return_unique(uq, yp_chrC(munit_rand_int_range(0, 255)));
+}
 
-extern ypObject *rand_obj_hashable(fixture_type_t *type)
+static ypObject *_rand_obj_hashable(fixture_type_t *type)
 {
     // Start with depth-1 as we are calling _new_rand ourselves.
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH - 1, /*only_hashable=*/TRUE};
@@ -230,107 +324,89 @@ extern ypObject *rand_obj_hashable(fixture_type_t *type)
     return result;
 }
 
-extern ypObject *rand_obj(fixture_type_t *type)
+static ypObject *_rand_obj(fixture_type_t *type)
 {
     // Start with depth-1 as we are calling _new_rand ourselves.
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH - 1, /*only_hashable=*/FALSE};
     return type->_new_rand(&memo);
 }
 
-extern ypObject *rand_obj_any_not_iterable(void)
+extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type)
 {
-    return rand_obj(rand_choice_fixture_types(fixture_types_not_iterable));
+    // None and bool have limited possible values, making uniqueness impossible.
+    if (type == fixture_type_NoneType || type == fixture_type_bool) {
+        if (uq != NULL) {
+            munit_error("cannot ensure uniqueness for None and bool");  // GCOVR_EXCL_LINE
+        }
+        return _rand_obj(type);
+    } else {
+        _return_unique(uq, _rand_obj(type));
+    }
 }
 
-extern ypObject *rand_obj_any_hashable_not_str(void)
+extern ypObject *rand_obj_any_not_iterable(uniqueness_t *uq)
 {
-    return rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable_not_str));
+    _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_not_iterable)));
 }
 
-extern hashability_pair_t rand_obj_any_hashability_pair(void)
+extern ypObject *rand_obj_any_hashable_not_str(uniqueness_t *uq)
+{
+    _return_unique(
+            uq, _rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable_not_str)));
+}
+
+static ypObject *rand_obj_any_hashable_paired(uniqueness_t *uq)
+{
+    _return_unique(
+            uq, _rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable_paired)));
+}
+
+extern hashability_pair_t rand_obj_any_hashability_pair(uniqueness_t *uq)
 {
     hashability_pair_t pair;
-    pair.hashable = rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable_paired));
+    pair.hashable = rand_obj_any_hashable_paired(uq);
     assert_not_raises(pair.unhashable = yp_unfrozen_copy(pair.hashable));
     return pair;
 }
 
-extern ypObject *rand_obj_any_mutable(void)
+extern ypObject *rand_obj_any_mutable(uniqueness_t *uq)
 {
-    return rand_obj(rand_choice_fixture_types(fixture_types_mutable));
+    _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_mutable)));
 }
 
-extern ypObject *rand_obj_any_hashable(void)
+extern ypObject *rand_obj_any_hashable(uniqueness_t *uq)
 {
-    return rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable));
+    _return_unique(uq, _rand_obj_hashable(rand_choice_fixture_types(fixture_types_immutable)));
 }
 
-extern ypObject *rand_obj_any(void)
+extern ypObject *rand_obj_any(uniqueness_t *uq)
 {
-    return rand_obj(rand_choice_fixture_types(fixture_types_all));
+    _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_all)));
 }
 
-static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
+static void rand_objs_byte(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
     yp_ssize_t i;
-    ypObject  *result;
-    for (i = 0; i < n; i++) {
-        assert_not_raises(result = yp_eq(array[i], x));
-        if (result == yp_True) return TRUE;
-    }
-    return FALSE;
+    for (i = 0; i < n; i++) array[i] = rand_obj_byte(uq);  // new ref
 }
 
-// Returns an object, as returned by supplier, that is unequal among the n objects in array.
-static ypObject *rand_obj_unique3(yp_ssize_t n, ypObject **array, objvoidfunc supplier)
+static void rand_objs_chr(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
-    // GCOVR_EXCL_START  FIXME I need to rethink how to ensure uniqueness in these tests.
-    yp_ssize_t max_dups = 5;  // Ensure we don't loop indefinitely with a bad supplier.
-    while (TRUE) {
-        ypObject *obj = supplier();  // new ref
-        if (array_contains(n, array, obj)) {
-            max_dups--;
-            if (max_dups < 1) munit_error("too many duplicate objects returned");
-            yp_decref(obj);  // Not unique, so discard it.
-        } else {
-            return obj;  // Unique, so keep it.
-        }
-    }
-    // GCOVR_EXCL_STOP
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) array[i] = rand_obj_chr(uq);  // new ref
 }
 
-extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array)
+static void rand_objs_any_hashable(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
-    return rand_obj_unique3(n, array, rand_obj_any_mutable);
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) array[i] = rand_obj_any_hashable(uq);  // new ref
 }
 
-// Fills array with n unequal objects as returned by supplier.
-static void rand_objs3(yp_ssize_t n, ypObject **array, objvoidfunc supplier)
+static void rand_objs_any(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
-    yp_ssize_t max_dups = n + 10;  // Ensure we don't loop indefinitely with a bad supplier.
-    yp_ssize_t fill = 0;
-    while (fill < n) {
-        array[fill] = supplier();  // new ref
-        if (array_contains(fill, array, array[fill])) {
-            max_dups--;
-            if (max_dups < 1) munit_error("too many duplicate objects returned");
-            yp_decref(array[fill]);  // Not unique, so discard it.
-        } else {
-            fill++;  // Unique, so keep it.
-        }
-    }
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) array[i] = rand_obj_any(uq);  // new ref
 }
-
-static void rand_objs_byte(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_byte); }
-
-static void rand_objs_chr(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_chr); }
-
-static void rand_objs_any_hashable(yp_ssize_t n, ypObject **array)
-{
-    rand_objs3(n, array, rand_obj_any_hashable);
-}
-
-extern void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
 
 
 static ypObject *_new_items_listKV(yp_ssize_t n, va_list args)
@@ -372,7 +448,7 @@ extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...)
 
 typedef struct _rand_iter_state_t {
     yp_ssize_t               n;
-    rand_obj_supplier_t      supplier;
+    rand_obj_supplier_func   supplier;
     rand_obj_supplier_memo_t supplier_memo;
 } rand_iter_state_t;
 
@@ -391,8 +467,8 @@ static ypObject *rand_iter_func(ypObject *g, ypObject *value)
     return state->supplier(&state->supplier_memo);
 }
 
-static ypObject *new_rand_iter3(
-        yp_ssize_t n, rand_obj_supplier_t supplier, const rand_obj_supplier_memo_t *supplier_memo)
+static ypObject *new_rand_iter3(yp_ssize_t n, rand_obj_supplier_func supplier,
+        const rand_obj_supplier_memo_t *supplier_memo)
 {
     ypObject           *result;
     rand_iter_state_t   state = {n, supplier};
@@ -458,11 +534,11 @@ static fixture_type_t fixture_type_type_struct = {
 
         yp_type,  // new_
 
-        objvarargfunc_error,  // newN
-        voidarrayfunc_error,  // rand_items
+        objvarargfunc_error,   // newN
+        rand_objs_func_error,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -491,11 +567,11 @@ static fixture_type_t fixture_type_NoneType_struct = {
 
         objobjfunc_error,  // new_
 
-        objvarargfunc_error,  // newN
-        voidarrayfunc_error,  // rand_items
+        objvarargfunc_error,   // newN
+        rand_objs_func_error,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -530,11 +606,11 @@ static fixture_type_t fixture_type_bool_struct = {
 
         yp_bool,  // new_
 
-        objvarargfunc_error,  // newN
-        voidarrayfunc_error,  // rand_items
+        objvarargfunc_error,   // newN
+        rand_objs_func_error,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -567,11 +643,11 @@ static fixture_type_t fixture_type_int_struct = {
 
         yp_int,  // new_
 
-        objvarargfunc_error,  // newN
-        voidarrayfunc_error,  // rand_items
+        objvarargfunc_error,   // newN
+        rand_objs_func_error,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -604,11 +680,11 @@ static fixture_type_t fixture_type_intstore_struct = {
 
         yp_intstore,  // new_
 
-        objvarargfunc_error,  // newN
-        voidarrayfunc_error,  // rand_items
+        objvarargfunc_error,   // newN
+        rand_objs_func_error,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -641,11 +717,11 @@ static fixture_type_t fixture_type_float_struct = {
 
         yp_float,  // new_
 
-        objvarargfunc_error,  // newN
-        voidarrayfunc_error,  // rand_items
+        objvarargfunc_error,   // newN
+        rand_objs_func_error,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -678,11 +754,11 @@ static fixture_type_t fixture_type_floatstore_struct = {
 
         yp_floatstore,  // new_
 
-        objvarargfunc_error,  // newN
-        voidarrayfunc_error,  // rand_items
+        objvarargfunc_error,   // newN
+        rand_objs_func_error,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -701,7 +777,7 @@ static fixture_type_t fixture_type_floatstore_struct = {
 static ypObject *new_rand_iter(const rand_obj_supplier_memo_t *memo)
 {
     yp_ssize_t n = memo->depth < 1 ? 0 : munit_rand_int_range(0, 16);
-    return new_rand_iter3(n, rand_obj_any1, memo);
+    return new_rand_iter3(n, rand_obj_any_memo, memo);
 }
 
 static ypObject *newN_iter(int n, ...)
@@ -733,8 +809,8 @@ static fixture_type_t fixture_type_iter_struct = {
         newN_iter,      // newN
         rand_objs_any,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -812,13 +888,20 @@ args_end:
 
 // Fills array with n integers that cover a range with a random start and step. Any slice of these
 // integers is suitable to pass to newN_range to construct a new range.
-static void rand_items_range(yp_ssize_t n, ypObject **array)
+static void rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
-    yp_ssize_t i;
-    yp_int_t   start = range_rand_start();
-    yp_int_t   step = range_rand_step();
-    for (i = 0; i < n; i++) {
-        assert_not_raises(array[i] = yp_intC(start + (i * step)));
+    while (1) {
+        yp_ssize_t i;
+        yp_int_t   start = range_rand_start();
+        yp_int_t   step = range_rand_step();
+        for (i = 0; i < n; i++) {
+            assert_not_raises(array[i] = yp_intC(start + (i * step)));
+        }
+
+        // Test all selected integers for uniqueness as a group. If any single integer has a
+        // duplicate, discard all integers and try again.
+        if (uniqueness_push_array(uq, n, array)) return;
+        obj_array_decref2(n, array);
     }
 }
 
@@ -835,8 +918,8 @@ static fixture_type_t fixture_type_range_struct = {
         newN_range,        // newN
         rand_items_range,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -897,8 +980,8 @@ static fixture_type_t fixture_type_bytes_struct = {
         newN_bytes,      // newN
         rand_objs_byte,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -959,8 +1042,8 @@ static fixture_type_t fixture_type_bytearray_struct = {
         newN_bytearray,  // newN
         rand_objs_byte,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1023,8 +1106,8 @@ static fixture_type_t fixture_type_str_struct = {
         newN_str,       // newN
         rand_objs_chr,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1088,8 +1171,8 @@ static fixture_type_t fixture_type_chrarray_struct = {
         newN_chrarray,  // newN
         rand_objs_chr,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1111,7 +1194,7 @@ static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
         return yp_tuple_empty;
     } else {
         yp_ssize_t len = munit_rand_int_range(1, 16);
-        ypObject  *iter = new_rand_iter3(len, rand_obj_any1, memo);
+        ypObject  *iter = new_rand_iter3(len, rand_obj_any_memo, memo);
         ypObject  *result = yp_tuple(iter);
         yp_decref(iter);
         assert_not_exception(result);
@@ -1132,8 +1215,8 @@ static fixture_type_t fixture_type_tuple_struct = {
         yp_tupleN,      // newN
         rand_objs_any,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1155,7 +1238,7 @@ static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
         return yp_listN(0);
     } else {
         yp_ssize_t len = munit_rand_int_range(1, 16);
-        ypObject  *iter = new_rand_iter3(len, rand_obj_any1, memo);
+        ypObject  *iter = new_rand_iter3(len, rand_obj_any_memo, memo);
         ypObject  *result = yp_list(iter);
         yp_decref(iter);
         assert_not_exception(result);
@@ -1176,8 +1259,8 @@ static fixture_type_t fixture_type_list_struct = {
         yp_listN,       // newN
         rand_objs_any,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1200,7 +1283,7 @@ static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
     } else {
         // n may not be the final length, as duplicates are discarded.
         yp_ssize_t n = munit_rand_int_range(1, 16);
-        ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable1, memo);
+        ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable_memo, memo);
         ypObject  *result = yp_frozenset(iter);
         yp_decref(iter);
         assert_not_exception(result);
@@ -1221,8 +1304,8 @@ static fixture_type_t fixture_type_frozenset_struct = {
         yp_frozensetN,           // newN
         rand_objs_any_hashable,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1245,7 +1328,7 @@ static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
     } else {
         // n may not be the final length, as duplicates are discarded.
         yp_ssize_t n = munit_rand_int_range(1, 16);
-        ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable1, memo);
+        ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable_memo, memo);
         ypObject  *result = yp_set(iter);
         yp_decref(iter);
         assert_not_exception(result);
@@ -1266,8 +1349,8 @@ static fixture_type_t fixture_type_set_struct = {
         yp_setN,                 // newN
         rand_objs_any_hashable,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1352,8 +1435,8 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         new_frozenset_dirtyN,    // newN
         rand_objs_any_hashable,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1411,8 +1494,8 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         new_set_dirtyN,          // newN
         rand_objs_any_hashable,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1435,7 +1518,7 @@ static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
     } else {
         // n may not be the final length, as duplicate keys are discarded.
         yp_ssize_t n = munit_rand_int_range(1, 16);
-        ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue1, memo);
+        ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue_memo, memo);
         ypObject  *result = yp_frozendict(iter);
         yp_decref(iter);
         assert_not_exception(result);
@@ -1448,14 +1531,15 @@ static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
 // from the keys).
 static ypObject *_mapping_new_supplierN(int n, va_list args)
 {
-    int        i;
-    ypObject **values;
-    ypObject  *supplier;
+    int           i;
+    ypObject    **values;
+    ypObject     *supplier;
+    uniqueness_t *uq = uniqueness_new();
 
     if (n < 1) return yp_listN(0);
 
     values = malloc(sizeof(ypObject *) * (size_t)n);
-    rand_objs_any(n, values);
+    rand_objs_any(uq, n, values);
 
     assert_not_raises(supplier = yp_listN(0));  // new ref
 
@@ -1468,6 +1552,7 @@ static ypObject *_mapping_new_supplierN(int n, va_list args)
 
     obj_array_decref2(n, values);
     free(values);
+    uniqueness_dealloc(uq);
 
     return supplier;
 }
@@ -1526,7 +1611,7 @@ static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
     } else {
         // n may not be the final length, as duplicate keys are discarded.
         yp_ssize_t n = munit_rand_int_range(1, 16);
-        ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue1, memo);
+        ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue_memo, memo);
         ypObject  *result = yp_dict(iter);
         yp_decref(iter);
         assert_not_exception(result);
@@ -1757,7 +1842,7 @@ static fixture_type_t fixture_type_dict_dirty_struct = {
 
 static ypObject *new_rand_function_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
-    return rand_obj_any();
+    return rand_obj_any(NULL);
 }
 
 // TODO Randomly return a statically-allocated function.
@@ -1782,11 +1867,11 @@ static fixture_type_t fixture_type_function_struct = {
 
         objobjfunc_error,  // new_
 
-        objvarargfunc_error,  // newN
-        voidarrayfunc_error,  // rand_items
+        objvarargfunc_error,   // newN
+        rand_objs_func_error,  // rand_items
 
-        objvarargfunc_error,  // newK
-        voidarrayfunc_error,  // rand_values
+        objvarargfunc_error,   // newK
+        rand_objs_func_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -2051,6 +2136,7 @@ static void malloc_tracker_pop(void *p)
 
     // Find the pointer and set it to NULL. Ignore unknown pointers: we are only concerned with
     // allocations during the test.
+    // TODO Report on deep pointers, i.e. that are not deallocated in reverse order.
     for (i = malloc_tracker.len - 1; i >= 0; i--) {
         if (malloc_tracker.mallocs[i] == p) {
             malloc_tracker.mallocs[i] = NULL;
@@ -2059,6 +2145,7 @@ static void malloc_tracker_pop(void *p)
     }
 
     // Trim trailing NULL entries from the list.
+    // TODO Report on long runs of NULLs, i.e. that are not deallocated in reverse order.
     while (malloc_tracker.len > 0 && malloc_tracker.mallocs[malloc_tracker.len - 1] == NULL) {
         malloc_tracker.len--;
     }

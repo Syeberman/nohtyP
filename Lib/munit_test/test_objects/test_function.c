@@ -113,23 +113,20 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
     } while (0)
 
 // Fills array with n parameters; useful to create functions with many parameters. names start with
-// name_prefix and end with a number incrementing from zero. default_filler generates the default
+// name_prefix and end with a number incrementing from zero. rand_obj_any generates the default
 // values. array will contain new references that will need to be decremented with
 // parameter_decl_array_decref*.
 static void parameter_decl_array_fill4(
-        yp_ssize_t n, yp_parameter_decl_t *array, char *name_prefix, voidarrayfunc default_filler)
+        uniqueness_t *uq, yp_ssize_t n, yp_parameter_decl_t *array, char *name_prefix)
 {
     yp_ssize_t i;
-    char       name[32];
-    ypObject  *defaults[64];
-
-    assert_ssizeC(n, <=, yp_lengthof_array(defaults));
-    default_filler(n, defaults);  // new refs
+    char       name[32];  // Enough for a 64-bit decimal value (19), \0, and a long prefix (12).
 
     for (i = 0; i < n; i++) {
+        // Recall sprintf_array asserts on buffer overflow.
         sprintf_array(name, "%s%" PRIssize, name_prefix, i);
         assert_not_raises(array[i].name = yp_str_frombytesC2(-1, name));  // new ref
-        array[i].default_ = defaults[i];                                  // borrowed ref
+        array[i].default_ = rand_obj_any(uq);                             // new ref
     }
 }
 
@@ -485,14 +482,15 @@ static MunitResult test_new_immortal(const MunitParameter params[], fixture_t *f
 // Tests common to test_callN, test_call_stars, and callN_to_call_arrayX.
 static void _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 {
-    ypObject *defs[] = obj_array_init(5, rand_obj_any());
-    ypObject *args[] = obj_array_init(33, rand_obj_any());
-    ypObject *str_a = yp_str_frombytesC2(-1, "a");
-    ypObject *str_b = yp_str_frombytesC2(-1, "b");
-    ypObject *str_slash = yp_str_frombytesC2(-1, "/");
-    ypObject *str_star = yp_str_frombytesC2(-1, "*");
-    ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
-    ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *defs[] = obj_array_init(5, rand_obj_any(uq));
+    ypObject     *args[] = obj_array_init(33, rand_obj_any(uq));
+    ypObject     *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject     *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject     *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject     *str_star = yp_str_frombytesC2(-1, "*");
+    ypObject     *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject     *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
 
     // def f()
     {
@@ -1219,7 +1217,7 @@ static void _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_ssize_t          params_len = yp_lengthof_array(params);
         yp_function_decl_t  decl = {capture_code, 0, (yp_int32_t)params_len, params, NULL, NULL};
         ypObject           *f;
-        parameter_decl_array_fill4(params_len - 1, params + 1, "b", rand_objs_any);
+        parameter_decl_array_fill4(uq, params_len - 1, params + 1, "b");
         assert_not_raises(f = yp_functionC(&decl));
 
         ead(capt, any_callN(f, N(args[0])),
@@ -1363,21 +1361,23 @@ static void _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
     obj_array_decref(defs);
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
+    uniqueness_dealloc(uq);
 }
 
 // Tests common to test_callK (not yet implemented) and test_call_stars.
 static void _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
 {
-    ypObject *defs[] = obj_array_init(5, rand_obj_any());
-    ypObject *args[] = obj_array_init(33, rand_obj_any());
-    ypObject *str_a = yp_str_frombytesC2(-1, "a");
-    ypObject *str_b = yp_str_frombytesC2(-1, "b");
-    ypObject *str_c = yp_str_frombytesC2(-1, "c");
-    ypObject *str_slash = yp_str_frombytesC2(-1, "/");
-    ypObject *str_star = yp_str_frombytesC2(-1, "*");
-    ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
-    ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
-    ypObject *non_string = rand_obj_any_hashable_not_str();  // argument names must be strings
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *defs[] = obj_array_init(5, rand_obj_any(uq));
+    ypObject     *args[] = obj_array_init(33, rand_obj_any(uq));
+    ypObject     *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject     *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject     *str_c = yp_str_frombytesC2(-1, "c");
+    ypObject     *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject     *str_star = yp_str_frombytesC2(-1, "*");
+    ypObject     *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject     *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    ypObject     *non_string = rand_obj_any_hashable_not_str(uq);  // argument names must be strings
 
     // def f()
     {
@@ -2346,7 +2346,7 @@ static void _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         yp_ssize_t          params_len = yp_lengthof_array(params);
         yp_function_decl_t  decl = {capture_code, 0, (yp_int32_t)params_len, params, NULL, NULL};
         ypObject           *f;
-        parameter_decl_array_fill4(params_len - 1, params + 1, "b", rand_objs_any);
+        parameter_decl_array_fill4(uq, params_len - 1, params + 1, "b");
         assert_not_raises(f = yp_functionC(&decl));
 
         ead(capt, any_callK(f, K(str_a, args[0])),
@@ -2518,6 +2518,7 @@ static void _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_c, str_slash, str_star, str_star_args, str_star_star_kwargs,
             non_string));
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_callN(const MunitParameter params[], fixture_t *fixture)
@@ -2592,14 +2593,15 @@ static ypObject *callK_to_call_stars_frozendict(ypObject *c, int n, ...)
 
 static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject *defs[] = obj_array_init(2, rand_obj_any());
-    ypObject *args[] = obj_array_init(2, rand_obj_any());
-    ypObject *str_a = yp_str_frombytesC2(-1, "a");
-    ypObject *str_b = yp_str_frombytesC2(-1, "b");
-    ypObject *str_slash = yp_str_frombytesC2(-1, "/");
-    ypObject *str_star = yp_str_frombytesC2(-1, "*");
-    ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
-    ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *defs[] = obj_array_init(2, rand_obj_any(uq));
+    ypObject     *args[] = obj_array_init(2, rand_obj_any(uq));
+    ypObject     *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject     *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject     *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject     *str_star = yp_str_frombytesC2(-1, "*");
+    ypObject     *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject     *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
 
     // Shared tests.
     _test_callN(callN_to_call_stars_tuple);
@@ -2765,6 +2767,7 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
     obj_array_decref(defs);
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -2790,10 +2793,11 @@ static ypObject *callN_to_call_arrayX(ypObject *c, int n, ...)
 
 static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject *args[] = obj_array_init(2, rand_obj_any());
-    ypObject *str_a = yp_str_frombytesC2(-1, "a");
-    ypObject *str_b = yp_str_frombytesC2(-1, "b");
-    ypObject *str_slash = yp_str_frombytesC2(-1, "/");
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *args[] = obj_array_init(2, rand_obj_any(uq));
+    ypObject     *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject     *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject     *str_slash = yp_str_frombytesC2(-1, "/");
 
     // Shared tests.
     _test_callN(callN_to_call_arrayX);
@@ -2837,13 +2841,15 @@ static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fi
 
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash));
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_copy(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject *defs[] = obj_array_init(1, rand_obj_any());
-    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *defs[] = obj_array_init(1, rand_obj_any(uq));
+    ypObject     *str_a = yp_str_frombytesC2(-1, "a");
     define_function(f, None_code, ({str_a, defs[0]}));
 
     // All copies are lazy, because all function objects are immutable.
@@ -2853,13 +2859,15 @@ static MunitResult test_copy(const MunitParameter params[], fixture_t *fixture)
 
     obj_array_decref(defs);
     yp_decrefN(N(str_a, f));
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_deepcopy(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject *defs[] = obj_array_init(1, rand_obj_any());
-    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *defs[] = obj_array_init(1, rand_obj_any(uq));
+    ypObject     *str_a = yp_str_frombytesC2(-1, "a");
     define_function(f, None_code, ({str_a, defs[0]}));
 
     // deepcopy is not yet implemented.
@@ -2872,13 +2880,15 @@ static MunitResult test_deepcopy(const MunitParameter params[], fixture_t *fixtu
 
     obj_array_decref(defs);
     yp_decrefN(N(str_a, f));
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_bool(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject *defs[] = obj_array_init(1, rand_obj_any());
-    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *defs[] = obj_array_init(1, rand_obj_any(uq));
+    ypObject     *str_a = yp_str_frombytesC2(-1, "a");
     define_function2(f, None_code);
     define_function(f_a, None_code, ({str_a, defs[0]}));
 
@@ -2889,6 +2899,7 @@ static MunitResult test_bool(const MunitParameter params[], fixture_t *fixture)
 
     obj_array_decref(defs);
     yp_decrefN(N(str_a, f, f_a));
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 

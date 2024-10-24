@@ -838,12 +838,12 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
 extern void pprint(FILE *f, ypObject *obj);
 
 
-typedef ypObject *(*objvoidfunc)(void);
 typedef ypObject *(*objobjfunc)(ypObject *);
 typedef ypObject *(*objvarargfunc)(int, ...);
-typedef void (*voidarrayfunc)(yp_ssize_t, ypObject **);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
-typedef ypObject *(*rand_obj_supplier_t)(const rand_obj_supplier_memo_t *);
+typedef ypObject *(*rand_obj_supplier_func)(const rand_obj_supplier_memo_t *);
+typedef struct _uniqueness_t uniqueness_t;
+typedef void (*rand_objs_func)(uniqueness_t *, yp_ssize_t, ypObject **);
 
 // Describes a single nohtyP type in the context of these tests. Allows for generic tests to be
 // written that apply to an entire classification of types (i.e. test_sequence tests all sequence
@@ -857,20 +857,20 @@ typedef struct _fixture_type_t {
     ypObject       *falsy;  // The falsy/empty immortal for this type, or NULL. (Only immutables.)
     fixture_type_t *pair;   // The other type in this object pair, or points back to this type.
 
-    rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
+    rand_obj_supplier_func _new_rand;  // Call via rand_obj/etc.
 
     objobjfunc new_;  // The object converter, aka the single-argument constructor.
 
     // Functions for iterables, where rand_items returns objects that can be accepted by newN and
     // subsequently yielded by yp_iter. (For mappings, newN creates an object with the given keys
     // and random, unique values.)
-    objvarargfunc newN;        // Creates a iterable for the given items (i.e. yp_tupleN).
-    voidarrayfunc rand_items;  // Fills an array with n random, unique objects.
+    objvarargfunc  newN;        // Creates a iterable for the given items (i.e. yp_tupleN).
+    rand_objs_func rand_items;  // Fills an array with n random objects.
 
     // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
     // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys).
-    objvarargfunc newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
-    voidarrayfunc rand_values;  // Fills an array with n random, unique objects for values.
+    objvarargfunc  newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
+    rand_objs_func rand_values;  // Fills an array with n random objects for values.
 
     // Flags to describe the properties of the type.
     int is_mutable;
@@ -981,41 +981,47 @@ extern int object_is_hashable(ypObject *object);
 extern char param_key_type[];
 
 
+// A "uniqueness tracker". Used by functions such as rand_obj_any to ensure that the random objects
+// created are unique across all function calls made with that tracker. It is valid to have multiple
+// trackers active in a single test: each uniqueness tracker operates independently. Use NULL for
+// any uniqueness_t* parameter to disable the uniqueness check for that function call. Trackers are
+// allocated with uniqueness_new and freed with uniqueness_dealloc.
+typedef struct _uniqueness_t uniqueness_t;
+
 // Returned by rand_obj_any_hashability_pair.
 typedef struct _hashability_pair_t {
     ypObject *hashable;
     ypObject *unhashable;
 } hashability_pair_t;
 
+// Allocates a new uniqueness tracker.
+extern uniqueness_t *uniqueness_new(void);
+
+// Discards all references in the tracker and frees memory. uq cannot be used afterwards.
+extern void uniqueness_dealloc(uniqueness_t *uq);
+
 // Returns a random object of any type.
-extern ypObject *rand_obj_any(void);
+extern ypObject *rand_obj_any(uniqueness_t *uq);
 
 // Returns a random mutable object of any type.
-extern ypObject *rand_obj_any_mutable(void);
+extern ypObject *rand_obj_any_mutable(uniqueness_t *uq);
 
 // Returns a random hashable object of any type.
-extern ypObject *rand_obj_any_hashable(void);
+extern ypObject *rand_obj_any_hashable(uniqueness_t *uq);
 
 // Returns a random hashable object of any type except str.
-extern ypObject *rand_obj_any_hashable_not_str(void);
+extern ypObject *rand_obj_any_hashable_not_str(uniqueness_t *uq);
 
 // Returns two random objects of any type that compare equal; one is hashable and the other is not.
-extern hashability_pair_t rand_obj_any_hashability_pair(void);
+// While the objects are equal to each other, they will be unequal to any other object in uq.
+extern hashability_pair_t rand_obj_any_hashability_pair(uniqueness_t *uq);
 
 // Returns a random object of any non-iterable type.
-extern ypObject *rand_obj_any_not_iterable(void);
+extern ypObject *rand_obj_any_not_iterable(uniqueness_t *uq);
 
-// Returns a random object of the given type.
-extern ypObject *rand_obj(fixture_type_t *type);
-
-// Returns a random hashable object of the given type. type must be immutable.
-extern ypObject *rand_obj_hashable(fixture_type_t *type);
-
-// Returns a random mutable object of any type that is unequal to the objects in array.
-extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array);
-
-// Fills array with n random, unique objects of any type.
-extern void rand_objs_any(yp_ssize_t n, ypObject **array);
+// Returns a random object of the given type. uq must be NULL for fixture_type_NoneType and
+// fixture_type_bool, as there are too few values for these types to guarantee uniqueness.
+extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type);
 
 // Returns an object of the given type containing the n (key, value) pairs as 2-tuples. The object
 // is constructed by calling type->new_ with a list of the pairs.
@@ -1028,23 +1034,25 @@ extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args);
 extern ypObject *new_faulty_iter(
         ypObject *supplier, yp_ssize_t n, ypObject *exception, yp_ssize_t length_hint);
 
-// Initializes a ypObject * array of length n with values from expression. Expression is evaluated n
-// times. n must be an integer literal. Example:
+// Initializes a ypObject* array of length n with values from expression. Expression is evaluated n
+// times, however the order of evaluation is undefined. n must be an integer literal. Example:
 //
-//      ypObject *items[] = obj_array_init(5, rand_obj_any());
+//      uniqueness_t *uq = uniqueness_new();
+//      ypObject *items[] = obj_array_init(5, rand_obj_any(uq));
 #define obj_array_init(n, expression) {_COMMA_REPEAT##n((expression))}
 
-// Fills the ypObject * array using the given filler. Only call for arrays of fixed size (uses
+// Fills the ypObject* array using the given filler. Only call for arrays of fixed size (uses
 // yp_lengthof_array). Example:
 //
+//      uniqueness_t *uq = uniqueness_new();
 //      ypObject *items[5];
-//      obj_array_fill(items, type->rand_items);
-#define obj_array_fill(array, filler) (filler)(yp_lengthof_array(array), (array))
+//      obj_array_fill(items, uq, type->rand_items);
+#define obj_array_fill(array, uq, filler) (filler)((uq), yp_lengthof_array(array), (array))
 
-// Discards all references in the ypObject * array of length n. Skips NULL elements.
+// Discards all references in the ypObject* array of length n. Skips NULL elements.
 extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 
-// Discards all references in the ypObject * array. Skips NULL elements. Only call for arrays of
+// Discards all references in the ypObject* array. Skips NULL elements. Only call for arrays of
 // fixed size (uses yp_lengthof_array).
 #define obj_array_decref(array) obj_array_decref2(yp_lengthof_array(array), (array))
 

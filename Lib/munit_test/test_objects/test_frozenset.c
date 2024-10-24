@@ -32,9 +32,10 @@ typedef union {
 static void _test_newN(
         fixture_type_t *type, ypObject *(*any_newN)(int, ...), int test_exception_passthrough)
 {
-    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    uniqueness_t      *uq = uniqueness_new();
+    hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Basic newN.
     {
@@ -70,7 +71,7 @@ static void _test_newN(
 
     // Unhashable argument.
     {
-        ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
+        ypObject *unhashable = rand_obj_any_mutable(uq);
         assert_raises(any_newN(N(unhashable)), yp_TypeError);
         assert_raises(any_newN(N(items[0], unhashable)), yp_TypeError);
         assert_raises(any_newN(N(items[0], items[1], unhashable)), yp_TypeError);
@@ -95,6 +96,7 @@ static void _test_newN(
 
     obj_array_decref(items);
     yp_decrefN(N(pair.unhashable, pair.hashable));
+    uniqueness_dealloc(uq);
 }
 
 static void _test_new(
@@ -103,10 +105,11 @@ static void _test_new(
     fixture_type_t    *x_types[] = x_types_init();
     fixture_type_t    *friend_types[] = friend_types_init();
     fixture_type_t   **x_type;
-    hashability_pair_t pair = rand_obj_any_hashability_pair();
-    ypObject          *not_iterable = rand_obj_any_not_iterable();
+    uniqueness_t      *uq = uniqueness_new();
+    hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
+    ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Basic new.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
@@ -138,7 +141,7 @@ static void _test_new(
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (!(*x_type)->hashable_items_only) {
-            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
+            ypObject *unhashable = rand_obj_any_mutable(uq);
             ead(x, (*x_type)->newN(N(unhashable)), assert_raises(any_new(x), yp_TypeError));
             ead(x, (*x_type)->newN(N(items[0], unhashable)),
                     assert_raises(any_new(x), yp_TypeError));
@@ -195,6 +198,7 @@ static void _test_new(
 
     obj_array_decref(items);
     yp_decrefN(N(not_iterable, pair.unhashable, pair.hashable));
+    uniqueness_dealloc(uq);
 }
 
 static ypObject *newN_to_frozensetNV(int n, ...)
@@ -335,9 +339,10 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     fixture_type_t *type = fixture->type;
     ypObject *(*newN_to_call_type)(int, ...);
     ypObject *(*new_to_call_type)(ypObject *);
-    ypObject *str_iterable = yp_str_frombytesC2(-1, "iterable");
-    ypObject *str_cls = yp_str_frombytesC2(-1, "cls");
-    ypObject *str_rand = rand_obj(fixture_type_str);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *str_iterable = yp_str_frombytesC2(-1, "iterable");
+    ypObject     *str_cls = yp_str_frombytesC2(-1, "cls");
+    ypObject     *str_rand = rand_obj(uq, fixture_type_str);
 
     if (type->type == yp_t_frozenset) {
         newN_to_call_type = newN_to_call_t_frozenset;
@@ -386,6 +391,7 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     assert_isexception(yp_callN(type->type, N(yp_SyntaxError)), yp_SyntaxError);
 
     yp_decrefN(N(str_iterable, str_cls, str_rand));
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -397,8 +403,9 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     define_frozenset_mi_state(keysleft_2_index_0, 2, 0);
     define_frozenset_mi_state(keysleft_1_index_0, 1, 0);
     define_frozenset_mi_state(keysleft_0_index_0, 0, 0);
-    ypObject *items[2];
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[2];
+    obj_array_fill(items, uq, type->rand_items);
 
     // Corrupted states.
     {
@@ -439,6 +446,7 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     }
 
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 

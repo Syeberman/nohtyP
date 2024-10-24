@@ -24,8 +24,9 @@
 // the miniiter.
 static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
 {
-    ypObject *items[2];
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[2];
+    obj_array_fill(items, uq, type->rand_items);
 
     // iters created with a specific number of items should have exact length hints.
     {
@@ -44,6 +45,7 @@ static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
     }
 
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_iter(const MunitParameter params[], fixture_t *fixture)
@@ -55,8 +57,9 @@ static MunitResult test_iter(const MunitParameter params[], fixture_t *fixture)
 static MunitResult test_iter_keys(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Only mapping types support yp_iter_keys.
     if (!type->is_mapping) {
@@ -71,14 +74,16 @@ static MunitResult test_iter_keys(const MunitParameter params[], fixture_t *fixt
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_iter_values(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Only mapping types support yp_iter_values.
     if (!type->is_mapping) {
@@ -93,14 +98,16 @@ static MunitResult test_iter_values(const MunitParameter params[], fixture_t *fi
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_iter_items(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Only mapping types support yp_iter_items.
     if (!type->is_mapping) {
@@ -115,6 +122,7 @@ static MunitResult test_iter_items(const MunitParameter params[], fixture_t *fix
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -122,8 +130,9 @@ tear_down:
 static void _test_miniiter(
         fixture_type_t *type, ypObject *(*any_miniiter)(ypObject *, yp_uint64_t *))
 {
-    ypObject *items[2];
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[2];
+    obj_array_fill(items, uq, type->rand_items);
 
     // miniiters created with a specific number of items should have exact length hints.
     {
@@ -143,6 +152,7 @@ static void _test_miniiter(
     }
 
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixture)
@@ -154,8 +164,9 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
 static MunitResult test_miniiter_keys(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Only mapping types support yp_miniiter_keys.
     if (!type->is_mapping) {
@@ -171,14 +182,16 @@ static MunitResult test_miniiter_keys(const MunitParameter params[], fixture_t *
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_miniiter_values(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Only mapping types support yp_miniiter_values.
     if (!type->is_mapping) {
@@ -194,14 +207,16 @@ static MunitResult test_miniiter_values(const MunitParameter params[], fixture_t
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_miniiter_items(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Only mapping types support yp_miniiter_items.
     if (!type->is_mapping) {
@@ -217,6 +232,7 @@ static MunitResult test_miniiter_items(const MunitParameter params[], fixture_t 
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
