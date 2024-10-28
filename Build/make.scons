@@ -180,7 +180,8 @@ def nohtyP_checkapi(env):
 
 python_3 = SCons.Tool.Tool("python_3")
 # python_test requires at least Python 3.8.
-python_min_38 = SCons.Tool.Tool("python_min_38")
+# TODO Python 3.13 removed a bunch of deprecated functions: https://bugs.python.org/issue5846
+python_38_to_312 = SCons.Tool.Tool("python_38_to_312")
 pclint = SCons.Tool.Tool("pclint")
 
 
@@ -215,7 +216,7 @@ def MakeCompilerTargets(compilerEnv):
                 nohtyP_python_test(
                     compilerEnv.Clone(
                         tools=[
-                            python_min_38,
+                            python_38_to_312,
                         ]
                     ),
                     sharedLib,

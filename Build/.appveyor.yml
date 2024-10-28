@@ -43,10 +43,11 @@ matrix:
       platform: x86
 
 # Secure values are generated at https://ci.appveyor.com/tools/encrypt.
-# FIXME Ensure token is secure (and cycle token)
 environment:
   CODECOV_TOKEN:
-    secure: 2YMAr3uvG3H50SBYQMum7IPHXDycJOr0zNoxAhbqro0X6u5xTM0LCBQH1SmPiMyr
+    secure: 3q9hmH/cwPkDBNyqKyNK3f4jM784Xsu1KLw3Za/uzN8vgkXYYT/jVUKs1no9Y8hD
+  # Use this to refresh the cache; see https://www.appveyor.com/docs/build-cache.
+  # APPVEYOR_CACHE_SKIP_RESTORE: true
 
 # Ideally, each target is listed once, against the most-recent image that includes it.
 for:
@@ -97,32 +98,37 @@ for:
       # TODO Figure out why gcc_5:win32:amd64 isn't available
       YP_SKIP_TARGETS: gcc_5:win32:amd64 msvs_100:win32:amd64 msvs_90:win32:amd64
 
-init:
-  # Use this to refresh the cache; see https://www.appveyor.com/docs/build-cache.
-  # FIXME Refresh the cache before merging
-  # - pwsh: ${env:APPVEYOR_CACHE_SKIP_RESTORE} = "true"
-
+# XXX On Visual Studio 2017 (and 2015?), environment variables are not shared between pwsh's.
 install:
-  # FIXME Is 3.13 available on all Windows images? Docs say "no".
+  # TODO The Visual Studio 2017 and 2015 images stop at Python 3.8...which is EOL.
   - pwsh: |
-      if (! (Test-Path ".venv/bin/pip")) {
+      if (! (Test-Path ".venv/bin/Activate.ps1")) {
+        Write-Output "Creating virtual environment"
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -Path .venv
         if (${isWindows}) {
-          & C:/Python312-x64/python -m venv .venv
+          if (Test-Path "C:/Python312-x64/python") {
+            & "C:/Python312-x64/python" -m venv .venv
+          } else {
+            & "C:/Python38-x64/python" -m venv .venv
+          }
         } elseif (${isLinux}) {
           & "${HOME}/venv3.12/bin/python" -m venv .venv
         } elseif (${isMacOS}) {
-          & python3.12 -m venv .venv
+          & "python3.12" -m venv .venv
+        }
+        if (! $?) { throw "python -m venv returned an error" }
+
+        if (${isWindows}) {
+          Write-Output "Writing .venv/bin/Activate.ps1"
+          New-Item -ItemType Directory -Path ".venv/bin" | Out-Null
+          Write-Output ". `"`$`{PSScriptRoot`}/../Scripts/Activate.ps1`"" > ".venv/bin/Activate.ps1"
         }
       }
 
-      if (${isWindows}) {
-        . .venv/Scripts/Activate.ps1
-      } else {
-        . .venv/bin/Activate.ps1
-      }
-
-      pip -q install -U pip gcovr codecov-cli
+      Write-Output "Upgrading virtual environment"
+      . ".venv/bin/Activate.ps1"
+      & "python" -m pip -q install --upgrade --require-virtualenv pip gcovr codecov-cli
+      if (! $?) { throw "pip returned an error" }
   # Write out a Build/.appveyor.ps1 file containing common configurations.
   - pwsh: |
       Write-Output @'
@@ -153,6 +159,7 @@ install:
       }
       Write-Output "Targets: ${YP_TARGETS}"
 
+      . ".venv/bin/Activate.ps1"
       Build/make ${YP_TARGETS}
       if (! $?) { throw "Build/make returned an error" }
       '@ > Build/.appveyor.ps1
@@ -174,17 +181,18 @@ test_script:
         Write-Error ${PSItem}
         throw "tests failed"
       }
-  # FIXME gcovr.cfg?
-  # FIXME Excluded lines: https://github.com/gcovr/gcovr/issues/1008
   - pwsh: |
       if (${env:CONFIGURATION} -ne "Debug") { return }
       if (${env:YP_CI_CODECOV_UPLOAD} -ne "true") { return }
+
+      . ".venv/bin/Activate.ps1"
 
       Build/make coverage
       if (! $?) { throw "Build/make coverage returned an error" }
 
       New-Item -ItemType Directory -Path coverage.codecov/munit_test.gcov | Out-Null
       tar -x -z -f Build/native/coverage/munit_test.gcov.tar.gz -C coverage.codecov/munit_test.gcov/
+      if (! $?) { throw "tar returned an error" }
       gcovr --lcov coverage.codecov/munit_test.lcov --use-gcov-files coverage.codecov/munit_test.gcov/ --gcov-ignore-parse-errors
       if (! $?) { throw "gcovr returned an error" }
 
