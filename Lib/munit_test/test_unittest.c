@@ -38,6 +38,20 @@ static MunitResult test_PRI_formats(const MunitParameter params[], fixture_t *fi
 
 static MunitResult test_assert_setlike_helper(const MunitParameter params[], fixture_t *fixture)
 {
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[2];
+    obj_array_fill(items, uq, fixture_type_frozenset->rand_items);
+
+    // "mi is exhausted"
+    {
+        ypObject   *so = yp_frozensetN(0);
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(so, &mi_state);
+        ypObject   *actual;
+        assert_false(_assert_setlike_helper(mi, &mi_state, 0, NULL, &actual, NULL));
+        yp_decrefN(N(so, mi));
+    }
+
     // "yp_miniiter_next failed with an exception"
     {
         ypObject   *not_iterable = rand_obj_any_not_iterable(NULL);
@@ -48,13 +62,57 @@ static MunitResult test_assert_setlike_helper(const MunitParameter params[], fix
         yp_decref(not_iterable);
     }
 
-    // FIXME A few more tests.
+    // "equal item found, *items_i is less than n"
+    {
+        ypObject   *so = yp_frozensetN(N(items[0]));
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(so, &mi_state);
+        ypObject   *actual;
+        yp_ssize_t  items_i;
+        assert_true(_assert_setlike_helper(mi, &mi_state, 1, items, &actual, &items_i));
+        assert_obj(actual, eq, items[0]);
+        assert_ssizeC(items_i, ==, 0);
+        yp_decrefN(N(so, mi, actual));
+    }
 
+    // "equal item not found, *items_i is equal to n"
+    {
+        ypObject   *so = yp_frozensetN(N(items[1]));
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(so, &mi_state);
+        ypObject   *actual;
+        yp_ssize_t  items_i;
+        assert_true(_assert_setlike_helper(mi, &mi_state, 1, items, &actual, &items_i));
+        assert_obj(actual, eq, items[1]);
+        assert_ssizeC(items_i, ==, 1);
+        yp_decrefN(N(so, mi, actual));
+    }
+
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_assert_mapping_helper(const MunitParameter params[], fixture_t *fixture)
 {
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *keys[2];
+    ypObject     *values[2];
+    obj_array_fill(keys, uq, fixture_type_frozendict->rand_items);
+    obj_array_fill(values, uq, fixture_type_frozendict->rand_values);
+
+    // "mi is exhausted"
+    {
+        ypObject   *mp = yp_frozendictK(0);
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter_items(mp, &mi_state);
+        ypObject   *actual_key;
+        ypObject   *actual_value;
+        assert_false(
+                _assert_mapping_helper(mi, &mi_state, 0, NULL, &actual_key, &actual_value, NULL));
+        yp_decrefN(N(mp, mi));
+    }
+
     // "yp_miniiter_items_next failed with an exception"
     {
         ypObject   *not_iterable = rand_obj_any_not_iterable(NULL);
@@ -68,8 +126,43 @@ static MunitResult test_assert_mapping_helper(const MunitParameter params[], fix
         yp_decref(not_iterable);
     }
 
-    // FIXME A few more tests.
+    // "equal key found, *items_ki is less than k"
+    {
+        ypObject   *mp = yp_frozendictK(K(keys[0], values[0]));
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter_items(mp, &mi_state);
+        ypObject   *actual_key;
+        ypObject   *actual_value;
+        ypObject   *items[] = {keys[0], values[0]};  // borrowed refs
+        yp_ssize_t  items_ki;
+        assert_true(_assert_mapping_helper(
+                mi, &mi_state, 1, items, &actual_key, &actual_value, &items_ki));
+        assert_obj(actual_key, eq, keys[0]);
+        assert_obj(actual_value, eq, values[0]);
+        assert_ssizeC(items_ki, ==, 0);
+        yp_decrefN(N(mp, mi, actual_key, actual_value));
+    }
 
+    // "equal key not found, *items_ki is equal to k"
+    {
+        ypObject   *mp = yp_frozendictK(K(keys[1], values[1]));
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter_items(mp, &mi_state);
+        ypObject   *actual_key;
+        ypObject   *actual_value;
+        ypObject   *items[] = {keys[0], values[0]};  // borrowed refs
+        yp_ssize_t  items_ki;
+        assert_true(_assert_mapping_helper(
+                mi, &mi_state, 1, items, &actual_key, &actual_value, &items_ki));
+        assert_obj(actual_key, eq, keys[1]);
+        assert_obj(actual_value, eq, values[1]);
+        assert_ssizeC(items_ki, ==, 1);
+        yp_decrefN(N(mp, mi, actual_key, actual_value));
+    }
+
+    obj_array_decref(values);
+    obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
