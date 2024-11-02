@@ -9,7 +9,9 @@ from pathlib import Path
 
 
 # TODO SCons should have an easier way to disable output for a Delete.
-quietDelete = SCons.Action.ActionFactory(SCons.Defaults.Delete.actfunc, lambda x, y=0: "")
+quietDelete = SCons.Action.ActionFactory(
+    SCons.Defaults.Delete.actfunc, lambda x, y=0: ""
+)
 
 
 # Input environment variables (set in build scripts):
@@ -74,7 +76,9 @@ def CoverageAction(target, source, env):
         outFile = env.ReplaceIxes(
             dataFile, "COVDATAPREFIX", "COVDATASUFFIX", "COVOUTPREFIX", "COVOUTSUFFIX"
         )
-        if env.Execute(*env.subst(["$COVCOM", "$COVCOMSTR"], target=outFile, source=dataFile)):
+        if env.Execute(
+            *env.subst(["$COVCOM", "$COVCOMSTR"], target=outFile, source=dataFile)
+        ):
             env.Exit(1)
         outFiles.append(outFile)
 
@@ -91,13 +95,21 @@ def CoverageAction(target, source, env):
 
 def CoverageEmitter(target, source, env):
     archive, *others = SCons.Util.flatten(target)
-    archive = SCons.Util.adjustixes(str(archive), env.subst("$COVPREFIX"), env.subst("$COVSUFFIX"))
+    archive = SCons.Util.adjustixes(
+        str(archive), env.subst("$COVPREFIX"), env.subst("$COVSUFFIX")
+    )
     return [archive, *others], source
 
 
 def generate_CoverageBuilder(env):
     env["BUILDERS"]["Coverage"] = SCons.Builder.Builder(
-        action=SCons.Action.Action(CoverageAction, None),
+        action=SCons.Action.Action(
+            CoverageAction,
+            cmdstr=None,
+            # Trigger recompilation if any of these variables change. COVBRANCHFLAGS is listed
+            # separately because its presence in COVCOM may depend on which data file is analyzed.
+            varlist=["COVTESTACTION", "COVCOM", "COVBRANCHFLAGS"],
+        ),
         emitter=CoverageEmitter,
     )
 
@@ -119,5 +131,4 @@ def generate_CoverageBuilder(env):
         "--demangled-names",
         "--preserve-paths",
     ]
-    # FIXME Changes to covcom don't trigger recompilation
     env["COVCOM"] = "$COV $COVFLAGS --stdout $SOURCE > $TARGET"
