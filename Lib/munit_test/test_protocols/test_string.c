@@ -16,15 +16,16 @@ static void _test_findC(fixture_type_t *type,
         yp_ssize_t (*any_findC5)(ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, ypObject **),
         int forward, int raises)
 {
-    ypObject *items[3];
-    ypObject *string;
-    ypObject *other_0_1;
-    ypObject *other_1_2;
-    ypObject *other_0_2;
-    ypObject *other_1_0;
-    ypObject *empty = type->newN(0);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[3];
+    ypObject     *string;
+    ypObject     *other_0_1;
+    ypObject     *other_1_2;
+    ypObject     *other_0_2;
+    ypObject     *other_1_0;
+    ypObject     *empty = type->newN(0);
 
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
     string = type->newN(N(items[0], items[1], items[2]));
     // TODO Test against different "other" types (the other pair, really)
     other_0_1 = type->newN(N(items[0], items[1]));
@@ -72,6 +73,7 @@ static void _test_findC(fixture_type_t *type,
 
     obj_array_decref(items);
     yp_decrefN(N(string, empty, other_0_1, other_1_2, other_0_2, other_1_0));
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_findC(const MunitParameter params[], fixture_t *fixture)

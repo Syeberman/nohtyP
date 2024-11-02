@@ -1,7 +1,7 @@
 import python_common
 
 _generate, _exists = python_common.DefinePythonToolFunctions(
-    range(0x03080000, 0x04000000), __name__
+    range(0x03080000, 0x030D0000), __name__
 )
 
 # Define new functions so that we remain in any stack traces involving these functions

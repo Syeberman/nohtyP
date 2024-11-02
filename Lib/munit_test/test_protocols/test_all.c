@@ -20,7 +20,7 @@
 static MunitResult test_unsupported_protocols(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *self = rand_obj(type);
+    ypObject       *self = rand_obj(NULL, type);
 
     if (type != fixture_type_bool && !type->is_numeric && !type->is_sequence && !type->is_setlike) {
         assert_raises(yp_lt(self, self), yp_TypeError);

@@ -6,7 +6,9 @@ branches:
 
 skip_branch_with_pr: true
 
-cache: Build/site_toolsconfig.py
+cache:
+  - Build/site_toolsconfig.py
+  - .venv/
 
 deploy: off
 
@@ -29,6 +31,7 @@ configuration:
   - Build
 
 matrix:
+  fast_finish: true
   exclude:
     # TODO Are there any 32-bit compilers on the macOS images?
     - image: macOS-Sonoma
@@ -39,6 +42,13 @@ matrix:
     - image: Ubuntu
       platform: x86
 
+# Secure values are generated at https://ci.appveyor.com/tools/encrypt.
+environment:
+  CODECOV_TOKEN:
+    secure: 3q9hmH/cwPkDBNyqKyNK3f4jM784Xsu1KLw3Za/uzN8vgkXYYT/jVUKs1no9Y8hD
+  # Use this to refresh the cache; see https://www.appveyor.com/docs/build-cache.
+  # APPVEYOR_CACHE_SKIP_RESTORE: true
+
 # Ideally, each target is listed once, against the most-recent image that includes it.
 for:
   - matrix:
@@ -46,11 +56,12 @@ for:
         - image: Ubuntu2204
     environment:
       YP_COMPILER_OSES: gcc_11:posix gcc_10:posix gcc_9:posix
+      YP_CI_CODECOV_UPLOAD: true
   - matrix:
       only:
         - image: macOS-Sonoma
     environment:
-       YP_COMPILER_OSES: gcc_12:darwin gcc_11:darwin gcc_10:darwin
+      YP_COMPILER_OSES: gcc_12:darwin gcc_11:darwin gcc_10:darwin
   - matrix:
       only:
         - image: Visual Studio 2022
@@ -59,7 +70,7 @@ for:
       # TODO The docs say gcc_5:win32 is available, but it's not...
       # TODO Qt contains MinGW builds (MinGW 9.0.0 64 bit: C:\Qt\6.5.3\mingw_64)
       # TODO Qt contains MinGW builds (MinGW 8.1.0: C:\Qt\Tools\mingw810_32)
-       YP_COMPILER_OSES: gcc_8:win32
+      YP_COMPILER_OSES: gcc_8:win32
   - matrix:
       only:
         - image: Visual Studio 2019
@@ -87,45 +98,69 @@ for:
       # TODO Figure out why gcc_5:win32:amd64 isn't available
       YP_SKIP_TARGETS: gcc_5:win32:amd64 msvs_100:win32:amd64 msvs_90:win32:amd64
 
-init:
-  # Use this to refresh the cache; see https://www.appveyor.com/docs/build-cache.
-  # - pwsh: $env:APPVEYOR_CACHE_SKIP_RESTORE = "true"
-
+# XXX On Visual Studio 2017 (and 2015?), environment variables are not shared between pwsh's.
 install:
+  # TODO The Visual Studio 2017 and 2015 images stop at Python 3.8...which is EOL.
+  - pwsh: |
+      if (! (Test-Path ".venv/bin/Activate.ps1")) {
+        Write-Output "Creating virtual environment"
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -Path .venv
+        if (${isWindows}) {
+          if (Test-Path "C:/Python312-x64/python") {
+            & "C:/Python312-x64/python" -m venv .venv
+          } else {
+            & "C:/Python38-x64/python" -m venv .venv
+          }
+        } elseif (${isLinux}) {
+          & "${HOME}/venv3.12/bin/python" -m venv .venv
+        } elseif (${isMacOS}) {
+          & "python3.12" -m venv .venv
+        }
+        if (! $?) { throw "python -m venv returned an error" }
+
+        if (${isWindows}) {
+          Write-Output "Writing .venv/bin/Activate.ps1"
+          New-Item -ItemType Directory -Path ".venv/bin" | Out-Null
+          Write-Output ". `"`$`{PSScriptRoot`}/../Scripts/Activate.ps1`"" > ".venv/bin/Activate.ps1"
+        }
+      }
+
+      Write-Output "Upgrading virtual environment"
+      . ".venv/bin/Activate.ps1"
+      & "python" -m pip -q install --upgrade --require-virtualenv pip gcovr codecov-cli
+      if (! $?) { throw "pip returned an error" }
   # Write out a Build/.appveyor.ps1 file containing common configurations.
   - pwsh: |
-      echo @'
-      $YP_ACTION = $args[0] # build, test, analyze, ...
-      if (! $YP_ACTION) { throw "missing 'action' argument to Build/.appveyor.ps1" }
-      if (! $env:YP_COMPILER_OSES) { throw "YP_COMPILER_OSES not set" }
-      $YP_COMPILER_OSES = -split $env:YP_COMPILER_OSES
-      $YP_SKIP_TARGETS = -split $env:YP_SKIP_TARGETS
-      switch ($env:PLATFORM) {
-        "x64" { $YP_ARCH = "amd64" }
-        "x86" { $YP_ARCH = "x86" }
-        default { throw "unknown platform $($env:PLATFORM)" }
+      Write-Output @'
+      ${YP_ACTION} = ${args}[0] # build, test, analyze, ...
+      if (! ${YP_ACTION}) { throw "missing 'action' argument to Build/.appveyor.ps1" }
+      if (! ${env:YP_COMPILER_OSES}) { throw "YP_COMPILER_OSES not set" }
+      ${YP_COMPILER_OSES} = -split ${env:YP_COMPILER_OSES}
+      ${YP_SKIP_TARGETS} = -split ${env:YP_SKIP_TARGETS}
+      switch (${env:PLATFORM}) {
+        "x64" { ${YP_ARCH} = "amd64" }
+        "x86" { ${YP_ARCH} = "x86" }
+        default { throw "unknown platform ${env:PLATFORM}" }
       }
-      switch ($env:CONFIGURATION) {
-        "Debug" { $YP_CONFIGURATION = "debug" }
-        "Build" { $YP_CONFIGURATION = "release" }
-        default { throw "unknown configuration $($env:CONFIGURATION)" }
+      switch (${env:CONFIGURATION}) {
+        "Debug" { ${YP_CONFIGURATION} = "debug" }
+        "Build" { ${YP_CONFIGURATION} = "release" }
+        default { throw "unknown configuration ${env:CONFIGURATION}" }
       }
 
-      if ($isWindows) { $env:Path = "C:/Python38-x64;$($env:Path)" }
-      if ($isLinux) { . $HOME/venv3.8/bin/activate.ps1 }
-
-      $YP_TARGETS = @()
-      foreach ($YP_COMPILER_OS in $YP_COMPILER_OSES) {
-        $YP_TARGET = "$($YP_ACTION):$($YP_COMPILER_OS):$($YP_ARCH):$($YP_CONFIGURATION)"
-        if ("$($YP_COMPILER_OS):$($YP_ARCH)" -in $YP_SKIP_TARGETS) {
-          echo "Skipping due to YP_SKIP_TARGETS: $($YP_TARGET)"
+      ${YP_TARGETS} = @()
+      foreach (${YP_COMPILER_OS} in ${YP_COMPILER_OSES}) {
+        ${YP_TARGET} = "${YP_ACTION}:${YP_COMPILER_OS}:${YP_ARCH}:${YP_CONFIGURATION}"
+        if ("${YP_COMPILER_OS}:${YP_ARCH}" -in ${YP_SKIP_TARGETS}) {
+          Write-Output "Skipping due to YP_SKIP_TARGETS: ${YP_TARGET}"
           continue
         }
-        $YP_TARGETS += "$($YP_TARGET)"
+        ${YP_TARGETS} += "${YP_TARGET}"
       }
+      Write-Output "Targets: ${YP_TARGETS}"
 
-      echo "Targets: $($YP_TARGETS)"
-      Build/make $($YP_TARGETS)
+      . ".venv/bin/Activate.ps1"
+      Build/make ${YP_TARGETS}
       if (! $?) { throw "Build/make returned an error" }
       '@ > Build/.appveyor.ps1
 
@@ -133,7 +168,7 @@ build_script:
   - pwsh: |
       try { Build/.appveyor.ps1 build }
       catch {
-        Write-Error $PSItem
+        Write-Error ${PSItem}
         throw "build failed"
       }
 
@@ -143,6 +178,23 @@ test_script:
       catch {
         7z a tests.log.zip Build/*/*/python_test.log Build/*/*/munit_test.log
         appveyor PushArtifact tests.log.zip
-        Write-Error $PSItem
+        Write-Error ${PSItem}
         throw "tests failed"
       }
+  - pwsh: |
+      if (${env:CONFIGURATION} -ne "Debug") { return }
+      if (${env:YP_CI_CODECOV_UPLOAD} -ne "true") { return }
+
+      . ".venv/bin/Activate.ps1"
+
+      Build/make coverage
+      if (! $?) { throw "Build/make coverage returned an error" }
+
+      New-Item -ItemType Directory -Path coverage.codecov/munit_test.gcov | Out-Null
+      tar -x -z -f Build/native/coverage/munit_test.gcov.tar.gz -C coverage.codecov/munit_test.gcov/
+      if (! $?) { throw "tar returned an error" }
+      gcovr --lcov coverage.codecov/munit_test.lcov --use-gcov-files coverage.codecov/munit_test.gcov/ --gcov-ignore-parse-errors
+      if (! $?) { throw "gcovr returned an error" }
+
+      codecovcli upload-process --file coverage.codecov/munit_test.lcov --name "AppVeyor ${env:APPVEYOR_BUILD_VERSION}" --flag munit_test --fail-on-error --plugin noop --disable-search
+      if (! $?) { throw "codecovcli returned an error" }

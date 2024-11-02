@@ -213,7 +213,7 @@ def ApplyGCCOptions(env, version):
         # Source/assembly listing (.s) TODO preprocessed?
         # "-Wa,-alns=${TARGET.base}.s",
     )
-    if env["CONFIGURATION"] in ("debug", "coverage"):
+    if env["CONFIGURATION"] == "debug":
         addCcFlags(
             # Disable (non-debuggable) optimizations
             # gcc 7.0 (and previous) on Linux, Windows, and Mac all crash with -Og:
@@ -226,12 +226,23 @@ def ApplyGCCOptions(env, version):
             # Runtime check: stack overflow
             # XXX Not supported on Windows: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90458#c4
             # TODO Stack overflow detection should possibly always be enabled.
-            "-fstack-clash-protection"
-            if version >= 8 and _platform_name != "win32"
-            else "-fstack-check",
+            (
+                "-fstack-clash-protection"
+                if version >= 8 and _platform_name != "win32"
+                else "-fstack-check"
+            ),
             # Runtime check: buffer overflow (needs -fmudflap to linker)
             # TODO Not supported on MinGW/Windows, apparently
             # "-fmudflapth",
+        )
+    elif env["CONFIGURATION"] == "coverage":
+        addCcFlags(
+            # Disable all optimizations
+            "-O0",
+            # Instrument code for coverage analysis
+            "--coverage",
+            # Use absolute path names in the .gcno files
+            "-fprofile-abs-path",
         )
     else:
         addCcFlags(
@@ -244,11 +255,6 @@ def ApplyGCCOptions(env, version):
             # Optimize whole program (needs -flto to linker): conflicts with -g
             # https://gcc.gnu.org/onlinedocs/gcc-4.9.0/gcc/Optimize-Options.html
             # "-flto",
-        )
-    if env["CONFIGURATION"] == "coverage":
-        addCcFlags(
-            "--coverage",
-            "-fprofile-abs-path",
         )
 
     # Disable frame-pointer omission (ie frame pointers will be available on all builds)
@@ -290,22 +296,30 @@ def ApplyGCCOptions(env, version):
         # not available by default. So link these libraries statically.
         "-static" if env["TARGET_OS"] == "win32" else "",
         # Create a mapfile (.map)
-        "-Wl,-map,${TARGET.base}.map"
-        if _platform_name == "darwin"
-        else "-Wl,-Map,${TARGET.base}.map",
+        (
+            "-Wl,-map,${TARGET.base}.map"
+            if _platform_name == "darwin"
+            else "-Wl,-Map,${TARGET.base}.map"
+        ),
         # TODO Version stamp?
     )
     if env["TARGET_ARCH"] == "x86":
         # Large address aware (>2GB)
         addLinkFlags("-Wl,--large-address-aware")
-    if env["CONFIGURATION"] in ("debug", "coverage"):
+    if env["CONFIGURATION"] == "debug":
         addLinkFlags(
             # Disable (non-debuggable) optimizations
             "-Og" if version >= 4.8 else "-O0",
             # Runtime check: buffer overflow (needs -fmudflap* to compiler)
             # TODO Not supported on MinGW/Windows, apparently
             # "-fmudflap",
-            "--coverage" if env["CONFIGURATION"] == "coverage" else "",
+        )
+    if env["CONFIGURATION"] == "coverage":
+        addLinkFlags(
+            # Disable all optimizations
+            "-O0",
+            # Instrument code for coverage analysis
+            "--coverage",
         )
     else:
         addLinkFlags(
@@ -376,14 +390,24 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
         if not env.WhereIs("$CC"):
             raise SCons.Errors.StopError(f"{gcc_name_arch} configuration failed")
 
-        def check_version(env, output, unique=True):
+        def check_cc_version(env, output, unique=True):
             output = output.strip()
             if re_version.fullmatch(output) is None:
                 raise SCons.Errors.StopError(
                     f"tried finding {gcc_name}, found {output} instead"
                 )
 
-        env.ParseConfig("$CC -dumpfullversion -dumpversion", check_version)
+        def check_cov_version(env, output, unique=True):
+            # First line: gcov (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 13.2.0
+            output = output.splitlines()[0].strip().split()[-1]
+            if re_version.fullmatch(output) is None:
+                raise SCons.Errors.StopError(
+                    f"tried finding gcov for {gcc_name}, found {output} instead"
+                )
+
+        env.ParseConfig("$CC -dumpfullversion -dumpversion", check_cc_version)
+        if env["CONFIGURATION"] == "coverage":
+            env.ParseConfig("$COV --version", check_cov_version)
 
         ApplyGCCOptions(env, numericVersion)
 

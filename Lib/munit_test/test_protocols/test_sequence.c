@@ -23,8 +23,9 @@ typedef struct _slice_args_t {
 static MunitResult test_contains(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Previously-deleted item.
     if (type->is_mutable) {
@@ -37,6 +38,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     }
 
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -46,13 +48,14 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
+    uniqueness_t    *uq = uniqueness_new();
+    ypObject        *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject        *items[4];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // range stores integers following a pattern, so doesn't support concat.
     if (type->is_patterned) {
-        ypObject *sq = rand_obj(type);
+        ypObject *sq = type->newN(N(items[0], items[1]));
         assert_raises(yp_concat(sq, sq), yp_TypeError);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
@@ -194,6 +197,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(not_iterable));
     return MUNIT_OK;
 }
@@ -201,12 +205,13 @@ tear_down:
 static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // range stores integers following a pattern, so doesn't support repeat.
     if (type->is_patterned) {
-        ypObject *sq = rand_obj(type);
+        ypObject *sq = type->newN(N(items[0], items[1]));
         assert_raises(yp_repeatC(sq, 2), yp_TypeError);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
@@ -299,16 +304,18 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static void _test_getindexC(
         fixture_type_t *type, ypObject *(*any_getindexC)(ypObject *, yp_ssize_t))
 {
-    ypObject *items[2];
-    ypObject *sq;
-    ypObject *empty = type->newN(0);
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[2];
+    ypObject     *sq;
+    ypObject     *empty = type->newN(0);
+    obj_array_fill(items, uq, type->rand_items);
     sq = type->newN(N(items[0], items[1]));
 
     // Basic index.
@@ -350,6 +357,7 @@ static void _test_getindexC(
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(sq, empty));
 }
 
@@ -362,9 +370,10 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
 static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[5];
     ypObject       *sq;
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
     sq = type->newN(N(items[0], items[1], items[2], items[3], items[4]));
 
     // Basic slice.
@@ -530,6 +539,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
 
     yp_decref(sq);
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -544,11 +554,12 @@ static ypObject *getindexC_to_getitem(ypObject *sq, yp_ssize_t i)
 static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[2];
     ypObject       *sq;
     ypObject       *empty = type->newN(0);
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
     sq = type->newN(N(items[0], items[1]));
 
     // Shared tests.
@@ -567,6 +578,7 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(sq, empty, intstore_0));
     return MUNIT_OK;
 }
@@ -574,6 +586,7 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
 static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *int_0 = yp_intC(0);
     ypObject       *int_1 = yp_intC(1);
     ypObject       *int_2 = yp_intC(2);
@@ -586,7 +599,7 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     ypObject       *items[3];
     ypObject       *sq;
     ypObject       *empty = type->newN(0);
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
     sq = type->newN(N(items[0], items[1]));
 
     // Basic index.
@@ -647,6 +660,7 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(sq, empty, int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
             int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
@@ -658,10 +672,11 @@ static void _test_findC(fixture_type_t *type,
         yp_ssize_t (*any_findC5)(ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, ypObject **),
         int forward, int raises)
 {
-    ypObject *items[3];
-    ypObject *sq;
-    ypObject *empty = type->newN(0);
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[3];
+    ypObject     *sq;
+    ypObject     *empty = type->newN(0);
+    obj_array_fill(items, uq, type->rand_items);
     sq = type->newN(N(items[0], items[1]));
 
 #define assert_not_found_exc(expression)            \
@@ -811,6 +826,7 @@ static void _test_findC(fixture_type_t *type,
 #undef assert_not_found_exc
 
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(sq, empty));
 }
 
@@ -841,10 +857,11 @@ static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixtur
 static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[3];
     ypObject       *sq;
     ypObject       *empty = type->newN(0);
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
     sq = type->newN(N(items[0], items[1]));
 
     // Basic count.
@@ -972,6 +989,7 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(sq, empty));
     return MUNIT_OK;
 }
@@ -979,8 +997,9 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
 static void _test_setindexC(fixture_type_t *type,
         void (*any_setindexC)(ypObject *, yp_ssize_t, ypObject *, ypObject **))
 {
-    ypObject *items[4];
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[4];
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support setindex.
     if (!type->is_mutable) {
@@ -1081,6 +1100,7 @@ static void _test_setindexC(fixture_type_t *type,
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixture)
@@ -1092,11 +1112,12 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
 static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
+    uniqueness_t    *uq = uniqueness_new();
+    ypObject        *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject        *items[11];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support setslice.
     if (!type->is_mutable) {
@@ -1374,6 +1395,7 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(not_iterable));
     return MUNIT_OK;
 }
@@ -1388,12 +1410,13 @@ static void setindexC_to_setitem(ypObject *sq, yp_ssize_t i, ypObject *x, ypObje
 static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[4];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Shared tests.
-    _test_setindexC(fixture->type, yp_setindexC);
+    _test_setindexC(fixture->type, setindexC_to_setitem);
 
     // Remaining tests only apply to mutable objects.
     if (!type->is_mutable) goto tear_down;
@@ -1424,6 +1447,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(intstore_0));
     return MUNIT_OK;
 }
@@ -1431,8 +1455,9 @@ tear_down:
 static void _test_delindexC(fixture_type_t *type,
         void (*any_delindexC)(ypObject *, yp_ssize_t, ypObject **), int raises)
 {
-    ypObject *items[4];
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[4];
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support delindex.
     if (!type->is_mutable) {
@@ -1515,6 +1540,7 @@ static void _test_delindexC(fixture_type_t *type,
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixture)
@@ -1532,8 +1558,9 @@ static MunitResult test_dropindexC(const MunitParameter params[], fixture_t *fix
 static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[9];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support delslice.
     if (!type->is_mutable) {
@@ -1659,6 +1686,7 @@ static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixt
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -1666,9 +1694,10 @@ static void _test_delitem(fixture_type_t *type,
         void (*any_delindexC)(ypObject *, yp_ssize_t, ypObject **),
         void (*any_delitem)(ypObject *, ypObject *, ypObject **), int raises)
 {
-    ypObject *intstore_0 = yp_intstoreC(0);
-    ypObject *items[4];
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *intstore_0 = yp_intstoreC(0);
+    ypObject     *items[4];
+    obj_array_fill(items, uq, type->rand_items);
 
     // Shared tests.
     _test_delindexC(type, any_delindexC, raises);
@@ -1702,6 +1731,7 @@ static void _test_delitem(fixture_type_t *type,
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(intstore_0));
 }
 
@@ -1735,8 +1765,9 @@ static MunitResult test_dropitem(const MunitParameter params[], fixture_t *fixtu
 static void _test_appendC(
         fixture_type_t *type, void (*any_append)(ypObject *, ypObject *, ypObject **))
 {
-    ypObject *items[3];
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[3];
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support append.
     if (!type->is_mutable) {
@@ -1796,6 +1827,7 @@ static void _test_appendC(
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_append(const MunitParameter params[], fixture_t *fixture)
@@ -1815,9 +1847,10 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
+    uniqueness_t    *uq = uniqueness_new();
+    ypObject        *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject        *items[4];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support extend.
     if (!type->is_mutable) {
@@ -1944,6 +1977,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(not_iterable));
     return MUNIT_OK;
 }
@@ -1951,8 +1985,9 @@ tear_down:
 static MunitResult test_irepeatC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support irepeat.
     if (!type->is_mutable) {
@@ -2023,14 +2058,16 @@ static MunitResult test_irepeatC(const MunitParameter params[], fixture_t *fixtu
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support insert.
     if (!type->is_mutable) {
@@ -2132,14 +2169,16 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support popindex.
     if (!type->is_mutable) {
@@ -2229,14 +2268,16 @@ static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixt
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support pop.
     if (!type->is_mutable) {
@@ -2285,6 +2326,7 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -2292,8 +2334,9 @@ tear_down:
 static void _test_remove(
         fixture_type_t *type, void (*any_remove)(ypObject *, ypObject *, ypObject **), int raises)
 {
-    ypObject *items[3];
-    obj_array_fill(items, type->rand_items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[3];
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support remove.
     if (!type->is_mutable) {
@@ -2394,6 +2437,7 @@ static void _test_remove(
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture)
@@ -2411,8 +2455,9 @@ static MunitResult test_discard(const MunitParameter params[], fixture_t *fixtur
 static MunitResult test_reverse(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[3];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support reverse.
     if (!type->is_mutable) {
@@ -2469,17 +2514,19 @@ static MunitResult test_reverse(const MunitParameter params[], fixture_t *fixtur
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *int_0 = yp_intC(0);
     ypObject       *int_1 = yp_intC(1);
     ypObject       *int_2 = yp_intC(2);
     ypObject       *items[2];
-    obj_array_fill(items, type->rand_items);
+    obj_array_fill(items, uq, type->rand_items);
 
     // Sort is only implemented for list; it's not currently part of the sequence protocol.
     if (type->type != yp_t_list) {
@@ -2503,6 +2550,7 @@ static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
 
 tear_down:
     obj_array_decref(items);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(int_0, int_1, int_2));
     return MUNIT_OK;
 }

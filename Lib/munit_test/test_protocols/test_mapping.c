@@ -21,8 +21,9 @@ static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
 static MunitResult test_contains(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[2];
-    obj_array_fill(keys, type->rand_items);
+    obj_array_fill(keys, uq, type->rand_items);
 
     // Previously-deleted key.
     if (type->is_mutable) {
@@ -37,7 +38,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     // Item is unhashable.
     {
         ypObject *mp = type->newN(N(keys[0], keys[1]));
-        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        ypObject *unhashable = rand_obj_any_mutable(uq);
         assert_obj(yp_contains(mp, unhashable), is, yp_False);
         assert_obj(yp_in(unhashable, mp), is, yp_False);
         assert_obj(yp_not_in(unhashable, mp), is, yp_True);
@@ -46,7 +47,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
 
     // An unhashable x should match the equal key in mp.
     {
-        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
         ypObject          *mp = type->newN(N(pair.hashable));
         assert_obj(yp_contains(mp, pair.unhashable), is, yp_True);
         assert_obj(yp_in(pair.unhashable, mp), is, yp_True);
@@ -55,6 +56,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     }
 
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -62,16 +64,17 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
 static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t *x_type,
         ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject                   *expected)
 {
-    ypObject *keys[2];
-    ypObject *values[2];
-    ypObject *mp;
-    ypObject *empty = type->newK(0);
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *keys[2];
+    ypObject     *values[2];
+    ypObject     *mp;
+    ypObject     *empty = type->newK(0);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
     mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
 
-    ead(x, rand_obj(x_type), assert_obj(any_cmp(mp, x), is, expected));
-    ead(x, rand_obj(x_type), assert_obj(any_cmp(empty, x), is, expected));
+    ead(x, rand_obj(NULL, x_type), assert_obj(any_cmp(mp, x), is, expected));
+    ead(x, rand_obj(NULL, x_type), assert_obj(any_cmp(empty, x), is, expected));
 
     if (x_type->is_collection) {
         ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1])),
@@ -84,16 +87,18 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
 
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(mp, empty));
 }
 
 static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
         ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_same, ypObject *x_different)
 {
-    ypObject *keys[4];
-    ypObject *values[4];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *keys[4];
+    ypObject     *values[4];
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Non-empty mp.
     {
@@ -225,7 +230,7 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
         ypObject  *h_values[4];  // hashable values
         ypObject  *mp;
         ypObject  *empty = type->newK(0);
-        obj_array_fill(h_values, type->rand_items);  // use rand_items to get hashable values
+        obj_array_fill(h_values, uq, type->rand_items);  // use rand_items to get hashable values
         mp = type->newK(K(keys[0], h_values[0], keys[1], h_values[1]));
 
         // Run the tests twice: once where mp has not cached the hash, and once where it has.
@@ -281,6 +286,7 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
 
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
@@ -338,14 +344,15 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
 static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[3];
     ypObject       *values[3];
     ypObject       *unhashable;
     ypObject       *mp;
     ypObject       *empty = type->newK(0);
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
-    unhashable = rand_obj_any_mutable_unique(2, keys);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
+    unhashable = rand_obj_any_mutable(uq);
     mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
 
     // Basic key.
@@ -376,7 +383,7 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
 
     // An unhashable key should match the equal key in mp.
     {
-        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
         ypObject          *mp_pair = type->newK(K(pair.hashable, values[0]));
         ead(value, yp_getitem(mp_pair, pair.unhashable), assert_obj(value, eq, values[0]));
         yp_decrefN(N(pair.hashable, pair.unhashable, mp_pair));
@@ -396,6 +403,7 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
 
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(unhashable, mp, empty));
     return MUNIT_OK;
 }
@@ -403,14 +411,15 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
 static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[3];
     ypObject       *values[3];
     ypObject       *unhashable;
     ypObject       *mp;
     ypObject       *empty = type->newK(0);
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
-    unhashable = rand_obj_any_mutable_unique(2, keys);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
+    unhashable = rand_obj_any_mutable(uq);
     mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
 
     // Basic key.
@@ -445,7 +454,7 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 
     // An unhashable key should match the equal key in mp.
     {
-        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
         ypObject          *mp_pair = type->newK(K(pair.hashable, values[0]));
         ead(value, yp_getdefault(mp_pair, pair.unhashable, values[2]),
                 assert_obj(value, eq, values[0]));
@@ -469,6 +478,7 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(unhashable, mp, empty));
     return MUNIT_OK;
 }
@@ -476,10 +486,11 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[3];
     ypObject       *values[3];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Immutables don't support setitem.
     if (!type->is_mutable) {
@@ -544,7 +555,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     // key is unhashable.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        ypObject *unhashable = rand_obj_any_mutable(uq);
         assert_raises_exc(yp_setitem(mp, unhashable, values[2], &exc), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp, unhashable));
@@ -552,7 +563,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 
     // Unhashable keys should always cause TypeError, even if that key is already in mp.
     {
-        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
         ypObject          *mp = type->newK(K(pair.hashable, values[0]));
         assert_raises_exc(yp_setitem(mp, pair.unhashable, values[2], &exc), yp_TypeError);
         assert_mapping(mp, pair.hashable, values[0]);
@@ -571,16 +582,18 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static void _test_delitem(
         fixture_type_t *type, void (*any_delitem)(ypObject *, ypObject *, ypObject **), int raises)
 {
-    ypObject *keys[3];
-    ypObject *values[3];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *keys[3];
+    ypObject     *values[3];
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Immutables don't support delitem.
     if (!type->is_mutable) {
@@ -647,7 +660,7 @@ static void _test_delitem(
     // key is unhashable.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        ypObject *unhashable = rand_obj_any_mutable(uq);
         assert_not_found_exc(any_delitem(mp, unhashable, &exc));
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp, unhashable));
@@ -655,7 +668,7 @@ static void _test_delitem(
 
     // An unhashable key should match the equal key in mp.
     {
-        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
         ypObject          *mp = type->newK(K(pair.hashable, values[0]));
         assert_not_raises_exc(any_delitem(mp, pair.unhashable, &exc));
         assert_len(mp, 0);
@@ -675,6 +688,7 @@ static void _test_delitem(
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
 }
 
 static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixture)
@@ -692,10 +706,11 @@ static MunitResult test_dropitem(const MunitParameter params[], fixture_t *fixtu
 static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[4];
     ypObject       *values[4];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Immutables don't support popvalue.
     if (!type->is_mutable) {
@@ -768,7 +783,7 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
     // key is unhashable.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
-        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        ypObject *unhashable = rand_obj_any_mutable(uq);
         ead(value, yp_popvalue3(mp, unhashable, values[3]), assert_obj(value, eq, values[3]));
         assert_raises(yp_popvalue2(mp, unhashable), yp_KeyError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
@@ -777,8 +792,8 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
 
     // An unhashable key should match the equal key in mp.
     {
-        hashability_pair_t pair0 = rand_obj_any_hashability_pair();
-        hashability_pair_t pair1 = rand_obj_any_hashability_pair();
+        hashability_pair_t pair0 = rand_obj_any_hashability_pair(uq);
+        hashability_pair_t pair1 = rand_obj_any_hashability_pair(uq);
         ypObject          *mp = type->newK(K(pair0.hashable, values[0], pair1.hashable, values[1]));
         ead(value, yp_popvalue3(mp, pair0.unhashable, values[3]), assert_obj(value, eq, values[0]));
         assert_mapping(mp, pair1.hashable, values[1]);
@@ -815,6 +830,7 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -822,10 +838,11 @@ static MunitResult test_popitem(const MunitParameter params[], fixture_t *fixtur
 {
     fixture_type_t *type = fixture->type;
     yp_ssize_t      i;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[6];
     ypObject       *values[6];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Immutables don't support popitem.
     if (!type->is_mutable) {
@@ -909,19 +926,21 @@ static MunitResult test_popitem(const MunitParameter params[], fixture_t *fixtur
         yp_decrefN(N(mp, key, value));
     }
 
-tear_down:
+tear_down:  // GCOVR_EXCL_LINE (I'm not sure why this is showing as not covered)
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[3];
     ypObject       *values[3];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Immutables don't support setdefault.
     if (!type->is_mutable) {
@@ -996,7 +1015,7 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
     // key is unhashable.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        ypObject *unhashable = rand_obj_any_mutable(uq);
         assert_raises(yp_setdefault(mp, unhashable, values[2]), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp, unhashable));
@@ -1004,7 +1023,7 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
 
     // Unhashable keys should always cause TypeError, even if that key is already in mp.
     {
-        hashability_pair_t pair = rand_obj_any_hashability_pair();
+        hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
         ypObject          *mp = type->newK(K(pair.hashable, values[0]));
         assert_raises(yp_setdefault(mp, pair.unhashable, values[2]), yp_TypeError);
         assert_mapping(mp, pair.hashable, values[0]);
@@ -1032,17 +1051,19 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
 static void _test_updateK(fixture_type_t *type,
         void (*any_updateK)(ypObject *, ypObject **, int, ...), int test_unhashables)
 {
-    hashability_pair_t pair = rand_obj_any_hashability_pair();
+    uniqueness_t      *uq = uniqueness_new();
+    hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *keys[6];
     ypObject          *values[6];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Immutables don't support update.
     if (!type->is_mutable) {
@@ -1125,7 +1146,7 @@ static void _test_updateK(fixture_type_t *type,
     // key is unhashable.
     if (test_unhashables) {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        ypObject *unhashable = rand_obj_any_mutable(uq);
         assert_raises_exc(any_updateK(mp, &exc, K(unhashable, values[2])), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp, unhashable));
@@ -1157,6 +1178,7 @@ static void _test_updateK(fixture_type_t *type,
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(pair.hashable, pair.unhashable));
 }
 
@@ -1171,10 +1193,11 @@ static void updateK_to_updateKV(ypObject *mapping, ypObject **exc, int n, ...)
 static MunitResult test_updateK(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[6];
     ypObject       *values[6];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     // Shared tests.
     _test_updateK(type, yp_updateK, /*test_unhashables=*/TRUE);
@@ -1216,6 +1239,7 @@ static MunitResult test_updateK(const MunitParameter params[], fixture_t *fixtur
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -1301,11 +1325,12 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    ypObject        *not_iterable = rand_obj_any_not_iterable();
+    uniqueness_t    *uq = uniqueness_new();
+    ypObject        *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject        *keys[6];
     ypObject        *values[6];
-    obj_array_fill(keys, type->rand_items);
-    obj_array_fill(values, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(values, uq, type->rand_values);
 
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         void (*updateK)(ypObject *, ypObject **, int, ...);
@@ -1390,6 +1415,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
+    uniqueness_dealloc(uq);
     yp_decrefN(N(not_iterable));
     return MUNIT_OK;
 }

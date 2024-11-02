@@ -65,14 +65,18 @@ Native Arches: {native_archs}
     for compiler_name in compiler_names:
         compiler = SCons.Tool.Tool(compiler_name)
 
-        for targ_os, targ_arch, configuration in itertools.product(oses, archs, configurations):
+        for targ_os, targ_arch, configuration in itertools.product(
+            oses, archs, configurations
+        ):
             # TODO Support cross-compiling OSes, if possible
             if targ_os != native_os:
                 continue
 
-            is_native_target = (targ_os == native_os and targ_arch in native_archs)
+            is_native_target = targ_os == native_os and targ_arch in native_archs
 
-            SconscriptLog.write(f"\n{compiler_name} {targ_os} {targ_arch} {configuration}\n")
+            SconscriptLog.write(
+                f"\n{compiler_name} {targ_os} {targ_arch} {configuration}\n"
+            )
 
             try:
                 compilerEnv = rootEnv.Clone(
@@ -81,7 +85,7 @@ Native Arches: {native_archs}
                     TARGET_ARCH=targ_arch,
                     CONFIGURATION=configuration,
                     IS_NATIVE_TARGET=is_native_target,
-                    IS_INSTALL_TARGET= False, # possibly set to True below
+                    IS_INSTALL_TARGET=False,  # possibly set to True below
                     tools=[compiler, "tar"],
                 )
             except (SCons.Errors.UserError, SCons.Errors.StopError):
@@ -111,16 +115,14 @@ Native Arches: {native_archs}
             yield compilerEnv
 
 
-def _AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets):
+def _AddCompilerEnvAliases(
+    compilerEnv, buildTargets, testTargets, analyzeTargets, coverageTargets
+):
     compiler_name: str = compilerEnv["COMPILER"].name
     targ_os: str = compilerEnv["TARGET_OS"]
     targ_arch: str = compilerEnv["TARGET_ARCH"]
     configuration: str = compilerEnv["CONFIGURATION"]
     is_install_target: str = compilerEnv["IS_INSTALL_TARGET"]
-
-    # TODO Handle this differently?
-    if configuration == "coverage":
-        buildTargets += testTargets
 
     if is_install_target:
         if configuration == "release":
@@ -130,13 +132,16 @@ def _AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTarget
         buildTargets.append(compilerEnv.Install(native_dest, buildTargets))
         testTargets.append(compilerEnv.Install(native_dest, testTargets))
         analyzeTargets.append(compilerEnv.Install(native_dest, analyzeTargets))
+        coverageTargets.append(compilerEnv.Install(native_dest, coverageTargets))
 
         # Most developers only want to build or test with one variant on their host system.
         # These aliases make this easy. A full alias looks like `test:release`. The action
         # (`test`) defaults to `build`. The configuration (`release`) defaults to both
         # `release` and `debug`.
-        AliasIfNotEmpty(compilerEnv, configuration, buildTargets)
-        if configuration != "coverage":
+        if configuration == "coverage":
+            AliasIfNotEmpty(compilerEnv, configuration, coverageTargets)
+        else:
+            AliasIfNotEmpty(compilerEnv, configuration, buildTargets)
             AliasIfNotEmpty(compilerEnv, "build:" + configuration, buildTargets)
             AliasIfNotEmpty(compilerEnv, "test:" + configuration, testTargets)
             AliasIfNotEmpty(compilerEnv, "analyze:" + configuration, analyzeTargets)
@@ -152,7 +157,7 @@ def _AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTarget
     hierarchy = (compiler_name, targ_os, targ_arch, configuration)
     if configuration == "coverage":
         hierarchyName = ":".join(hierarchy)
-        AliasIfNotEmpty(compilerEnv, hierarchyName, buildTargets)
+        AliasIfNotEmpty(compilerEnv, hierarchyName, coverageTargets)
     else:
         AliasIfNotEmpty(compilerEnv, "all", buildTargets)
         AliasIfNotEmpty(compilerEnv, "build:all", buildTargets)
@@ -168,5 +173,9 @@ def _AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTarget
 
 def AddBuildTargets(rootEnv, makeTargets):
     for compilerEnv in _MakeCompilerEnvs(rootEnv):
-        buildTargets, testTargets, analyzeTargets = makeTargets(compilerEnv)
-        _AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets)
+        buildTargets, testTargets, analyzeTargets, coverageTargets = makeTargets(
+            compilerEnv
+        )
+        _AddCompilerEnvAliases(
+            compilerEnv, buildTargets, testTargets, analyzeTargets, coverageTargets
+        )

@@ -70,7 +70,9 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
         ],
     )
     env.Replace(
-        PDB="$VTOP/munit_test.pdb", CCCOMSTR="Compiling $TARGET", LINKCOMSTR="Linking $TARGET"
+        PDB="$VTOP/munit_test.pdb",
+        CCCOMSTR="Compiling $TARGET",
+        LINKCOMSTR="Linking $TARGET",
     )
     source = [
         "$VTOP/Tools/munit/munit.c",
@@ -83,12 +85,50 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
     return env.Program("$VTOP/munit_test", source=source)
 
 
+def maybe_cov_branch_flags(env, target):
+    """Disable branch coverage from the tests and libraries. Ideally we would collect all data,
+    including branch coverage, and then ignore it in the reports. Unfortunately, neither Gcovr nor
+    Codecov has this ability, so we configure this via Gcov options.
+    """
+    target = Path(str(target))
+    if target.is_relative_to(env.subst("$VTOP/Lib/munit_test/")):
+        return ""
+    if target.is_relative_to(env.subst("$VTOP/Tools/munit/")):
+        return ""
+    return "$COVBRANCHFLAGS"
+
+
+def CoverageCommand(env, *, cov_target, cmd_target, cmd_source, cmd_action):
+    """On coverage targets, calls the env.Coverage builder. Otherwise, calls the Command builder."""
+    if env.subst("$CONFIGURATION") != "coverage":
+        cov_node = []
+        cmd_node = env.Command(target=cmd_target, source=cmd_source, action=cmd_action)
+    else:
+        env.Replace(
+            COVDATADIR="$VTOP",
+            COVTESTACTION=cmd_action,
+            COVCOMSTR="Analyzing $SOURCE",
+            maybe_cov_branch_flags=maybe_cov_branch_flags,
+        )
+        env.Append(COVFLAGS=["${maybe_cov_branch_flags(__env__, TARGET)}"])
+        cov_node, cmd_node = env.Coverage(
+            target=(cov_target, cmd_target), source=cmd_source
+        )
+    return cov_node, cmd_node
+
+
 def nohtyP_python_test(env, sharedLib):
     env.PrependENVPath("PYTHONPATH", "#/Lib")
     env["ENV"]["NOHTYP_LIBRARY"] = GetSharedLibrary(env, sharedLib)
-    scripts = ("#/Lib/yp.py", env.Glob("#/Lib/python_test/*.py"), env.Glob("#/Lib/python_test/*.txt"))
+    scripts = (
+        "#/Lib/yp.py",
+        env.Glob("#/Lib/python_test/*.py"),
+        env.Glob("#/Lib/python_test/*.txt"),
+    )
     testLog = env.Command(
-        "$VTOP/python_test.log", (sharedLib, scripts), "$PYTHON -m python_test -v > $TARGET"
+        target="$VTOP/python_test.log",
+        source=(sharedLib, scripts),
+        action="$PYTHON -m python_test -v > $TARGET",
     )
     env.Clean(sharedLib, testLog)
     return testLog
@@ -97,18 +137,27 @@ def nohtyP_python_test(env, sharedLib):
 # Runs the munit_test suite.
 def nohtyP_munit_test(env, munit_test):
     munit_target = "$VTOP/munit_test.log"
-    env.Replace(MUNIT_TEST=GetProgram(env, munit_test), MUNIT_TARGET=munit_target)
+    env.Replace(
+        MUNIT_TEST=GetProgram(env, munit_test),
+        MUNIT_TARGET=munit_target,
+        MUNIT_FLAGS=[],
+    )
+
+    # Use a fixed seed for coverage analysis so we aren't trying to hit a moving target.
+    if env.subst("$CONFIGURATION") == "coverage":
+        env.Append(MUNIT_FLAGS=[["--seed", "0x69d6ab6c"]])
 
     # Assertion failures and status updates go to stderr (see MUNIT_OUTPUT_FILE above).
-    munit_action = "$MUNIT_TEST 2> $MUNIT_TARGET"
-    if env.subst("$CONFIGURATION") == "coverage":
-        env.Replace(COVDATADIR="$VTOP", COVTESTACTION=munit_action, COVCOMSTR="Analyzing $SOURCE")
-        testLogs = env.Coverage(target=("$VTOP/munit_test", munit_target), source=munit_test)
-    else:
-        testLogs = env.Command(target=munit_target, source=munit_test, action=munit_action)
+    cov_archive, test_log = CoverageCommand(
+        env,
+        cov_target="$VTOP/munit_test",
+        cmd_target=munit_target,
+        cmd_source=munit_test,
+        cmd_action="$MUNIT_TEST $MUNIT_FLAGS 2> $MUNIT_TARGET",
+    )
 
-    env.Clean(munit_test, testLogs)
-    return testLogs
+    env.Clean(munit_test, [cov_archive, test_log])
+    return cov_archive, test_log
 
 
 def nohtyP_checkapi(env):
@@ -117,22 +166,26 @@ def nohtyP_checkapi(env):
     # of standard headers that work well with pycparser.
     env.PrependUnique(CPPPATH=["#", "#/Include/fake_libc_include"], PDB="", LIBS="")
     headerDotC = env.Command(
-        "$VTOP/checkapi/nohtyP_h.c", "$VTOP/nohtyP.h", SCons.Defaults.Copy("$TARGET", "$SOURCE")
+        target="$VTOP/checkapi/nohtyP_h.c",
+        source="$VTOP/nohtyP.h",
+        action=SCons.Defaults.Copy("$TARGET", "$SOURCE"),
     )
     preprocessed = env.Preprocessed("$VTOP/checkapi/nohtyP_h", source=headerDotC)
 
     # TODO Have checkapi write directly to the file
     scripts = (env.Glob("#/Tools/checkapi/*.py"),)
     checkapiLog = env.Command(
-        "$VTOP/checkapi.log",
-        (preprocessed, scripts),
-        "$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET",
+        target="$VTOP/checkapi.log",
+        source=(preprocessed, scripts),
+        action="$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET",
     )
     return checkapiLog
 
 
 python_3 = SCons.Tool.Tool("python_3")
-python_min_38 = SCons.Tool.Tool("python_min_38")  # python_test requires at least Python 3.8
+# python_test requires at least Python 3.8.
+# TODO Python 3.13 removed a bunch of deprecated functions: https://bugs.python.org/issue5846
+python_38_to_312 = SCons.Tool.Tool("python_38_to_312")
 pclint = SCons.Tool.Tool("pclint")
 
 
@@ -142,7 +195,7 @@ def MakeCompilerTargets(compilerEnv):
     # checkapi requires Python 3, but so do our build scripts, so this should not raise errors.
     checkapi = nohtyP_checkapi(compilerEnv.Clone(tools=[python_3]))
 
-    # These collect all the build, test, and analysis targets, including:
+    # These collect all the build, test, analysis, and coverage targets, including:
     #   - the C and C# builds of the nohtyP shared library
     #   - python_test and ypExamples results
     #   - checkapi.py, PC-lint, expanded compiler warnings
@@ -150,15 +203,16 @@ def MakeCompilerTargets(compilerEnv):
     buildTargets = [sharedLib]
     testTargets = [sharedLib]
     analyzeTargets = [sharedLib, checkapi]
+    coverageTargets = [sharedLib]
 
     if compilerEnv["IS_NATIVE_TARGET"]:
         # We can only run munit_test on native OS and architectures.
-        testTargets.append(
-            nohtyP_munit_test(
-                compilerEnv.Clone(),
-                nohtyP_munit_test_Program_shared(compilerEnv.Clone(), sharedLib),
-            )
+        cov_archive, test_log = nohtyP_munit_test(
+            compilerEnv.Clone(),
+            nohtyP_munit_test_Program_shared(compilerEnv.Clone(), sharedLib),
         )
+        testTargets.append(test_log)
+        coverageTargets.append(cov_archive)
 
         # python_test requires a minimum version of Python.
         try:
@@ -166,7 +220,7 @@ def MakeCompilerTargets(compilerEnv):
                 nohtyP_python_test(
                     compilerEnv.Clone(
                         tools=[
-                            python_min_38,
+                            python_38_to_312,
                         ]
                     ),
                     sharedLib,
@@ -175,7 +229,7 @@ def MakeCompilerTargets(compilerEnv):
         except (SCons.Errors.UserError, SCons.Errors.StopError):
             traceback.print_exc(file=SconscriptLog)
 
-    return buildTargets, testTargets, analyzeTargets
+    return buildTargets, testTargets, analyzeTargets, coverageTargets
 
 
 AddBuildTargets(RootEnv, MakeCompilerTargets)
