@@ -201,18 +201,16 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         {
             ypObject *part1 = NULL;
             ypObject *part2 = NULL;
-            assert_raises_exc(
-                    yp_partition(self, self, &exc, &part1, &part2), yp_NotImplementedError);
-            assert_isexception(part1, yp_NotImplementedError);
-            assert_isexception(part2, yp_NotImplementedError);
+            assert_raises_exc(yp_partition(self, self, &exc, &part1, &part2), yp_MethodError);
+            assert_isexception(part1, yp_MethodError);
+            assert_isexception(part2, yp_MethodError);
         }
         {
             ypObject *part1 = NULL;
             ypObject *part2 = NULL;
-            assert_raises_exc(
-                    yp_rpartition(self, self, &exc, &part1, &part2), yp_NotImplementedError);
-            assert_isexception(part1, yp_NotImplementedError);
-            assert_isexception(part2, yp_NotImplementedError);
+            assert_raises_exc(yp_rpartition(self, self, &exc, &part1, &part2), yp_MethodError);
+            assert_isexception(part1, yp_MethodError);
+            assert_isexception(part2, yp_MethodError);
         }
         assert_raises(yp_splitC3(self, yp_None, 0), yp_MethodError);
         assert_raises(yp_split2(self, yp_None), yp_MethodError);

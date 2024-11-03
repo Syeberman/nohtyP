@@ -603,27 +603,27 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
 // needs to point to a valid function (as opposed to constantly checking for NULL)
 // clang-format off
 #define DEFINE_GENERIC_METHODS(name, retval) \
-    static ypObject *yp_UNUSED name ## _objproc(ypObject *x) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objobjobjproc(ypObject *x, ypObject *y, ypObject *z) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objobjintproc(ypObject *x, ypObject *y, int b) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objssizeproc(ypObject *x, yp_ssize_t i) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objssizeobjproc(ypObject *x, yp_ssize_t i, ypObject *y) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objssizeintproc(ypObject *x, yp_ssize_t i, int b) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objsliceproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objsliceobjproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objvalistproc(ypObject *x, int n, va_list args) { return retval; } \
-    static ypObject *yp_UNUSED name ## _objpobjpobjproc(ypObject *x, ypObject **key, ypObject **value) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objproc(ypObject *x) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objobjobjproc(ypObject *x, ypObject *y, ypObject *z) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objobjintproc(ypObject *x, ypObject *y, int b) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objssizeproc(ypObject *x, yp_ssize_t i) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objssizeobjproc(ypObject *x, yp_ssize_t i, ypObject *y) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objssizeintproc(ypObject *x, yp_ssize_t i, int b) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objsliceproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objsliceobjproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objvalistproc(ypObject *x, int n, va_list args) { return retval; } \
+    static yp_UNUSED ypObject * name ## _objpobjpobjproc(ypObject *x, ypObject **key, ypObject **value) { return retval; } \
     \
-    static ypObject *yp_UNUSED name ## _visitfunc(ypObject *x, void *memo) { return retval; } \
-    static ypObject *yp_UNUSED name ## _traversefunc(ypObject *x, visitfunc visitor, void *memo) { return retval; } \
-    static ypObject *yp_UNUSED name ## _hashfunc(ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash) { return retval; } \
-    static ypObject *yp_UNUSED name ## _miniiterfunc(ypObject *x, yp_uint64_t *state) { return retval; } \
-    static ypObject *yp_UNUSED name ## _miniiter_items_nextfunc(ypObject *x, yp_uint64_t *state, ypObject **key, ypObject **value) { return retval; } \
-    static ypObject *yp_UNUSED name ## _miniiter_lenhfunc(ypObject *x, yp_uint64_t *state, yp_ssize_t *length_hint) { return retval; } \
-    static ypObject *yp_UNUSED name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
-    static ypObject *yp_UNUSED name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
-    static ypObject *yp_UNUSED name ## _findfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index) { return retval; }
+    static yp_UNUSED ypObject * name ## _visitfunc(ypObject *x, void *memo) { return retval; } \
+    static yp_UNUSED ypObject * name ## _traversefunc(ypObject *x, visitfunc visitor, void *memo) { return retval; } \
+    static yp_UNUSED ypObject * name ## _hashfunc(ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash) { return retval; } \
+    static yp_UNUSED ypObject * name ## _miniiterfunc(ypObject *x, yp_uint64_t *state) { return retval; } \
+    static yp_UNUSED ypObject * name ## _miniiter_items_nextfunc(ypObject *x, yp_uint64_t *state, ypObject **key, ypObject **value) { return retval; } \
+    static yp_UNUSED ypObject * name ## _miniiter_lenhfunc(ypObject *x, yp_uint64_t *state, yp_ssize_t *length_hint) { return retval; } \
+    static yp_UNUSED ypObject * name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
+    static yp_UNUSED ypObject * name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
+    static yp_UNUSED ypObject * name ## _findfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index) { return retval; }
 // clang-format on
 
 DEFINE_GENERIC_METHODS(MethodError, yp_MethodError);  // for methods the type doesn't support
@@ -2758,7 +2758,8 @@ static int ypQuickSeq_new_fromsequence_builtins(
 // Initializes state with the given sequence, sets *methods to the proper method table to use, and
 // returns yp_None. On error, returns an exception, and *methods and state are undefined.
 // sequence is borrowed by state and must not be freed until methods->close is called.
-static ypObject *ypQuickSeq_new_fromsequence(
+// TODO Review if this will be useful or if it should be removed entirely.
+static yp_UNUSED ypObject *ypQuickSeq_new_fromsequence(
         const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *sequence)
 {
     if (ypQuickSeq_new_fromsequence_builtins(methods, state, sequence)) {
@@ -5821,7 +5822,7 @@ yp_int_t yp_asintC(ypObject *x, ypObject **exc)
     return_yp_CEXC_BAD_TYPE(0, exc, x);
 }
 
-// TODO Make this a public API? (all the yp_index_* functions.)
+// TODO Make all the yp_index_* functions public in nohtyP.h.
 // TODO Be consistent with Python's __index__.
 // Losslessly converts the integral object to a C integer. Raises yp_TypeError if x is not an
 // integral; in particular, a float will raise yp_TypeError.
@@ -5850,9 +5851,10 @@ static yp_int_t yp_index_asintC(ypObject *x, ypObject **exc)
         if ((yp_int_t)retval != asint) return_yp_CEXC_ERR(retval, exc, yp_OverflowError); \
         return retval;                                                                    \
     }
+// TODO Make all the yp_index_* functions public in nohtyP.h.
 #define _ypInt_PUBLIC_AS_C_FUNCTIONS(name, mask) \
     _ypInt_PUBLIC_AS_C_FUNCTION(, , name, mask)  \
-            _ypInt_PUBLIC_AS_C_FUNCTION(static, _index, name, mask)
+            _ypInt_PUBLIC_AS_C_FUNCTION(static yp_UNUSED, _index, name, mask)
 // clang-format off
 _ypInt_PUBLIC_AS_C_FUNCTIONS(int8,   0xFF);
 _ypInt_PUBLIC_AS_C_FUNCTIONS(uint8,  0xFFu);
@@ -5872,7 +5874,11 @@ yp_STATIC_ASSERT(yp_sizeof(yp_int_t) == 8, sizeof_yp_int);
 
 yp_int64_t yp_asint64C(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 
-static yp_int64_t yp_index_asint64C(ypObject *x, ypObject **exc) { return yp_index_asintC(x, exc); }
+// TODO Make all the yp_index_* functions public in nohtyP.h.
+static yp_UNUSED yp_int64_t yp_index_asint64C(ypObject *x, ypObject **exc)
+{
+    return yp_index_asintC(x, exc);
+}
 
 yp_uint64_t yp_asuint64C(ypObject *x, ypObject **exc)
 {
@@ -5881,7 +5887,8 @@ yp_uint64_t yp_asuint64C(ypObject *x, ypObject **exc)
     return (yp_uint64_t)asint;
 }
 
-static yp_uint64_t yp_index_asuint64C(ypObject *x, ypObject **exc)
+// TODO Make all the yp_index_* functions public in nohtyP.h.
+static yp_UNUSED yp_uint64_t yp_index_asuint64C(ypObject *x, ypObject **exc)
 {
     yp_int_t asint = yp_index_asintC(x, exc);
     if (asint < 0) return_yp_CEXC_ERR((yp_uint64_t)asint, exc, yp_OverflowError);
@@ -5893,11 +5900,16 @@ yp_STATIC_ASSERT(yp_sizeof(yp_ssize_t) == yp_sizeof(yp_int_t), sizeof_yp_ssize_e
 
 yp_ssize_t yp_asssizeC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 
+// TODO Make all the yp_index_* functions public in nohtyP.h.
 static yp_ssize_t yp_index_asssizeC(ypObject *x, ypObject **exc) { return yp_index_asintC(x, exc); }
 
 yp_hash_t yp_ashashC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 
-static yp_hash_t yp_index_ashashC(ypObject *x, ypObject **exc) { return yp_index_asintC(x, exc); }
+// TODO Make all the yp_index_* functions public in nohtyP.h.
+static yp_UNUSED yp_hash_t yp_index_ashashC(ypObject *x, ypObject **exc)
+{
+    return yp_index_asintC(x, exc);
+}
 #endif
 
 // TODO Make this a public API?
@@ -7435,7 +7447,7 @@ static ypObject *_ypStr_new_ucs_2(int type, yp_ssize_t requiredLen, int alloclen
 {
     return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_enc_ucs_2);
 }
-static ypObject *_ypStr_new_ucs_4(int type, yp_ssize_t requiredLen, int alloclen_fixed)
+static yp_UNUSED ypObject *_ypStr_new_ucs_4(int type, yp_ssize_t requiredLen, int alloclen_fixed)
 {
     return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_enc_ucs_4);
 }
@@ -9497,7 +9509,8 @@ static ypObject *_yp_codecs_register_alias_norm(ypObject *alias_norm, ypObject *
     return exc;
 }
 
-static ypObject *yp_codecs_register_alias(ypObject *alias, ypObject *encoding)
+// TODO Remove yp_UNUSED once this is made public.
+static yp_UNUSED ypObject *yp_codecs_register_alias(ypObject *alias, ypObject *encoding)
 {
     ypObject *result;
     ypObject *alias_norm = _yp_codecs_normalize_encoding_name(alias);        // new ref
@@ -9513,7 +9526,8 @@ static ypObject *yp_codecs_register_alias(ypObject *alias, ypObject *encoding)
     return result;
 }
 
-static ypObject *yp_codecs_lookup_alias(ypObject *alias)
+// TODO Remove yp_UNUSED once this is made public.
+static yp_UNUSED ypObject *yp_codecs_lookup_alias(ypObject *alias)
 {
     ypObject *encoding;
     ypObject *alias_norm = _yp_codecs_normalize_encoding_name(alias);  // new ref
@@ -9539,7 +9553,8 @@ static ypObject *yp_codecs_lookup_alias(ypObject *alias)
 // inline array, and if it grows past that then we allocate on the heap.
 static ypObject *_yp_codecs_errors2handler = NULL;
 
-static ypObject *yp_codecs_register_error(
+// TODO Remove yp_UNUSED once this is made public.
+static yp_UNUSED ypObject *yp_codecs_register_error(
         ypObject *name, yp_codecs_error_handler_func_t error_handler)
 {
     ypObject *exc = yp_None;
@@ -12096,12 +12111,26 @@ ypObject *yp_joinNV(ypObject *s, int n, va_list args)
 
 void yp_partition(ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2)
 {
-    *part0 = *part1 = *part2 = yp_NotImplementedError;
+    int s_pair = ypObject_TYPE_PAIR_CODE(s);
+    if (s_pair == ypStr_CODE) {
+        str_partition(s, sep, part0, part1, part2);
+    } else if (s_pair == ypBytes_CODE) {
+        bytes_partition(s, sep, part0, part1, part2);
+    } else {
+        *part0 = *part1 = *part2 = yp_METHOD_ERR(s);
+    }
 }
 
 void yp_rpartition(ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2)
 {
-    *part0 = *part1 = *part2 = yp_NotImplementedError;
+    int s_pair = ypObject_TYPE_PAIR_CODE(s);
+    if (s_pair == ypStr_CODE) {
+        str_rpartition(s, sep, part0, part1, part2);
+    } else if (s_pair == ypBytes_CODE) {
+        bytes_rpartition(s, sep, part0, part1, part2);
+    } else {
+        *part0 = *part1 = *part2 = yp_METHOD_ERR(s);
+    }
 }
 
 ypObject *yp_splitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit)
@@ -15508,15 +15537,6 @@ success:
     // When the code jumps here, it means ep points to the proper entry
     *loc = ep;
     return yp_None;
-}
-
-// As per _ypSet_lookkey, but calls yp_hashC for the hash.
-static ypObject *_ypSet_lookkey_byhash(ypObject *so, ypObject *key, ypSet_KeyEntry **loc)
-{
-    ypObject *exc = yp_None;
-    yp_hash_t hash = yp_hashC(key, &exc);
-    if (yp_isexceptionC(exc)) return exc;
-    return _ypSet_lookkey(so, key, hash, loc);
 }
 
 // As per _ypSet_lookkey, but calls yp_currenthashC for the hash.
