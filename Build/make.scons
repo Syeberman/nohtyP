@@ -164,9 +164,9 @@ def nohtyP_checkapi(env):
     # nohtyP.h contains very few PP conditionals, so not much needs to be set up. Preprocessed
     # only recognizes .c (etc) files so we make a copy with that extension. Use dummy versions
     # of standard headers that work well with pycparser.
-    # FIXME Are the fake includes necessary when we have the real ones available? We always analyze in the context of
-    # a compiler.
     env.PrependUnique(CPPPATH=["#", "#/Include/fake_libc_include"], PDB="", LIBS="")
+    env.PrependENVPath("PYTHONPATH", "#/Tools/pycparser")
+
     headerDotC = env.Command(
         target="$VTOP/checkapi/nohtyP_h.c",
         source="$VTOP/nohtyP.h",
@@ -175,7 +175,11 @@ def nohtyP_checkapi(env):
     preprocessed = env.Preprocessed("$VTOP/checkapi/nohtyP_h", source=headerDotC)
 
     # TODO Have checkapi write directly to the file
-    scripts = (env.Glob("#/Tools/checkapi/*.py"),)
+    scripts = (
+        env.Glob("#/Tools/checkapi/*.py"),
+        env.Glob("#/Tools/pycparser/pycparser/*.py"),
+        env.Glob("#/Tools/pycparser/pycparser/ply/*.py"),
+    )
     checkapiLog = env.Command(
         target="$VTOP/checkapi.log",
         source=(preprocessed, scripts),
