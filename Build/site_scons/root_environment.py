@@ -62,6 +62,7 @@ def MakeRootEnv():
         PCH="",
         PPCCCOMSTR="",
         RPATH=[],
+        SACCCOMSTR="",
         SHCCCOMSTR="",
         SHLIBNOVERSIONSYMLINKS="",
         SHLIBVERSION="",

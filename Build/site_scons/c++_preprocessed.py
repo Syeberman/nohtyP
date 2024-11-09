@@ -1,23 +1,22 @@
 """Provides a Preprocessed action for generic Posix C++ compilers.
 """
 
+import cc_preprocessed
+import preprocessed_builder
 import SCons.Action
 import SCons.Util
-import preprocessed_builder
-import cc_preprocessed
 
 # XXX These are internal to SCons and may change in the future...but it's unlikely
-cplusplus = __import__('c++', globals(), locals(), [])
+cplusplus = __import__("c++", globals(), locals(), [])
 CXXSuffixes = cplusplus.CXXSuffixes
 
 # TODO Contribute this back to SCons
 
 
 def cxx_preprocessed_emitter(target, source, env):
-    suffix = env.subst('$CXXPREPROCESSEDSUFFIX')
+    suffix = env.subst("$CXXPREPROCESSEDSUFFIX")
     target = [
-        SCons.Util.adjustixes(str(t), "", suffix, ensure_suffix=False)
-        for t in target
+        SCons.Util.adjustixes(str(t), "", suffix, ensure_suffix=False) for t in target
     ]
     return (target, source)
 
@@ -36,6 +35,8 @@ def generate_PreprocessedBuilder(env):
 
     # PPCXX is the preprocessor-only mode for CXX, the C++ compiler (compare with SHCXX et al)
     # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
-    env['PPCXX'] = '$CXX'
-    env['PPCXXFLAGS'] = SCons.Util.CLVar('$CXXFLAGS')
-    env['PPCXXCOM'] = '$PPCXX -E -o $TARGET -c $PPCXXFLAGS $PPCCFLAGS $_CCCOMCOM $SOURCES'
+    env["PPCXX"] = "$CXX"
+    env["PPCXXFLAGS"] = SCons.Util.CLVar("$CXXFLAGS")
+    env["PPCXXCOM"] = (
+        "$PPCXX -E -o $TARGET -c $PPCXXFLAGS $PPCCFLAGS $_CCCOMCOM $SOURCES"
+    )

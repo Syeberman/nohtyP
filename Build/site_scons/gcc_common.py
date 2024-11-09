@@ -10,6 +10,7 @@ import SCons.Errors
 import SCons.Platform
 import SCons.Tool
 import SCons.Warnings
+import cc_analysis
 import cc_preprocessed
 import gcc_coverage
 from root_environment import SconscriptLog
@@ -176,10 +177,8 @@ def ApplyGCCOptions(env, version):
     def addCcFlags(*args):
         env.AppendUnique(CCFLAGS=list(args))
 
-    # FIXME -nostdinc for analyze?
-    # FIXME analyze? (enable -Wextra, disable -Werror, supress individual warnings)
-    # FIXME -fcallgraph-info for analyze? or -fanalyzer
     addCcFlags(*archOpts)
+
     addCcFlags(
         # Warnings-as-errors, all (avoidable) warnings
         "-Werror",
@@ -195,14 +194,13 @@ def ApplyGCCOptions(env, version):
         "-Wmissing-parameter-type",
         # Before 4.8, shadow warned if a declaration shadowed a function (index, div)
         "-Wshadow" if version >= 4.8 else "",
-        # Disable some warnings
-        "-Wno-unused-function",  # TODO Mark MethodError_lenfunc/etc as unused (portably)?
+        # pointer-sign warns about using a string literal for yp_uint8_t* arguments
         "-Wno-pointer-sign",
         # GCC before 13.0 didn't recognize `#pragma region`
         "" if version >= 13.0 else "-Wno-unknown-pragmas",
         # float-conversion warns about passing a double to finite/isnan, unfortunately
         "-Wno-float-conversion",
-        # TODO maybe-uninitialized would be good during analyze
+        # maybe-uninitialized doesn't understand yp_isexceptionC(result) semantics
         "-Wno-maybe-uninitialized" if version >= 4.8 else "-Wno-uninitialized",
         # For shared libraries, only expose functions explicitly marked ypAPI
         "-fvisibility=hidden" if version >= 4.0 else "",
@@ -269,6 +267,7 @@ def ApplyGCCOptions(env, version):
         pass
     else:
         addCcFlags("-fno-omit-frame-pointer")
+
     # Ensure SCons knows to clean .s, etc
     _updateCcEmitters(env)
 
@@ -284,14 +283,33 @@ def ApplyGCCOptions(env, version):
     # XXX -g3 (debug info) enables -dD, which includes #defines in the output; since we don't need debug info, disable
     # it with -g0 last in the argument list. (See https://github.com/gcc-mirror/gcc/commit/934a541)
     # TODO -save-temps above also writes the .i file
-    # TODO Create PPCC, PPCFLAGS, PPCCFLAGS just like SHCC/etc, and contribute back to SCons?
     # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
+    # FIXME Remove the need for this
     env["PPCCCOM"] = "$CC -E -o $TARGET -c $CFLAGS $CCFLAGS $_CCCOMCOM -g0 $SOURCES"
+
+    env["SACFLAGS"] = env["SACXXFLAGS"] = env["SACCFLAGS"] = ""
+
+    def addAnalysisFlags(*args):
+        env.AppendUnique(SACCFLAGS=list(args))
+
+    # TODO -nostdinc for analyze?
+    # TODO -fcallgraph-info for analyze? or -fanalyzer
+    # TODO `gcc.exe -c -fanalyzer nohtyP.c` emits a nohtyP.o file
+    addAnalysisFlags(
+        "-Wall",
+        "-Wextra",
+        # "-fanalyzer",
+        # There are too many unused parameters for this to be useful.
+        "-Wno-unused-parameter",
+        # Initializing missing fields to zero is well-defined behaviour.
+        "-Wno-missing-field-initializers",
+    )
 
     def addLinkFlags(*args):
         env.AppendUnique(LINKFLAGS=list(args))
 
     addLinkFlags(*archOpts)
+
     addLinkFlags(
         # Warnings-as-errors, all (avoidable) warnings
         "-Werror",
@@ -383,6 +401,7 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
         # FIXME Update SCons to skip autodetection when requested (it's slowing the build down)
         for tool in _tools:
             tool.generate(env)
+        cc_analysis.generate_AnalysisBuilder(env)
         cc_preprocessed.generate_PreprocessedBuilder(env)
         gcc_coverage.generate_CoverageBuilder(env)
 

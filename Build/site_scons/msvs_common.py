@@ -7,6 +7,7 @@ import SCons.Errors
 import SCons.Tool
 import SCons.Tool.MSCommon.vs
 import SCons.Warnings
+import msvs_analysis
 import msvs_preprocessed
 
 # Disables "MSVC_USE_SCRIPT set to False" warnings. Unfortunately, also disables "No version of
@@ -83,7 +84,6 @@ def ApplyMSVSOptions(env, version):
     def addCcFlags(*args):
         env.AppendUnique(CCFLAGS=list(args))
 
-    # TODO /analyze? (enable /Wall, disable /WX, suppress individual warnings)
     addCcFlags(
         # Warning level 3
         "/W3",
@@ -137,6 +137,35 @@ def ApplyMSVSOptions(env, version):
         addCppDefines("_DEBUG")
     else:
         addCppDefines("NDEBUG")
+
+    env["SACFLAGS"] = env["SACXXFLAGS"] = env["SACCFLAGS"] = ""
+
+    def addAnalysisFlags(*args):
+        env.AppendUnique(SACCFLAGS=list(args))
+
+    # TODO Are there other Espx engine plugins?
+    # FIXME Trigger recompilation when changed. When creating the Action, I think this will work:
+    #   varlist=["ENV['Esp.Extensions']"]
+    env.AppendENVPath(
+        "Esp.Extensions",
+        [
+            "ConcurrencyCheck.dll",
+            "CppCoreCheck.dll",
+            "EnumIndex.dll",
+            "HResultCheck.dll",
+            "VariantClear.dll",
+        ],
+    )
+    addAnalysisFlags(
+        # Suppress startup banner.
+        "/nologo",
+        # Enable all warnings, including the /sdl and /GS warnings.
+        "/Wall",
+        # Enable code analysis.
+        "/analyze",
+        # TODO Are there other analyze plugins?
+        ["/analyze:plugin", "EspxEngine.dll"],
+    )
 
     def addLinkFlags(*args):
         env.AppendUnique(LINKFLAGS=list(args))
@@ -248,6 +277,7 @@ def DefineMSVSToolFunctions(numericVersion, sconsKeys):
         # FIXME Report this back to SCons
         if env["_MANIFEST_SOURCES"] is None:
             env["_MANIFEST_SOURCES"] = ""
+        msvs_analysis.generate_AnalysisBuilder(env)
         msvs_preprocessed.generate_PreprocessedBuilder(env)
         if not env.WhereIs("$CC"):
             toolsConfig.update({compilerEnv_name: None})
