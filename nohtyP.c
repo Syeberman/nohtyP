@@ -8470,7 +8470,7 @@ static ypObject *ypStringLib_encode_call_errorhandler(yp_codecs_error_handler_fu
     // this isn't documented and I'm assuming it's a deprecated feature
 
     if (*newPos < 0) *newPos = source_len + (*newPos);
-    if (newPos < 0 || *newPos > source_len) {
+    if (*newPos < 0 || *newPos > source_len) {
         yp_decref(replacement);
         return yp_IndexError;  // "position %zd from error handler out of bounds"
     }
@@ -8553,7 +8553,7 @@ static ypObject *ypStringLib_decode_call_errorhandler(yp_codecs_error_handler_fu
     // this isn't documented and I'm assuming it's a deprecated feature
 
     if (*newPos < 0) *newPos = source_len + (*newPos);
-    if (newPos < 0 || *newPos > source_len) {
+    if (*newPos < 0 || *newPos > source_len) {
         yp_decref(replacement);
         return yp_IndexError;  // "position %zd from error handler out of bounds"
     }
