@@ -14,29 +14,30 @@ from site_scons.utilities import AliasIfNotEmpty
 # TODO If none of these compilers can be found, default to an "any" compiler (but still version the
 # output directory)
 # TODO Would love to make this more dynamic, finding any known compiler, and then trimming.
-# TODO Visual Studio 2022, 2019, 2017 support
 # TODO Clang/LLVM support
 # TODO GCC 6 can't be found on AppVeyor's Ubuntu1604
 compiler_names = (
-    "gcc_13",
-    "gcc_12",
-    "gcc_11",
-    "msvs_158",
-    "gcc_10",
-    "gcc_9",
-    "gcc_8",
-    "gcc_7",
-    "msvs_140",
-    "gcc_6",
-    "gcc_5",
-    "msvs_120",
-    "gcc_49",
-    "gcc_48",
-    "msvs_110",
-    "gcc_47",
-    "gcc_46",
-    "msvs_100",
-    "msvs_90",
+    "gcc_13",  # April 2023
+    "gcc_12",  # May 2022
+    "msvs_17",  # November 2021
+    "gcc_11",  # April 2021
+    "gcc_10",  # May 2020
+    "gcc_9",  # May 2019
+    "msvs_16",  # April 2019
+    "gcc_8",  # May 2018
+    "gcc_7",  # May 2017
+    "msvs_15",  # March 2017
+    "gcc_6",  # April 2016
+    "msvs_140",  # July 2015
+    "gcc_5",  # April 2015
+    "gcc_49",  # July 2014
+    "msvs_120",  # October 2013
+    "gcc_48",  # May 2013
+    "msvs_110",  # September 2012
+    "gcc_47",  # June 2012
+    "gcc_46",  # June 2011
+    "msvs_100",  # April 2010
+    "msvs_90",  # November 2007
 )
 oses = ("win32", "posix", "darwin")
 archs = ("amd64", "x86")

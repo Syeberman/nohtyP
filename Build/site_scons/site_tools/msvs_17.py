@@ -1,9 +1,8 @@
-# Visual Studio 2017
+# Visual Studio 2022
 
 import msvs_common
-# FIXME It seems MS is using the minor version as more of a build number now, so we should just
-# accept any "version 15" Visual Studio we find.
-_generate, _exists = msvs_common.DefineMSVSToolFunctions(15.8, ("15.8", ))
+
+_generate, _exists = msvs_common.DefineMSVSToolFunctions(17.0, ("14.3", ))
 
 
 # Define new functions so that we remain in any stack traces involving these functions
