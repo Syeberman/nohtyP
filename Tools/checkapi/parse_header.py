@@ -5,8 +5,9 @@ Date: May 19, 2014
 """
 
 import copy
+import io
 from typing import Callable, TypeVar
-from pycparser import c_generator, c_ast, parse_file
+from pycparser import c_generator, c_ast, CParser
 import re
 
 K = TypeVar('K')
@@ -161,7 +162,11 @@ class ApiVisitor(c_ast.NodeVisitor):
 
 def parse_header(filepath: str):
     """Parses nohtyP.h and similar files.  The file must have already been preprocessed."""
-    ast = parse_file(filepath)
+    # The "optimize" options disable the lextab.py and yacctab.py cached files.
+    parser = CParser(lex_optimize=False, yacc_optimize=False)
+    with io.open(filepath) as f:
+        ast = parser.parse(f.read(), filepath)
+
     visitor = ApiVisitor()
     visitor.visit(ast)
     return visitor.header

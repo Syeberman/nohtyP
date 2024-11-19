@@ -111,6 +111,7 @@ class CParser(PLYParser):
             start='translation_unit_or_empty',
             debug=yacc_debug,
             optimize=yacc_optimize,
+            write_tables=yacc_optimize, # TODO(Sye) Contribute back to pycparser.
             tabmodule=yacctab,
             outputdir=taboutputdir)
 
