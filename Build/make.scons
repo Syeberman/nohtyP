@@ -5,7 +5,7 @@ import SCons.Defaults
 import SCons.Errors
 import SCons.Tool
 import SCons.Util
-from site_scons.build_environments import AddBuildTargets
+from site_scons.build_environments import AddBuildTargets, BuildTargets
 from site_scons.root_environment import MakeRootEnv, SconscriptLog
 from site_scons.utilities import GetImportLibrary, GetProgram, GetSharedLibrary
 
@@ -176,7 +176,6 @@ def nohtyP_checkapi(env):
     )
     preprocessed = env.Preprocessed("$VTOP/checkapi/nohtyP_h", source=headerDotC)
 
-    # TODO Have checkapi write directly to the file
     scripts = (
         env.Glob("#/Tools/checkapi/*.py"),
         env.Glob("#/Tools/pycparser/pycparser/*.py"),
@@ -197,34 +196,35 @@ python_38_to_312 = SCons.Tool.Tool("python_38_to_312")
 pclint = SCons.Tool.Tool("pclint")
 
 
-def MakeCompilerTargets(compilerEnv):
+def MakeBuildTargets(compilerEnv):
+    targets = BuildTargets()
+
     sharedLib, sharedLibAnalysis = nohtyP_SharedLibrary(compilerEnv.Clone())
+    targets.build.append(sharedLib)
+    targets.test.append(sharedLib)
+    targets.coverage.append(sharedLib)
 
-    # checkapi requires Python 3, but so do our build scripts, so this should not raise errors.
-    checkapi = nohtyP_checkapi(compilerEnv.Clone(tools=[python_3]))
+    # We run the compiler's static analysis with the latest installed version of each compiler.
+    if compilerEnv["IS_COMPILER_ANALYSIS_TARGET"]:
+        targets.analyze.append(sharedLibAnalysis)
 
-    # These collect all the build, test, analysis, and coverage targets, including:
-    #   - the C and C# builds of the nohtyP shared library
-    #   - python_test and ypExamples results
-    #   - checkapi.py, PC-lint, expanded compiler warnings
-    #   - targets that copy the above to Build/native (why sharedLib is in every one)
-    buildTargets = [sharedLib]
-    testTargets = [sharedLib]
-    analyzeTargets = [checkapi, sharedLibAnalysis]
-    coverageTargets = [sharedLib]
+    # checkapi doesn't depend on the compiler/etc, so we only run it once.
+    if compilerEnv["IS_CHECKAPI_TARGET"]:
+        checkapi = nohtyP_checkapi(compilerEnv.Clone(tools=[python_3]))
+        targets.analyze.append(checkapi)
 
+    # We can only run munit_test on native OS and architectures.
     if compilerEnv["IS_NATIVE_TARGET"]:
-        # We can only run munit_test on native OS and architectures.
         cov_archive, test_log = nohtyP_munit_test(
             compilerEnv.Clone(),
             nohtyP_munit_test_Program_shared(compilerEnv.Clone(), sharedLib),
         )
-        testTargets.append(test_log)
-        coverageTargets.append(cov_archive)
+        targets.test.append(test_log)
+        targets.coverage.append(cov_archive)
 
         # python_test requires a minimum version of Python.
         try:
-            testTargets.append(
+            targets.test.append(
                 nohtyP_python_test(
                     compilerEnv.Clone(
                         tools=[
@@ -237,10 +237,10 @@ def MakeCompilerTargets(compilerEnv):
         except (SCons.Errors.UserError, SCons.Errors.StopError):
             traceback.print_exc(file=SconscriptLog)
 
-    return buildTargets, testTargets, analyzeTargets, coverageTargets
+    return targets
 
 
-AddBuildTargets(RootEnv, MakeCompilerTargets)
+AddBuildTargets(RootEnv, MakeBuildTargets)
 
 
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to

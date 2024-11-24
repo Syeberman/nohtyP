@@ -27,16 +27,13 @@ def createPreprocessedBuilder(env):
         preprocessed = SCons.Builder.Builder(
             action={},
             emitter={},
-            # prefix = '',
-            # TODO gcc uses different suffixes for C and C++
-            # suffix = '$CPREPROCESSEDSUFFIX',
             src_builder=["CFile", "CXXFile"],
             source_scanner=SCons.Tool.SourceFileScanner,
             single_source=True,
         )
         env["BUILDERS"]["Preprocessed"] = preprocessed
 
-        # TODO msvc preprocesses both C and C++ files with a .i extension; gcc keeps them separate
+        # XXX msvc preprocesses both C and C++ files with a .i extension; gcc keeps them separate
         env.SetDefault(CPREPROCESSEDSUFFIX=".i")
         env.SetDefault(CXXPREPROCESSEDSUFFIX=".ii")
 

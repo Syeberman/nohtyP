@@ -27,14 +27,13 @@ def createAnalysisBuilder(env):
         analysis = SCons.Builder.Builder(
             action={},
             emitter={},
-            # prefix = '',
-            suffix=AnalysisSuffix,
             src_builder=["CFile", "CXXFile"],
             source_scanner=SCons.Tool.SourceFileScanner,
             single_source=True,
         )
         env["BUILDERS"]["Analysis"] = analysis
 
+        # Allow for different suffixes for C and C++ files.
         env.SetDefault(CANALYSISSUFFIX=AnalysisSuffix)
         env.SetDefault(CXXANALYSISSUFFIX=AnalysisSuffix)
 
