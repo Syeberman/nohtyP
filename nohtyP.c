@@ -806,11 +806,12 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 // Length of an array in a structure. Only call for arrays of fixed size.
 #define yp_lengthof_array_member(structType, member) yp_lengthof_array(((structType *)0)->member)
 
-// Versions of memcmp/etc that don't warn about yp_ssize_t mismatches.
+// Versions of memcmp/etc that don't warn about yp_ssize_t or yp_uint8_t* mismatches.
 #define yp_memcmp(x, y, l) (memcmp((x), (y), (size_t)(l)))
 #define yp_memcpy(d, s, l) (memcpy((d), (s), (size_t)(l)))
 #define yp_memmove(d, s, l) (memmove((d), (s), (size_t)(l)))
 #define yp_memset(x, c, l) (memset((x), (c), (size_t)(l)))
+#define yp_strlen(x) ((yp_ssize_t)strlen((char *)(x)))
 
 // XXX Adapted from _Py_SIZE_ROUND_DOWN et al
 // Below "a" is a power of 2. Round down size "n" to be a multiple of "a".
@@ -7481,8 +7482,8 @@ static ypObject *ypStringLib_new_copy(int type, ypObject *s, int alloclen_fixed)
 
     copy = _ypStringLib_new(type, s_len, alloclen_fixed, s_enc);
     if (yp_isexceptionC(copy)) return copy;
-    ypStringLib_MEMCPY(
-            s_enc->sizeshift, ypStringLib_DATA(copy), 0, ypStringLib_DATA(s), 0, (s_len + 1));
+    ypStringLib_MEMCPY(s_enc->sizeshift, ypStringLib_DATA(copy), (yp_ssize_t)0, ypStringLib_DATA(s),
+            (yp_ssize_t)0, (s_len + 1));
     ypStringLib_SET_LEN(copy, s_len);
     ypStringLib_ASSERT_INVARIANTS(copy);
     return copy;
@@ -7783,7 +7784,8 @@ static ypObject *ypStringLib_repeat(ypObject *s, yp_ssize_t factor)
     newS = _ypStringLib_new(ypObject_TYPE_CODE(s), newLen, /*alloclen_fixed=*/TRUE, s_enc);
     if (yp_isexceptionC(newS)) return newS;
 
-    ypStringLib_MEMCPY(s_enc->sizeshift, ypStringLib_DATA(newS), 0, ypStringLib_DATA(s), 0, s_len);
+    ypStringLib_MEMCPY(s_enc->sizeshift, ypStringLib_DATA(newS), (yp_ssize_t)0, ypStringLib_DATA(s),
+            (yp_ssize_t)0, s_len);
     _ypSequence_repeat_memcpy(ypStringLib_DATA(newS), factor, s_len << s_enc->sizeshift);
     s_enc->setindexX(ypStringLib_DATA(newS), newLen, 0);
     ypStringLib_SET_LEN(newS, newLen);
@@ -7899,7 +7901,8 @@ static ypObject *_ypStringLib_setslice_total(ypObject *s, yp_ssize_t step, void 
 
     if (step == 1) {
         // XXX Recall that x_data is not necessarily null-terminated!
-        ypStringLib_MEMCPY(x_enc->sizeshift, ypStringLib_DATA(s), 0, x_data, 0, x_len);
+        ypStringLib_MEMCPY(
+                x_enc->sizeshift, ypStringLib_DATA(s), (yp_ssize_t)0, x_data, (yp_ssize_t)0, x_len);
     } else {
         yp_ssize_t i;
         yp_ASSERT1(step == -1);  // also asserted above
@@ -7950,7 +7953,8 @@ static ypObject *_ypStringLib_setslice_regular(ypObject *s, yp_ssize_t start, yp
         } else {
             // The data doesn't overlap, so use memcpy. The second memcpy will include the null
             // terminator (note the +1 to length).
-            ypStringLib_MEMCPY(newEnc->sizeshift, ypStringLib_DATA(s), 0, oldptr, 0, start);
+            ypStringLib_MEMCPY(newEnc->sizeshift, ypStringLib_DATA(s), (yp_ssize_t)0, oldptr,
+                    (yp_ssize_t)0, start);
             ypStringLib_MEMCPY(newEnc->sizeshift, ypStringLib_DATA(s), stop + growBy, oldptr, stop,
                     ypStringLib_LEN(s) - stop + 1);
             ypMem_REALLOC_CONTAINER_FREE_OLDPTR(s, ypStringLibObject, oldptr);
@@ -8930,11 +8934,11 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop(ypObject *dest, const yp_u
             // We've hit a decoding error: call the error handler
             // TODO Test surrogate characters in the start, end, and middle of string, both on
             // encode and decode, and multiple contiguous and non-contiguous surrogates
-            ypObject         *replacement;
-            yp_ssize_t        newPos;
-            const yp_uint8_t *errmsg;
-            yp_ssize_t        errEnd;
-            yp_ssize_t        errStart = source - starts;
+            ypObject   *replacement;
+            yp_ssize_t  newPos;
+            const char *errmsg;
+            yp_ssize_t  errEnd;
+            yp_ssize_t  errStart = source - starts;
             switch (ch) {
             case ypStringLib_UTF_8_INVALID_END:
                 errmsg = "unexpected end of data";
@@ -9869,9 +9873,8 @@ static int ypBytes_adjust_lenC(yp_ssize_t *len, const yp_uint8_t *source)
         if (source == NULL) {
             *len = 0;
         } else {
-            size_t ulen = strlen((const char *)source);
-            if (ulen > ypBytes_LEN_MAX) return FALSE;
-            *len = (yp_ssize_t)ulen;
+            *len = yp_strlen(source);
+            if (*len > ypBytes_LEN_MAX) return FALSE;
         }
     } else if (*len > ypBytes_LEN_MAX) {
         return FALSE;
@@ -10646,7 +10649,7 @@ static ypObject *_yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t 
 
     *bytes = ypBytes_DATA(seq);
     if (len == NULL) {
-        if ((yp_ssize_t)strlen(*bytes) != ypBytes_LEN(seq)) return yp_TypeError;
+        if (yp_strlen(*bytes) != ypBytes_LEN(seq)) return yp_TypeError;
     } else {
         *len = ypBytes_LEN(seq);
     }
@@ -11258,8 +11261,8 @@ static ypObject *_str_tailmatch(
     if (ypStr_ENC_CODE(s) == ypStr_ENC_CODE(x)) {
         yp_ssize_t sizeshift = ypStr_ENC(x)->sizeshift;
 
-        int memcmp_result =
-                ypStr_MEMCMP(sizeshift, ypStr_DATA(s), cmp_start, ypStr_DATA(x), 0, ypStr_LEN(x));
+        int memcmp_result = ypStr_MEMCMP(
+                sizeshift, ypStr_DATA(s), cmp_start, ypStr_DATA(x), (yp_ssize_t)0, ypStr_LEN(x));
         return ypBool_FROM_C(memcmp_result == 0);
     } else {
         ypStringLib_getindexXfunc s_getindexX = ypStr_ENC(s)->getindexX;
@@ -11421,7 +11424,8 @@ static int _ypStr_are_equal(ypObject *s, ypObject *x)
     // Recall strs are stored in the smallest encoding that can hold them, so different encodings
     // means differing characters
     if (ypStr_ENC_CODE(s) != ypStr_ENC_CODE(x)) return 0;
-    return ypStr_MEMCMP(ypStr_ENC(s)->sizeshift, ypStr_DATA(s), 0, ypStr_DATA(x), 0, s_len) == 0;
+    return ypStr_MEMCMP(ypStr_ENC(s)->sizeshift, ypStr_DATA(s), (yp_ssize_t)0, ypStr_DATA(x),
+                   (yp_ssize_t)0, s_len) == 0;
 }
 static ypObject *str_eq(ypObject *s, ypObject *x)
 {
@@ -11684,7 +11688,7 @@ static ypObject *_yp_asencodedCX(
     if (size == NULL) {
         // TODO Support ucs-2 and -4 here
         if (ypStr_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
-        if ((yp_ssize_t)strlen(*encoded) != ypStr_LEN(s)) return yp_TypeError;
+        if (yp_strlen(*encoded) != ypStr_LEN(s)) return yp_TypeError;
     } else {
         *size = ypStr_LEN(s) << ypStr_ENC(s)->sizeshift;
     }
@@ -12596,14 +12600,16 @@ static ypObject *_ypTuple_new_fromiterable(int type, ypObject *iterable)
 static ypObject *_ypTuple_concat_fromtuple(ypObject *sq, ypObject *x)
 {
     int        sq_type = ypObject_TYPE_CODE(sq);
+    yp_ssize_t sq_len = ypTuple_LEN(sq);
+    yp_ssize_t x_len = ypTuple_LEN(x);
     yp_ssize_t newLen;
     ypObject  *newSq;
     yp_ssize_t i;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypTuple_CODE);
 
-    if (ypTuple_LEN(sq) < 1) {
-        if (ypTuple_LEN(x) < 1) {
+    if (sq_len < 1) {
+        if (x_len < 1) {
             // The concatenation is empty.
             if (sq_type == ypTuple_CODE) return yp_tuple_empty;
             return _ypTuple_new(ypList_CODE, 0, /*alloclen_fixed=*/FALSE);
@@ -12614,21 +12620,20 @@ static ypObject *_ypTuple_concat_fromtuple(ypObject *sq, ypObject *x)
             }
             return _ypTuple_copy(sq_type, x);
         }
-    } else if (ypTuple_LEN(x) < 1) {
+    } else if (x_len < 1) {
         // The concatenation is equal to sq.
         if (sq_type == ypTuple_CODE) return yp_incref(sq);
         return _ypTuple_copy(ypList_CODE, sq);
     }
 
-    if (ypTuple_LEN(sq) > ypTuple_LEN_MAX - ypTuple_LEN(x)) return yp_MemorySizeOverflowError;
-    newLen = ypTuple_LEN(sq) + ypTuple_LEN(x);
+    if (sq_len > ypTuple_LEN_MAX - x_len) return yp_MemorySizeOverflowError;
+    newLen = sq_len + x_len;
 
     newSq = _ypTuple_new(sq_type, newLen, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newSq)) return newSq;
 
-    yp_memcpy(ypTuple_ARRAY(newSq), ypTuple_ARRAY(sq), ypTuple_LEN(sq) * yp_sizeof(ypObject *));
-    yp_memcpy(ypTuple_ARRAY(newSq) + ypTuple_LEN(sq), ypTuple_ARRAY(x),
-            ypTuple_LEN(x) * yp_sizeof(ypObject *));
+    yp_memcpy(ypTuple_ARRAY(newSq), ypTuple_ARRAY(sq), sq_len * yp_sizeof(ypObject *));
+    yp_memcpy(ypTuple_ARRAY(newSq) + sq_len, ypTuple_ARRAY(x), x_len * yp_sizeof(ypObject *));
     for (i = 0; i < newLen; i++) yp_incref(ypTuple_ARRAY(newSq)[i]);
 
     ypTuple_SET_LEN(newSq, newLen);
@@ -13931,7 +13936,7 @@ struct s_MergeState {
      * so we could cut the storage for this, but it's a minor amount,
      * and keeping all the info explicit simplifies the code.
      */
-    int n;
+    yp_ssize_t n;
     struct s_slice pending[MAX_MERGE_PENDING];
 
     /* 'a' points to this when possible, rather than muck with malloc. */
@@ -19619,7 +19624,7 @@ static ypObject *ypFunction_callNV_withself(ypObject *f, ypObject *self, int n_a
 {
     yp_uint8_t param_flags;
     yp_ssize_t params_len = ypFunction_PARAMS_LEN(f);
-    yp_ssize_t n_actual;
+    int        n_actual;
 
     yp_ASSERT1(ypObject_TYPE_CODE(f) == ypFunction_CODE);
     yp_ASSERT1(!yp_isexceptionC(self));
