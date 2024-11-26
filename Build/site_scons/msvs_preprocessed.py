@@ -82,14 +82,12 @@ def generate_PreprocessedBuilder(env):
 
     # PPCC is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
     # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
+    # TODO Should PPCXXFLAGS/etc reference CXXFLAGS/etc, like SHCXXFLAGS/etc does?
     env["PPCC"] = "$CC"
-    env["PPCCFLAGS"] = SCons.Util.CLVar("$CCFLAGS")
-    env["PPCFLAGS"] = SCons.Util.CLVar("$CFLAGS")
     env["PPCCCOM"] = (
         '${TEMPFILE("$PPCC /P $_MSVC_PP_OUTPUT_FLAG /c $CHANGED_SOURCES $PPCFLAGS $PPCCFLAGS $_CCCOMCOM","$PPCCCOMSTR")}'
     )
     env["PPCXX"] = "$CXX"
-    env["PPCXXFLAGS"] = SCons.Util.CLVar("$CXXFLAGS")
     env["PPCXXCOM"] = (
         '${TEMPFILE("$PPCXX /P $_MSVC_PP_OUTPUT_FLAG /c $CHANGED_SOURCES $PPCXXFLAGS $PPCCFLAGS $_CCCOMCOM","$PPCXXCOMSTR")}'
     )

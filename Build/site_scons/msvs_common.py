@@ -138,8 +138,6 @@ def ApplyMSVSOptions(env, version):
     else:
         addCppDefines("NDEBUG")
 
-    env["SACFLAGS"] = env["SACXXFLAGS"] = env["SACCFLAGS"] = ""
-
     def addAnalysisFlags(*args):
         env.AppendUnique(SACCFLAGS=list(args))
 

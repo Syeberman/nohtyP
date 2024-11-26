@@ -31,14 +31,11 @@ def generate_AnalysisBuilder(env):
         analysis.add_action(suffix, CXXAnalysisAction)
         analysis.add_emitter(suffix, cxx_analysis_emitter)
 
-    cc_analysis.add_common_sacc_variables(env)
-
     # SACXX is the static analysis mode for CXX, the C++ compiler (compare with SHCXX et al)
     # XXX We do not add -Wextra, -fanalyzer, or any other warning control flags here. The only
     # configuration SACXXCOM brings is to redirect stderr to TARGET and disable compilation.
-    # FIXME Is there a better way to disable the object file, while still getting all warnings?
+    # TODO Should SACXXFLAGS/etc reference CXXFLAGS/etc, like SHCXXFLAGS/etc does?
     env["SACXX"] = "$CXX"
-    env["SACXXFLAGS"] = SCons.Util.CLVar("$CXXFLAGS")
     env["SACXXCOM"] = (
         f"$SACXX -fsyntax-only $SACXXFLAGS $SACCFLAGS $_CCCOMCOM $SOURCES 2> $TARGET"
     )

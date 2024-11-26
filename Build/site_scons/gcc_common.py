@@ -279,16 +279,6 @@ def ApplyGCCOptions(env, version):
     else:
         addCppDefines("NDEBUG")
 
-    # PPCC is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
-    # XXX -g3 (debug info) enables -dD, which includes #defines in the output; since we don't need debug info, disable
-    # it with -g0 last in the argument list. (See https://github.com/gcc-mirror/gcc/commit/934a541)
-    # TODO -save-temps above also writes the .i file
-    # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
-    # FIXME Remove the need for this
-    env["PPCCCOM"] = "$CC -E -o $TARGET -c $CFLAGS $CCFLAGS $_CCCOMCOM -g0 $SOURCES"
-
-    env["SACFLAGS"] = env["SACXXFLAGS"] = env["SACCFLAGS"] = ""
-
     def addAnalysisFlags(*args):
         env.AppendUnique(SACCFLAGS=list(args))
 

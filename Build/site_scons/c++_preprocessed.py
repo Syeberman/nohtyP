@@ -31,12 +31,10 @@ def generate_PreprocessedBuilder(env):
         preprocessed.add_action(suffix, CXXPreprocessedAction)
         preprocessed.add_emitter(suffix, cxx_preprocessed_emitter)
 
-    cc_preprocessed.add_common_ppcc_variables(env)
-
     # PPCXX is the preprocessor-only mode for CXX, the C++ compiler (compare with SHCXX et al)
     # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
+    # TODO Should PPCXXFLAGS/etc reference CXXFLAGS/etc, like SHCXXFLAGS/etc does?
     env["PPCXX"] = "$CXX"
-    env["PPCXXFLAGS"] = SCons.Util.CLVar("$CXXFLAGS")
     env["PPCXXCOM"] = (
         "$PPCXX -E -o $TARGET -c $PPCXXFLAGS $PPCCFLAGS $_CCCOMCOM $SOURCES"
     )

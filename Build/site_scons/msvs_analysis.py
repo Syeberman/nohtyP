@@ -54,14 +54,12 @@ def generate_AnalysisBuilder(env):
     # FIXME Code analysis also creates a log file named filename.nativecodeanalysis.xml, where
     # filename is the name of the analyzed source file. I've disabled this for now with
     # `/analyze:autolog-`... but should we prefer this?
+    # TODO Should SACXXFLAGS/etc reference CXXFLAGS/etc, like SHCXXFLAGS/etc does?
     env["SACC"] = "$CC"
-    env["SACCFLAGS"] = SCons.Util.CLVar("$CCFLAGS")
-    env["SACFLAGS"] = SCons.Util.CLVar("$CFLAGS")
     env["SACCCOM"] = (
         '${TEMPFILE("$SACC /analyze:only /analyze:autolog- $CHANGED_SOURCES $SACFLAGS $SACCFLAGS $_CCCOMCOM > $TARGET","$SACCCOMSTR")}'
     )
     env["SACXX"] = "$CXX"
-    env["SACXXFLAGS"] = SCons.Util.CLVar("$CXXFLAGS")
     env["SACXXCOM"] = (
         '${TEMPFILE("$SACXX /analyze:only /analyze:autolog- $CHANGED_SOURCES $SACXXFLAGS $SACCFLAGS $_CCCOMCOM > $TARGET","$SACXXCOMSTR")}'
     )

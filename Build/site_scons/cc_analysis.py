@@ -32,9 +32,8 @@ def generate_AnalysisBuilder(env):
     # SACC is the static analysis mode for CC, the C compiler (compare with SHCC et al)
     # XXX We do not add -Wextra, -fanalyzer, or any other warning control flags here. The only
     # configuration SACCCOM brings is to redirect stderr to TARGET and disable compilation.
-    # FIXME Is there a better way to disable the object file, while still getting all warnings?
+    # TODO Should SACFLAGS/etc reference CFLAGS/etc, like SHCFLAGS/etc does?
     env["SACC"] = "$CC"
-    env["SACFLAGS"] = SCons.Util.CLVar("$CFLAGS")
     env["SACCCOM"] = (
         f"$SACC -fsyntax-only $SACFLAGS $SACCFLAGS $_CCCOMCOM $SOURCES 2> $TARGET"
     )

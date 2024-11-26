@@ -6,8 +6,8 @@ import SCons.Tool
 
 # TODO Contribute this back to SCons
 
-# FIXME Could we take the program as input and analyze the source files backwards? In other words,
-# is there whole-program analysis vs per-file analysis?
+# TODO Could we take the program as input and determine the source files to analyze?
+# TODO Can we enable whole-program analysis on top of per-file analysis?
 
 AnalysisSuffix = ".analysis.txt"
 
