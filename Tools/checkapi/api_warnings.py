@@ -1,6 +1,7 @@
 from parse_header import ypHeader
 
-# FIXME Test all the warnings.
+# TODO C functions match the non-C version in expected ways. (And L functions.) (And F.)
+# TODO L functions do not reference ypObject *.
 
 
 def CheckVarargFunctions(warnings: list[str], header: ypHeader):
@@ -9,46 +10,34 @@ def CheckVarargFunctions(warnings: list[str], header: ypHeader):
 
         if not func.is_vararg:
             if vararg_params:
-                warnings.append(
-                    "vararg function missing N or K postfix: {}".format(func.name)
-                )
+                warnings.append(f"vararg function missing N or K postfix: {func.name}")
             continue
         if not vararg_params:
-            warnings.append(
-                "N, K, or V used in non-vararg function: {}".format(func.name)
-            )
+            warnings.append(f"N, K, or V used in non-vararg function: {func.name}")
             continue
 
         if func.postfix_param_count is not None:
             warnings.append(
-                "vararg function contains input count postfix: {}".format(func.name)
+                f"vararg function contains input count postfix: {func.name}"
             )
 
         if func.params[-2].type != "int" or func.params[-2].name != "n":
-            warnings.append(
-                "must have `int n` argument before varargs: {}".format(func.name)
-            )
+            warnings.append(f"must have `int n` argument before varargs: {func.name}")
 
         if "V" in func.postfixes:
             if func.params[-1].type != "va_list":
-                warnings.append("V used in non-va_list function{}".format(func.name))
+                warnings.append(f"V used in non-va_list function: {func.name}")
             pair_name = func.rootname + func.postfixes.replace("V", "")
             if header.name2funcs.get(pair_name) is None:
-                warnings.append(
-                    "NV (or KV) missing N (or K) pair: {}".format(func.name)
-                )
+                warnings.append(f"NV (or KV) missing N (or K) pair: {func.name}")
         else:
             if func.params[-1].type != "...":
-                warnings.append(
-                    "ellipsis not used in non-V function: {}".format(func.name)
-                )
+                warnings.append(f"ellipsis not used in non-V function: {func.name}")
             pair_name = func.rootname + func.postfixes.replace("N", "NV").replace(
                 "K", "KV"
             )
             if header.name2funcs.get(pair_name) is None:
-                warnings.append(
-                    "N (or K) missing NV (or KV) pair: {}".format(func.name)
-                )
+                warnings.append(f"N (or K) missing NV (or KV) pair: {func.name}")
 
 
 def CheckParameterCounts(warnings: list[str], header: ypHeader):
@@ -60,30 +49,38 @@ def CheckParameterCounts(warnings: list[str], header: ypHeader):
 
         if func.postfix_param_count != param_count:
             warnings.append(
-                "parameter count postfix ({}) isn't correct ({}): {}".format(
-                    func.postfix_param_count, param_count, func.name
-                )
+                f"parameter count postfix ({func.postfix_param_count}) isn't correct ({param_count}): {func.name}"
             )
 
 
-# FIXME Check that functions that don't return ypObject* have an exc parameter.
 def CheckSetExcFunctions(warnings: list[str], header: ypHeader):
     for func in header.funcs:
-        if not any(p.name == "exc" for p in func.params):
+        if func.always_succeeds or func.is_support:
             continue
 
-        # FIXME If the function returns a ypObject * it doesn't need exc
+        if not func.is_exc:
+            has_out_params = (
+                any(p.type == "ypObject **" for p in func.params)
+                or func.rootname == "yp_unpack"
+            )
+            if func.returntype != "ypObject *" and not has_out_params:
+                warnings.append(
+                    f"must return `ypObject *` or have `ypObject **` output parameter: {func.name}"
+                )
+            continue
+
+        if func.returntype == "ypObject *":
+            warnings.append(
+                f"`ypObject **exc` not necessary, `ypObject *` is returned: {func.name}"
+            )
+
         if "L" not in func.postfixes and func.params[0].type != "ypObject *":
             warnings.append(
-                "first parameter of exc function isn't `ypObject *`: {}".format(
-                    func.name
-                )
+                f"first parameter of non-L exc function isn't `ypObject *`: {func.name}"
             )
 
         exc_param = func.params[-3] if func.is_vararg else func.params[-1]
         if exc_param.type != "ypObject **" or exc_param.name != "exc":
             warnings.append(
-                "`ypObject **exc` parameter not in expected location: {}".format(
-                    func.name
-                )
+                f"`ypObject **exc` parameter not in expected location: {func.name}"
             )

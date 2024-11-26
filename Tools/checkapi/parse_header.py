@@ -10,8 +10,8 @@ from typing import Callable, TypeVar
 from pycparser import c_generator, c_ast, CParser
 import re
 
-K = TypeVar('K')
-V = TypeVar('V')
+K = TypeVar("K")
+V = TypeVar("V")
 
 
 def setdefault_call(d: dict[K, V], key: K, default_callable: Callable[[], V]):
@@ -87,6 +87,17 @@ class ypFunction:
         r"^(?P<root>yp_([ois]2[ois]_)?([a-z_]+|(asu?int\d+)|(asfloat\d+)))"
         r"(?P<post>(CF?)?(LF?)?(NV?)?(KV?)?D?X?(?P<post_paramcnt>\d?))$"
     )
+    _always_succeeds_roots = frozenset(
+        ("yp_incref", "yp_decref", "yp_isexception", "yp_iscallable", "yp_type")
+    )
+    _support_names = frozenset(
+        (
+            "yp_initialize",
+            "yp_mem_default_malloc",
+            "yp_mem_default_malloc_resize",
+            "yp_mem_default_free",
+        )
+    )
 
     name: str
     params: list[ypParameter]
@@ -94,7 +105,10 @@ class ypFunction:
     rootname: str
     postfixes: str
     postfix_param_count: int | None
-    is_vararg: bool
+    is_vararg: bool  # Works with variable arguments.
+    is_exc: bool  # Returns exceptions through a `ypObject **exc` parameter.
+    always_succeeds: bool  # Does not raise exceptions.
+    is_support: bool  # Supports nohtyP (i.e. yp_initialize, yp_mem_*).
 
     @classmethod
     def from_Decl(cls, declnode: c_ast.Decl):
@@ -126,6 +140,9 @@ class ypFunction:
         post_paramcnt = namematch.group("post_paramcnt")
         self.postfix_param_count = int(post_paramcnt) if post_paramcnt else None
         self.is_vararg = "N" in postfixes or "K" in postfixes or "V" in postfixes
+        self.is_exc = any(p.name == "exc" for p in self.params)
+        self.always_succeeds = self.rootname in ypFunction._always_succeeds_roots
+        self.is_support = self.name in ypFunction._support_names
 
     def __str__(self):
         return "%s (%s): %r" % (
@@ -140,7 +157,8 @@ class ypHeader:
 
     def __init__(self):
         self.funcs = list[ypFunction]()
-        self.name2funcs = dict[str, list[ypFunction]]()  # a few functions are listed twice or more
+        # A few functions are listed twice or more, so we store as a list.
+        self.name2funcs = dict[str, list[ypFunction]]()
         self.root2funcs = dict[str, list[ypFunction]]()
 
     def add_func(self, func: ypFunction):
