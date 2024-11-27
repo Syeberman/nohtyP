@@ -2,7 +2,7 @@
  * nohtyP.h - A Python-like API for C, in one .c and one .h
  *
  *      https://github.com/Syeberman/nohtyP   [v0.1.0 $Change$]
- *      Copyright (c) 2001-2020 Python Software Foundation; All Rights Reserved
+ *      Copyright (c) 2001 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  *
  * The goal of nohtyP is to enable Python-like code to be written in C. It is patterned after
@@ -55,13 +55,13 @@
  *
  *      C - C native types are accepted and returned where appropriate
  *      L - Library routines that operate strictly on C types
- *      F - A version of "C" or "L" that accepts floats in place of ints
+ *      CF, LF - A version of "C" or "L" that accepts floats in place of ints
  *      N - n variable positional arguments follow
  *      K - n key/value arguments follow (for a total of n*2 arguments)
  *      NV, KV - A version of "N" or "K" that accepts a va_list in place of ...
  *      D - Discard after use (ie yp_IFd)
  *      X - Direct access to internal memory or borrowed objects; tread carefully!
- *      # (number) - A function with # inputs that shares the same name as another function
+ *      # (number) - A function with # parameters that shares the same name as another function
  */
 
 

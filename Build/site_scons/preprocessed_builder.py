@@ -1,8 +1,8 @@
 """Used by the compilers to configure a "Preprocessed" Builder.
 """
-import SCons.Tool
-import SCons.Builder
 
+import SCons.Builder
+import SCons.Tool
 
 # TODO Contribute this back to SCons
 
@@ -15,28 +15,26 @@ for suffix in CPreprocessedSuffix:
 
 def createPreprocessedBuilder(env):
     """This is a utility function that creates the Preprocessed Builders in an Environment if they
-    are not there already.
-
-    If they are there already, we return the existing one.
+    are not there already. Preprocessed Builders run the environment's compiler in a
+    preprocessor-only mode. If the Builder is there already, we return the existing one.
 
     Returns the Preprocessed builder.
     """
 
     try:
-        preprocessed = env['BUILDERS']['Preprocessed']
+        preprocessed = env["BUILDERS"]["Preprocessed"]
     except KeyError:
-        preprocessed = SCons.Builder.Builder(action={},
-                                             emitter={},
-                                             #prefix = '',
-                                             # TODO gcc uses different suffixes for C and C++
-                                             #suffix = '$CPREPROCESSEDSUFFIX',
-                                             src_builder=['CFile', 'CXXFile'],
-                                             source_scanner=SCons.Tool.SourceFileScanner,
-                                             single_source=True)
-        env['BUILDERS']['Preprocessed'] = preprocessed
+        preprocessed = SCons.Builder.Builder(
+            action={},
+            emitter={},
+            src_builder=["CFile", "CXXFile"],
+            source_scanner=SCons.Tool.SourceFileScanner,
+            single_source=True,
+        )
+        env["BUILDERS"]["Preprocessed"] = preprocessed
 
-        # TODO msvc preprocesses both C and C++ files with a .i extension; gcc keeps them separate
-        env.SetDefault(CPREPROCESSEDSUFFIX='.i')
-        env.SetDefault(CXXPREPROCESSEDSUFFIX='.ii')
+        # XXX msvc preprocesses both C and C++ files with a .i extension; gcc keeps them separate
+        env.SetDefault(CPREPROCESSEDSUFFIX=".i")
+        env.SetDefault(CXXPREPROCESSEDSUFFIX=".ii")
 
     return preprocessed

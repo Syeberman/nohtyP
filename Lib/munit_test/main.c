@@ -3,8 +3,6 @@
 #include <stdlib.h>
 
 
-// TODO Write a pycparser script that ensures all test functions lead back to here. Also to ensure
-// the suite names match the directory/file names.
 static MunitSuite munit_test_suite = {
         "",                     /* prefix */
         NULL,                   /* tests */

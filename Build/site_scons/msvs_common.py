@@ -7,6 +7,7 @@ import SCons.Errors
 import SCons.Tool
 import SCons.Tool.MSCommon.vs
 import SCons.Warnings
+import msvs_analysis
 import msvs_preprocessed
 
 # Disables "MSVC_USE_SCRIPT set to False" warnings. Unfortunately, also disables "No version of
@@ -62,7 +63,7 @@ def _linkEmitter(target, source, env):
     return target, source
 
 
-def _updateLinkEmitters(env, version):
+def _updateLinkEmitters(env):
     env.Append(
         PROGEMITTER=[
             _linkEmitter,
@@ -83,7 +84,6 @@ def ApplyMSVSOptions(env, version):
     def addCcFlags(*args):
         env.AppendUnique(CCFLAGS=list(args))
 
-    # TODO /analyze? (enable /Wall, disable /WX, suppress individual warnings)
     addCcFlags(
         # Warning level 3
         "/W3",
@@ -138,6 +138,31 @@ def ApplyMSVSOptions(env, version):
     else:
         addCppDefines("NDEBUG")
 
+    def addAnalysisFlags(*args):
+        env.AppendUnique(SACCFLAGS=list(args))
+
+    # TODO Are there other Espx engine plugins?
+    env.AppendENVPath(
+        "Esp.Extensions",
+        [
+            "ConcurrencyCheck.dll",
+            "CppCoreCheck.dll",
+            "EnumIndex.dll",
+            "HResultCheck.dll",
+            "VariantClear.dll",
+        ],
+    )
+    addAnalysisFlags(
+        # Suppress startup banner.
+        "/nologo",
+        # Enable all warnings, including the /sdl and /GS warnings.
+        "/Wall",
+        # Enable code analysis.
+        "/analyze",
+        # TODO Are there other analyze plugins?
+        ["/analyze:plugin", "EspxEngine.dll"],
+    )
+
     def addLinkFlags(*args):
         env.AppendUnique(LINKFLAGS=list(args))
 
@@ -174,11 +199,15 @@ def ApplyMSVSOptions(env, version):
     if _crtRequiresManifest(version):
         env["WINDOWS_EMBED_MANIFEST"] = True
     # Ensure SCons knows to clean .map, etc
-    _updateLinkEmitters(env, version)
+    _updateLinkEmitters(env)
 
 
-def DefineMSVSToolFunctions(numericVersion, supportedVersions):
-    """Returns (generate, exists), suitable for use as the SCons tool module functions."""
+def DefineMSVSToolFunctions(numericVersion, sconsKeys):
+    """Returns (generate, exists), suitable for use as the SCons tool module functions.
+
+    numericVersion: Adjusts compiler options; refers to the Visual Studio version.
+    sconsKeys: The key SCons uses for MSVC_VERSION; refers to the Visual C++ version.
+    """
 
     def generate(env):
         if env["TARGET_OS"] != "win32":
@@ -205,7 +234,7 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         if compilerEnv is None:
             raise SCons.Errors.StopError(
                 "Visual Studio %r (%r) disabled in %s"
-                % (supportedVersions[0], env["TARGET_ARCH"], toolsConfig.basename)
+                % (sconsKeys[0], env["TARGET_ARCH"], toolsConfig.basename)
             )
 
         # If there was an entry in site_toolsconfig.py, then explicitly use that environment
@@ -223,7 +252,7 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         # XXX get_vs_by_version is internal to SCons and may change in the future
         # FIXME This slows the build down. Cache MSVC_VERSION like we cache INCLUDE/etc
         # (except recall that MSVC_VERSION is not in env["ENV"] like the rest).
-        for version in supportedVersions:
+        for version in sconsKeys:
             try:
                 if SCons.Tool.MSCommon.vs.get_vs_by_version(version):
                     break
@@ -232,7 +261,7 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         else:
             toolsConfig.update({compilerEnv_name: None})
             raise SCons.Errors.UserError(
-                "Visual Studio %r is not installed" % supportedVersions[0]
+                "Visual Studio %r is not installed" % sconsKeys[0]
             )
         env["MSVC_VERSION"] = version
 
@@ -244,12 +273,13 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         # FIXME Report this back to SCons
         if env["_MANIFEST_SOURCES"] is None:
             env["_MANIFEST_SOURCES"] = ""
+        msvs_analysis.generate_AnalysisBuilder(env)
         msvs_preprocessed.generate_PreprocessedBuilder(env)
         if not env.WhereIs("$CC"):
             toolsConfig.update({compilerEnv_name: None})
             raise SCons.Errors.StopError(
                 "Visual Studio %r (%r) configuration failed"
-                % (supportedVersions[0], env["TARGET_ARCH"])
+                % (sconsKeys[0], env["TARGET_ARCH"])
             )
 
         # Add an entry for this compiler in site_toolsconfig.py if it doesn't already exist

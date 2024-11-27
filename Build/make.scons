@@ -5,7 +5,7 @@ import SCons.Defaults
 import SCons.Errors
 import SCons.Tool
 import SCons.Util
-from site_scons.build_environments import AddBuildTargets
+from site_scons.build_environments import AddBuildTargets, BuildTargets
 from site_scons.root_environment import MakeRootEnv, SconscriptLog
 from site_scons.utilities import GetImportLibrary, GetProgram, GetSharedLibrary
 
@@ -41,7 +41,10 @@ def nohtyP_SharedLibrary(env):
         LIBS=[],
     )
     env.Replace(PDB="$VTOP/nohtyP.pdb")
-    return env.SharedLibrary("$VTOP/nohtyP", source="$VTOP/nohtyP.c")
+    sharedLib = env.SharedLibrary("$VTOP/nohtyP", source="$VTOP/nohtyP.c")
+    # TODO It'd be neat if you gave Analysis sharedLib and it figured out the source files to analyze.
+    sharedLibAnalysis = env.Analysis("$VTOP/nohtyP", source="$VTOP/nohtyP.c")
+    return sharedLib, sharedLibAnalysis
 
 
 # Builds the munit_test suite against the shared library.
@@ -85,7 +88,7 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
     return env.Program("$VTOP/munit_test", source=source)
 
 
-def maybe_cov_branch_flags(env, target):
+def maybe_cov_branch_flags(target, source, env, for_signature):
     """Disable branch coverage from the tests and libraries. Ideally we would collect all data,
     including branch coverage, and then ignore it in the reports. Unfortunately, neither Gcovr nor
     Codecov has this ability, so we configure this via Gcov options.
@@ -108,9 +111,8 @@ def CoverageCommand(env, *, cov_target, cmd_target, cmd_source, cmd_action):
             COVDATADIR="$VTOP",
             COVTESTACTION=cmd_action,
             COVCOMSTR="Analyzing $SOURCE",
-            maybe_cov_branch_flags=maybe_cov_branch_flags,
         )
-        env.Append(COVFLAGS=["${maybe_cov_branch_flags(__env__, TARGET)}"])
+        env.Append(COVFLAGS=[maybe_cov_branch_flags])
         cov_node, cmd_node = env.Coverage(
             target=(cov_target, cmd_target), source=cmd_source
         )
@@ -165,6 +167,8 @@ def nohtyP_checkapi(env):
     # only recognizes .c (etc) files so we make a copy with that extension. Use dummy versions
     # of standard headers that work well with pycparser.
     env.PrependUnique(CPPPATH=["#", "#/Include/fake_libc_include"], PDB="", LIBS="")
+    env.PrependENVPath("PYTHONPATH", "#/Tools/pycparser")
+
     headerDotC = env.Command(
         target="$VTOP/checkapi/nohtyP_h.c",
         source="$VTOP/nohtyP.h",
@@ -172,8 +176,11 @@ def nohtyP_checkapi(env):
     )
     preprocessed = env.Preprocessed("$VTOP/checkapi/nohtyP_h", source=headerDotC)
 
-    # TODO Have checkapi write directly to the file
-    scripts = (env.Glob("#/Tools/checkapi/*.py"),)
+    scripts = (
+        env.Glob("#/Tools/checkapi/*.py"),
+        env.Glob("#/Tools/pycparser/pycparser/*.py"),
+        env.Glob("#/Tools/pycparser/pycparser/ply/*.py"),
+    )
     checkapiLog = env.Command(
         target="$VTOP/checkapi.log",
         source=(preprocessed, scripts),
@@ -189,34 +196,35 @@ python_38_to_312 = SCons.Tool.Tool("python_38_to_312")
 pclint = SCons.Tool.Tool("pclint")
 
 
-def MakeCompilerTargets(compilerEnv):
-    sharedLib = nohtyP_SharedLibrary(compilerEnv.Clone())
+def MakeBuildTargets(compilerEnv):
+    targets = BuildTargets()
 
-    # checkapi requires Python 3, but so do our build scripts, so this should not raise errors.
-    checkapi = nohtyP_checkapi(compilerEnv.Clone(tools=[python_3]))
+    sharedLib, sharedLibAnalysis = nohtyP_SharedLibrary(compilerEnv.Clone())
+    targets.build.append(sharedLib)
+    targets.test.append(sharedLib)
+    targets.coverage.append(sharedLib)
 
-    # These collect all the build, test, analysis, and coverage targets, including:
-    #   - the C and C# builds of the nohtyP shared library
-    #   - python_test and ypExamples results
-    #   - checkapi.py, PC-lint, expanded compiler warnings
-    #   - targets that copy the above to Build/native (why sharedLib is in every one)
-    buildTargets = [sharedLib]
-    testTargets = [sharedLib]
-    analyzeTargets = [sharedLib, checkapi]
-    coverageTargets = [sharedLib]
+    # We run the compiler's static analysis with the latest installed version of each compiler.
+    if compilerEnv["IS_COMPILER_ANALYSIS_TARGET"]:
+        targets.analyze.append(sharedLibAnalysis)
 
+    # checkapi doesn't depend on the compiler/etc, so we only run it once.
+    if compilerEnv["IS_CHECKAPI_TARGET"]:
+        checkapi = nohtyP_checkapi(compilerEnv.Clone(tools=[python_3]))
+        targets.analyze.append(checkapi)
+
+    # We can only run munit_test on native OS and architectures.
     if compilerEnv["IS_NATIVE_TARGET"]:
-        # We can only run munit_test on native OS and architectures.
         cov_archive, test_log = nohtyP_munit_test(
             compilerEnv.Clone(),
             nohtyP_munit_test_Program_shared(compilerEnv.Clone(), sharedLib),
         )
-        testTargets.append(test_log)
-        coverageTargets.append(cov_archive)
+        targets.test.append(test_log)
+        targets.coverage.append(cov_archive)
 
         # python_test requires a minimum version of Python.
         try:
-            testTargets.append(
+            targets.test.append(
                 nohtyP_python_test(
                     compilerEnv.Clone(
                         tools=[
@@ -229,10 +237,10 @@ def MakeCompilerTargets(compilerEnv):
         except (SCons.Errors.UserError, SCons.Errors.StopError):
             traceback.print_exc(file=SconscriptLog)
 
-    return buildTargets, testTargets, analyzeTargets, coverageTargets
+    return targets
 
 
-AddBuildTargets(RootEnv, MakeCompilerTargets)
+AddBuildTargets(RootEnv, MakeBuildTargets)
 
 
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to

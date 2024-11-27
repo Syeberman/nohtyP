@@ -16,8 +16,7 @@ image:
   - Ubuntu2204
   - macOS-Sonoma
   - Visual Studio 2022
-  # TODO Support Visual Studio 2019 (msvs_160:win32)
-  # - Visual Studio 2019
+  - Visual Studio 2019
   - Ubuntu
   - Visual Studio 2017
   - Visual Studio 2015
@@ -66,17 +65,15 @@ for:
       only:
         - image: Visual Studio 2022
     environment:
-      # TODO Support Visual Studio 2022 (msvs_170:win32)
       # TODO The docs say gcc_5:win32 is available, but it's not...
       # TODO Qt contains MinGW builds (MinGW 9.0.0 64 bit: C:\Qt\6.5.3\mingw_64)
       # TODO Qt contains MinGW builds (MinGW 8.1.0: C:\Qt\Tools\mingw810_32)
-      YP_COMPILER_OSES: gcc_8:win32
+      YP_COMPILER_OSES: msvs_17:win32 gcc_8:win32
   - matrix:
       only:
         - image: Visual Studio 2019
     environment:
-      # TODO Support Visual Studio 2019 (msvs_160:win32)
-      YP_COMPILER_OSES:
+      YP_COMPILER_OSES: msvs_16:win32
   - matrix:
       only:
         - image: Ubuntu
@@ -86,8 +83,7 @@ for:
       only:
         - image: Visual Studio 2017
     environment:
-      # TODO Support Visual Studio 2017 (msvs_150:win32)
-      YP_COMPILER_OSES: gcc_7:win32 msvs_140:win32
+      YP_COMPILER_OSES: msvs_15:win32 gcc_7:win32 msvs_140:win32
       # TODO Figure out why gcc_7:win32:x86 isn't available
       YP_SKIP_TARGETS: gcc_7:win32:x86
   - matrix:

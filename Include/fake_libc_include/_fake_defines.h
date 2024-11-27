@@ -33,6 +33,9 @@
 #define RAND_MAX 32767
 #define INT_MAX 32767
 
+#define SSIZE_MAX 0x7FFFFFFFFFFFFFFFL
+#define SIZE_MAX 0xFFFFFFFFFFFFFFFFuL
+
 /* C99 stdbool.h defines */
 #define __bool_true_false_are_defined 1
 #define false 0

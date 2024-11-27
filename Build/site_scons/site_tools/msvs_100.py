@@ -1,6 +1,7 @@
 # Visual Studio 2010
 
 import msvs_common
+
 _generate, _exists = msvs_common.DefineMSVSToolFunctions(10.0, ("10.0", "10.0Exp"))
 
 
