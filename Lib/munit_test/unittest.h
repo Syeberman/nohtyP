@@ -1061,6 +1061,16 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 yp_ssize_t yp_lenC_not_raises(ypObject *container);
 
 
+// Simulate an out-of-memory condition after the given number of successful allocations. If
+// successful is zero, the next allocation will fail. All allocations will fail once the OOM counter
+// reaches zero, until it is reset by malloc_tracker_oom_after or malloc_tracker_oom_disable.
+extern void malloc_tracker_oom_after(int successful);
+
+// Allow all subsequent allocations to succeed. This can be called at any time, regardless of the
+// status of the OOM counter. The OOM counter is automatically disabled at the start of each test.
+extern void malloc_tracker_oom_disable(void);
+
+
 extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size);
 extern void *malloc_tracker_malloc_resize(
         yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);

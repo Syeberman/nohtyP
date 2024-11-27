@@ -2107,12 +2107,16 @@ extern yp_ssize_t yp_lenC_not_raises(ypObject *container)
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {
+    // Simulate "out of memory" after this many allocations. Set to negative to disable.
+    int        oom;
     yp_ssize_t len;
     void      *mallocs[MALLOC_TRACKER_MAX_LEN];
-} malloc_tracker = {0};
+} malloc_tracker = {-1, 0};
 
 static void malloc_tracker_fixture_setup(void)
 {
+    // Disable simulated OOM states unless the test specifically configures this.
+    malloc_tracker.oom = -1;
     // We only track allocations made during the test, to verify they have been freed by the end.
     malloc_tracker.len = 0;
 }
@@ -2151,18 +2155,39 @@ static void malloc_tracker_pop(void *p)
     }
 }
 
+extern void malloc_tracker_oom_after(int successful)
+{
+    munit_assert_int(successful, >=, 0);
+    malloc_tracker.oom = successful;
+}
+
+extern void malloc_tracker_oom_disable(void) { malloc_tracker.oom = -1; }
+
+// Called before we actually allocate memory. Returns true iff we should simulate an OOM condition.
+// Otherwise, updates the OOM counter, which will possibly cause the next allocation to fail.
+static int malloc_tracker_oom_fail_alloc(void)
+{
+    if (malloc_tracker.oom == 0) return TRUE;
+    if (malloc_tracker.oom > 0) malloc_tracker.oom--;
+    return FALSE;
+}
+
 extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
-    void *p = yp_mem_default_malloc(actual, size);
-    if (p != NULL) malloc_tracker_push(p);
+    void *p;
+    if (malloc_tracker_oom_fail_alloc()) return NULL;
+    assert_not_null(p = yp_mem_default_malloc(actual, size));
+    malloc_tracker_push(p);
     return p;
 }
 
 extern void *malloc_tracker_malloc_resize(
         yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
-    void *newP = yp_mem_default_malloc_resize(actual, p, size, extra);
-    if (newP != NULL && newP != p) malloc_tracker_push(newP);
+    void *newP;
+    if (malloc_tracker_oom_fail_alloc()) return NULL;
+    assert_not_null(newP = yp_mem_default_malloc_resize(actual, p, size, extra));
+    if (newP != p) malloc_tracker_push(newP);
     return newP;
 }
 
