@@ -450,6 +450,189 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
+static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *items[16];
+    obj_array_fill(items, uq, type->rand_items);
+
+    // _ypSet_issubset_withiter
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_listN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_issubset(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_update_fromset
+    {
+        ypObject *so = yp_setN(0);
+        ypObject *x = type->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[8], items[9], items[10], items[11], items[12], items[13],
+                items[14], items[15]));
+        malloc_tracker_oom_after(0);
+        assert_raises_exc(yp_update(so, x, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_update_fromiter
+    if (type->is_mutable) {
+        ypObject *so = type->newN(0);
+        ypObject *x = yp_listN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[8], items[9], items[10], items[11], items[12], items[13],
+                items[14], items[15]));
+        malloc_tracker_oom_after(0);
+        assert_raises_exc(yp_update(so, x, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_intersection_update_fromiter
+    if (type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_listN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises_exc(yp_intersection_update(so, x, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_symmetric_difference_update_fromset
+    {
+        ypObject *so = yp_setN(0);
+        ypObject *x = type->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[8], items[9], items[10], items[11], items[12], items[13],
+                items[14], items[15]));
+        malloc_tracker_oom_after(0);
+        assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_union_fromset, copy
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_frozensetN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_union(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_union_fromset, resize
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_frozensetN(
+                N(items[2], items[3], items[4], items[5], items[6], items[7], items[8], items[9],
+                        items[10], items[11], items[12], items[13], items[14], items[15]));
+        malloc_tracker_oom_after(1);  // allow _ypSet_copy to succeed
+        assert_raises(yp_union(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_union_fromiter, copy
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_listN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_union(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_union_fromiter, resize
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_listN(
+                N(items[2], items[3], items[4], items[5], items[6], items[7], items[8], items[9],
+                        items[10], items[11], items[12], items[13], items[14], items[15]));
+        malloc_tracker_oom_after(1);  // allow _ypSet_copy to succeed
+        assert_raises(yp_union(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_intersection_fromset
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_frozensetN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_intersection(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_intersection_fromiter
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_listN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_intersection(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_difference_fromset
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_frozensetN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_difference(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_difference_fromiter
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_listN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_difference(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_symmetric_difference_fromset, copy
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_frozensetN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_symmetric_difference(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_symmetric_difference_fromset, resize
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_frozensetN(
+                N(items[2], items[3], items[4], items[5], items[6], items[7], items[8], items[9],
+                        items[10], items[11], items[12], items[13], items[14], items[15]));
+        malloc_tracker_oom_after(1);  // allow _ypSet_copy to succeed
+        assert_raises(yp_symmetric_difference(so, x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(so, x));
+    }
+
+    // _ypSet_fromiterable
+    {
+        ypObject *x = yp_listN(N(items[1], items[2]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_set(x), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(x));
+    }
+
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
 
 char *param_values_test_frozenset[] = {"frozenset", "set", "frozenset_dirty", "set_dirty", NULL};
 
@@ -458,7 +641,7 @@ static MunitParameterEnum test_frozenset_params[] = {
 
 MunitTest test_frozenset_tests[] = {TEST(test_newN, test_frozenset_params),
         TEST(test_new, test_frozenset_params), TEST(test_call_type, test_frozenset_params),
-        TEST(test_miniiter, test_frozenset_params), {NULL}};
+        TEST(test_miniiter, test_frozenset_params), TEST(test_oom, test_frozenset_params), {NULL}};
 
 
 extern void test_frozenset_initialize(void) {}
