@@ -282,13 +282,12 @@ def ApplyGCCOptions(env, version):
     def addAnalysisFlags(*args):
         env.AppendUnique(SACCFLAGS=list(args))
 
-    # TODO -nostdinc for analyze?
-    # TODO -fcallgraph-info for analyze? or -fanalyzer
-    # TODO `gcc.exe -c -fanalyzer nohtyP.c` emits a nohtyP.o file
+    # TODO -fcallgraph-info for analyze?
     addAnalysisFlags(
         "-Wall",
         "-Wextra",
-        # "-fanalyzer",
+        # TODO I'm not seeing any new warnings with -fanalyzer on Windows.
+        "-fanalyzer",
         # There are too many unused parameters for this to be useful.
         "-Wno-unused-parameter",
         # Initializing missing fields to zero is well-defined behaviour.
