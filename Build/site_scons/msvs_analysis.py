@@ -30,12 +30,18 @@ def cxx_analysis_emitter(target, source, env):
     return _analysis_emitter(target, source, env, suffix)
 
 
-CAnalysisAction = SCons.Action.Action(
-    "$SACCCOM", "$SACCCOMSTR", batch_key=msvc_batch_key, targets="$CHANGED_TARGETS"
-)
-CXXAnalysisAction = SCons.Action.Action(
-    "$SACXXCOM", "$SACXXCOMSTR", batch_key=msvc_batch_key, targets="$CHANGED_TARGETS"
-)
+def make_analysis_action(cmd, cmdstr):
+    return SCons.Action.Action(
+        cmd,
+        cmdstr,
+        batch_key=msvc_batch_key,
+        targets="$CHANGED_TARGETS",
+        varlist=["ENV['Esp.Extensions']"],
+    )
+
+
+CAnalysisAction = make_analysis_action("$SACCCOM", "$SACCCOMSTR")
+CXXAnalysisAction = make_analysis_action("$SACXXCOM", "$SACXXCOMSTR")
 
 
 def generate_AnalysisBuilder(env):
@@ -51,9 +57,9 @@ def generate_AnalysisBuilder(env):
 
     # SACC is the static analysis mode for CC, the C compiler (compare with SHCC et al)
     # XXX Warnings are written to stdout.
-    # FIXME Code analysis also creates a log file named filename.nativecodeanalysis.xml, where
+    # TODO Code analysis can also create a log file named filename.nativecodeanalysis.xml, where
     # filename is the name of the analyzed source file. I've disabled this for now with
-    # `/analyze:autolog-`... but should we prefer this?
+    # `/analyze:autolog-`... but should we prefer this over redirecting stdout?
     # TODO Should SACXXFLAGS/etc reference CXXFLAGS/etc, like SHCXXFLAGS/etc does?
     env["SACC"] = "$CC"
     env["SACCCOM"] = (

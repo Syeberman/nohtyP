@@ -142,8 +142,6 @@ def ApplyMSVSOptions(env, version):
         env.AppendUnique(SACCFLAGS=list(args))
 
     # TODO Are there other Espx engine plugins?
-    # FIXME Trigger recompilation when changed. When creating the Action, I think this will work:
-    #   varlist=["ENV['Esp.Extensions']"]
     env.AppendENVPath(
         "Esp.Extensions",
         [
