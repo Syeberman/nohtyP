@@ -2,7 +2,7 @@
  * nohtyP.h - A Python-like API for C, in one .c and one .h
  *
  *      https://github.com/Syeberman/nohtyP   [v0.1.0 $Change$]
- *      Copyright (c) 2001-2020 Python Software Foundation; All Rights Reserved
+ *      Copyright (c) 2001 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  *
  * The goal of nohtyP is to enable Python-like code to be written in C. It is patterned after

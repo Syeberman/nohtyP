@@ -1,7 +1,7 @@
 This is nohtyP version 0.5.0
 ============================
 
-Copyright (c) 2001-2020 Python Software Foundation. All rights reserved.
+Copyright (c) 2001 Python Software Foundation. All rights reserved.
 
 nohtyP is a pure-C implementation of the Python 3.x built-in library. It is implemented in one .c
 and one .h file for easy embedding in C projects. The API is designed to compensate for C's
@@ -76,7 +76,7 @@ Copyright and License Information
 
 As a derivative work of Python, nohtyP shares the same copyrights and licenses.
 
-Copyright (c) 2001-2020 Python Software Foundation. All rights reserved.
+Copyright (c) 2001 Python Software Foundation. All rights reserved.
 
 Copyright (c) 2000 BeOpen.com. All rights reserved.
 
@@ -90,7 +90,7 @@ usage, and a DISCLAIMER OF ALL WARRANTIES.
 nohtyP is patterned after, and contains source from, Python 2.7 and above. nohtyP has always been
 released under a Python Software Foundation (PSF) license. Source taken from Python comes from
 distributions containing *no* GNU General Public License (GPL) code. As such, nohtyP may be used in
-proprietary projects.
+proprietary projects. There are interfaces to some GNU code but these are entirely optional.
 
 All trademarks referenced herein are property of their respective holders.
 
