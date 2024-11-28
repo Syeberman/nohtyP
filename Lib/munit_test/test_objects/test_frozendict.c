@@ -892,6 +892,171 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
 }
 
 
+static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *str_keys[] = obj_array_init(16, rand_obj(uq, fixture_type_str));
+    ypObject       *keys[16];
+    obj_array_fill(keys, uq, type->rand_items);
+
+    // _ypDict_copy
+    {
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_unfrozen_copy(mp), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp));
+    }
+
+    // _ypDict_update_fromdict, new keyset
+    if (type->is_mutable) {
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        ypObject *x = yp_frozendict_fromkeysN(
+                yp_None, N(keys[2], keys[3], keys[4], keys[5], keys[6], keys[7], keys[8], keys[9],
+                                 keys[10], keys[11], keys[12], keys[13], keys[14], keys[15]));
+        malloc_tracker_oom_after(0);
+        assert_raises_exc(yp_update(mp, x, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp, x));
+    }
+
+    // _ypDict_update_fromdict, resize
+    if (type->is_mutable) {
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        ypObject *x = yp_frozendict_fromkeysN(
+                yp_None, N(keys[2], keys[3], keys[4], keys[5], keys[6], keys[7], keys[8], keys[9],
+                                 keys[10], keys[11], keys[12], keys[13], keys[14], keys[15]));
+        malloc_tracker_oom_after(1);  // allow _ypSet_new to succeed
+        assert_raises_exc(yp_update(mp, x, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp, x));
+    }
+
+    // dict_clear
+    if (type->is_mutable) {
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        malloc_tracker_oom_after(0);
+        assert_raises_exc(yp_clear(mp, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp));
+    }
+
+    // dict_setdefault
+    if (type->is_mutable) {
+        int       i;
+        ypObject *result = yp_None;
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        malloc_tracker_oom_after(0);
+        for (i = 2; i < yp_lengthof_array(keys); i++) {
+            result = yp_setdefault(mp, keys[i], yp_None);
+            if (yp_isexceptionC(result)) break;
+        }
+        assert_isexception(result, yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp));
+    }
+
+    // frozendict_func_new_code/dict_func_new_code, new keyset
+    {
+        ypObject *x = yp_dictK(0);
+        ypObject *args = yp_tupleN(N(x));
+        ypObject *kwargs = yp_frozendict_fromkeysN(yp_None, N(str_keys[0]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_call_stars(type->type, args, kwargs), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(kwargs, args, x));
+    }
+
+    // frozendict_func_new_code/dict_func_new_code, new dict
+    {
+        ypObject *x = yp_dictK(0);
+        ypObject *args = yp_tupleN(N(x));
+        ypObject *kwargs = yp_frozendict_fromkeysN(yp_None, N(str_keys[0]));
+        malloc_tracker_oom_after(1);  // allow _ypDict_new (keyset) to succeed
+        assert_raises(yp_call_stars(type->type, args, kwargs), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(kwargs, args, x));
+    }
+
+    // frozendict_func_new_code/dict_func_new_code, resize
+    {
+        ypObject *x = yp_dictK(0);
+        ypObject *args = yp_tupleN(N(x));
+        ypObject *kwargs = yp_frozendict_fromkeysN(yp_None,
+                N(str_keys[0], str_keys[1], str_keys[2], str_keys[3], str_keys[4], str_keys[5],
+                        str_keys[6], str_keys[7], str_keys[8], str_keys[9], str_keys[10],
+                        str_keys[11], str_keys[12], str_keys[13], str_keys[14], str_keys[15]));
+        malloc_tracker_oom_after(2);  // allow _ypDict_new (keyset and dict) to succeed
+        assert_raises(yp_call_stars(type->type, args, kwargs), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(kwargs, args, x));
+    }
+
+    // _ypDictKV, new keyset
+    {
+        malloc_tracker_oom_after(0);
+        if (type->type == yp_t_frozendict) {
+            assert_raises(yp_frozendictK(K(keys[0], yp_None)), yp_MemoryError);
+        } else {
+            assert_raises(yp_dictK(K(keys[0], yp_None)), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypDictKV, new dict
+    {
+        malloc_tracker_oom_after(1);  // allow _ypDict_new (keyset) to succeed
+        if (type->type == yp_t_frozendict) {
+            assert_raises(yp_frozendictK(K(keys[0], yp_None)), yp_MemoryError);
+        } else {
+            assert_raises(yp_dictK(K(keys[0], yp_None)), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypDict_new_fromiterable
+    {
+        ypObject *x = new_itemsK(fixture_type_list, K(keys[0], yp_None));
+        malloc_tracker_oom_after(0);
+        if (type->type == yp_t_frozendict) {
+            assert_raises(yp_frozendict(x), yp_MemoryError);
+        } else {
+            assert_raises(yp_dict(x), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(x));
+    }
+
+    // _ypDict_fromkeysNV
+    {
+        malloc_tracker_oom_after(0);
+        if (type->type == yp_t_frozendict) {
+            assert_raises(yp_frozendict_fromkeysN(yp_None, N(keys[0])), yp_MemoryError);
+        } else {
+            assert_raises(yp_dict_fromkeysN(yp_None, N(keys[0])), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypDict_fromkeys
+    {
+        ypObject *x = yp_listN(N(keys[0]));
+        malloc_tracker_oom_after(0);
+        if (type->type == yp_t_frozendict) {
+            assert_raises(yp_frozendict_fromkeys(x, yp_None), yp_MemoryError);
+        } else {
+            assert_raises(yp_dict_fromkeys(x, yp_None), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(x));
+    }
+
+    obj_array_decref(keys);
+    obj_array_decref(str_keys);
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
 char *param_values_test_frozendict[] = {
         "frozendict", "dict", "frozendict_dirty", "dict_dirty", NULL};
 
@@ -901,7 +1066,8 @@ static MunitParameterEnum test_frozendict_params[] = {
 MunitTest test_frozendict_tests[] = {TEST(test_newK, test_frozendict_params),
         TEST(test_new, test_frozendict_params), TEST(test_call_type, test_frozendict_params),
         TEST(test_fromkeysN, test_frozendict_params), TEST(test_fromkeys, test_frozendict_params),
-        TEST(test_miniiter, test_frozendict_params), {NULL}};
+        TEST(test_miniiter, test_frozendict_params), TEST(test_oom, test_frozendict_params),
+        {NULL}};
 
 
 extern void test_frozendict_initialize(void) {}

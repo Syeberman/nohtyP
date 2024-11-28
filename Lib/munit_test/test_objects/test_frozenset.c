@@ -468,9 +468,9 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     }
 
     // _ypSet_update_fromset
-    {
-        ypObject *so = yp_setN(0);
-        ypObject *x = type->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+    if (type->is_mutable) {
+        ypObject *so = type->newN(0);
+        ypObject *x = yp_frozensetN(N(items[0], items[1], items[2], items[3], items[4], items[5],
                 items[6], items[7], items[8], items[9], items[10], items[11], items[12], items[13],
                 items[14], items[15]));
         malloc_tracker_oom_after(0);
@@ -502,9 +502,9 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     }
 
     // _ypSet_symmetric_difference_update_fromset
-    {
-        ypObject *so = yp_setN(0);
-        ypObject *x = type->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+    if (type->is_mutable) {
+        ypObject *so = type->newN(0);
+        ypObject *x = yp_frozensetN(N(items[0], items[1], items[2], items[3], items[4], items[5],
                 items[6], items[7], items[8], items[9], items[10], items[11], items[12], items[13],
                 items[14], items[15]));
         malloc_tracker_oom_after(0);
@@ -619,11 +619,26 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(so, x));
     }
 
+    // _ypSetNV
+    {
+        malloc_tracker_oom_after(0);
+        if (type->type == yp_t_frozenset) {
+            assert_raises(yp_frozensetN(N(items[0])), yp_MemoryError);
+        } else {
+            assert_raises(yp_setN(N(items[0])), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+    }
+
     // _ypSet_fromiterable
     {
         ypObject *x = yp_listN(N(items[1], items[2]));
         malloc_tracker_oom_after(0);
-        assert_raises(yp_set(x), yp_MemoryError);
+        if (type->type == yp_t_frozenset) {
+            assert_raises(yp_frozenset(x), yp_MemoryError);
+        } else {
+            assert_raises(yp_set(x), yp_MemoryError);
+        }
         malloc_tracker_oom_disable();
         yp_decrefN(N(x));
     }
