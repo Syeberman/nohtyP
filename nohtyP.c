@@ -15897,9 +15897,8 @@ static ypObject *_ypSet_intersection_update_fromset(ypObject *so, ypObject *othe
     if (so == other) return yp_None;
 
     // Since we're only removing keys from so, it won't be resized, so we can loop over it. We
-    // break once so is empty because we aren't expecting any errors from _ypSet_lookkey.
+    // break once keysleft is zero because we aren't expecting any errors from _ypSet_lookkey.
     for (i = 0; keysleft > 0; i++) {
-        if (ypSet_LEN(so) < 1) break;
         yp_ASSERT(keys == ypSet_TABLE(so) && i < ypSet_ALLOCLEN(so),
                 "removing keys shouldn't resize set");
         if (!ypSet_ENTRY_USED(&keys[i])) continue;
@@ -21061,6 +21060,7 @@ static void _ypMem_initialize(const yp_initialize_parameters_t *args)
 
 // Called *exactly* *once* by yp_initialize to set up the codecs module. Errors are largely
 // ignored: calling code will fail gracefully later on.
+// FIXME Since this is initialization, we should abort on any error. (yp_ASSERT is only debug.)
 static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
 {
     ypObject *exc = yp_None;
