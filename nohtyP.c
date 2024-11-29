@@ -3472,8 +3472,12 @@ static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
 // but in the case of deep freeze allow deeper objects to silently fail to freeze.
 void yp_deepfreeze(ypObject *x, ypObject **exc)
 {
-    ypObject *memo = yp_setN(0);
-    ypObject *result = _yp_deepfreeze(x, memo);
+    ypObject *memo;
+    ypObject *result;
+
+    memo = yp_setN(0);
+    if (yp_isexceptionC(memo)) return_yp_EXC_ERR(exc, memo);
+    result = _yp_deepfreeze(x, memo);
     yp_decref(memo);
     if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
 }
@@ -15278,13 +15282,17 @@ yp_STATIC_ASSERT(ypSet_RESIZE_AT_NMR <= yp_SSIZE_T_MAX / ypSet_ALLOCLEN_MAX,
         ypSet_space_remaining_cant_overflow);
 static yp_ssize_t _ypSet_space_remaining(ypObject *so)
 {
+    yp_ssize_t retval;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(so) == ypFrozenSet_CODE);
+
     /* If fill >= 2/3 size, adjust size. Normally, this doubles or
      * quaduples the size, but it's also possible for the dict to shrink
      * (if ma_fill is much larger than se_used, meaning a lot of dict
      * keys have been deleted).
      */
     // XXX ypSet_space_remaining_cant_overflow ensures this can't overflow
-    yp_ssize_t retval = (ypSet_ALLOCLEN(so) * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM;
+    retval = (ypSet_ALLOCLEN(so) * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM;
     retval -= ypSet_FILL(so);
     if (retval <= 0) return 0;  // should resize before adding keys
     return retval;
@@ -15498,6 +15506,8 @@ static ypObject *_ypSet_lookkey(
     ypSet_KeyEntry          *ep0 = ypSet_TABLE(so);
     register ypSet_KeyEntry *ep;
     register ypObject       *cmp;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(so) == ypFrozenSet_CODE);
 
     i = (size_t)hash & mask;
     ep = &ep0[i];
@@ -19054,6 +19064,8 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
 
     // FIXME We could give yp_set a hint as to how big this will be.
     param_names = yp_setN(0);  // new ref
+    if (yp_isexceptionC(param_names)) return param_names;
+
     for (i = 0; i < params_len; i++) {
         yp_parameter_decl_t param = ypFunction_PARAMS(f)[i];
         ypObject           *param_kind = _ypFunction_parameter_kind(param.name);
