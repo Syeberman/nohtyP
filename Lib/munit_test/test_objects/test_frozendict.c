@@ -891,7 +891,7 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
-
+// FIXME Try some more things with valgrind?
 static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -899,6 +899,13 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     ypObject       *str_keys[] = obj_array_init(16, rand_obj(uq, fixture_type_str));
     ypObject       *keys[16];
     obj_array_fill(keys, uq, type->rand_items);
+
+    // Ensure that the function object has been validated first. _ypFunction_validate_parameters is
+    // called once per object, and always allocates a set; this allocation interferes with our
+    // malloc_tracker_oom_after allocation counts. Avoid this issue by triggering validation now.
+    // XXX Interestingly, munit's forking capability (disabled on Windows) exposes these issues.
+    ead(mp, yp_call_stars(type->type, yp_tuple_empty, yp_frozendict_empty),
+            assert_not_exception(mp));
 
     // _ypDict_copy
     {
@@ -958,6 +965,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     }
 
     // frozendict_func_new_code/dict_func_new_code, new keyset
+    // XXX The type->type function object must already be validated (see above).
     {
         ypObject *x = yp_dictK(0);
         ypObject *args = yp_tupleN(N(x));
@@ -969,6 +977,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     }
 
     // frozendict_func_new_code/dict_func_new_code, new dict
+    // XXX The type->type function object must already be validated (see above).
     {
         ypObject *x = yp_dictK(0);
         ypObject *args = yp_tupleN(N(x));
@@ -980,6 +989,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     }
 
     // frozendict_func_new_code/dict_func_new_code, resize
+    // XXX The type->type function object must already be validated (see above).
     {
         ypObject *x = yp_dictK(0);
         ypObject *args = yp_tupleN(N(x));
