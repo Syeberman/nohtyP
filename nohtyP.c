@@ -18870,7 +18870,7 @@ ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step)
     // TODO We could store len in our own _yp_uint_t field, to allow for larger ranges, but a lot
     // of other code would also have to change
     if (ulen > ((_yp_uint_t)ypObject_LEN_MAX)) return yp_SystemLimitationError;
-    if (ulen < 1) return yp_range_empty;
+    yp_ASSERT1(ulen > 0);    // empty case already handled above
     if (ulen < 2) step = 1;  // makes comparisons easier
 
     newR = ypMem_MALLOC_FIXED(ypRangeObject, ypRange_CODE);

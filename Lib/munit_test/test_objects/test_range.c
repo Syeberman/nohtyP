@@ -379,10 +379,40 @@ static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
+static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[2];
+    obj_array_fill(items, uq, fixture_type_range->rand_items);
+
+    // range_getslice
+    {
+        ypObject *r = fixture_type_range->newN(N(items[0], items[1]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_getsliceC4(r, 0, 1, 1), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(r));
+    }
+
+    // yp_rangeC
+    malloc_tracker_oom_after(0);
+    assert_raises(yp_rangeC(1), yp_MemoryError);
+    malloc_tracker_oom_disable();
+
+    // yp_rangeC3
+    malloc_tracker_oom_after(0);
+    assert_raises(yp_rangeC3(0, 1, 1), yp_MemoryError);
+    malloc_tracker_oom_disable();
+
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
 
 MunitTest test_range_tests[] = {TEST(test_rangeC, NULL), TEST(test_call_type, NULL),
         TEST(test_contains, NULL), TEST(test_findC, NULL), TEST(test_indexC, NULL),
-        TEST(test_rfindC, NULL), TEST(test_rindexC, NULL), {NULL}};
+        TEST(test_rfindC, NULL), TEST(test_rindexC, NULL), TEST(test_oom, NULL), {NULL}};
 
 
 extern void test_range_initialize(void) {}
