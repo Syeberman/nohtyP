@@ -2,6 +2,8 @@
 #include "munit_test/unittest.h"
 
 
+// FIXME There's a few branches not tested in range_eq/_ne.
+
 // Like assert_sequence, but also asserts that obj is a range object.
 #define assert_range(obj, ...)                                                                   \
     do {                                                                                         \
@@ -190,16 +192,17 @@ static void _test_contains(fixture_type_t *type, ypObject *(*any_contains)(ypObj
     ypObject  *i_first_p1 = yp_intC(first + 1);
     ypObject  *i_first_m1 = yp_intC(first - 1);
     yp_int_t   multi_step = (yp_int_t)munit_rand_int_range(2, 128);
-    yp_ssize_t multi_step_len = (yp_ssize_t)munit_rand_int_range(3, 128);
-    yp_int_t   last = first + (multi_step * multi_step_len);
+    yp_ssize_t multi_step_last_idx = (yp_ssize_t)munit_rand_int_range(2, 128);
+    yp_int_t   last = first + (multi_step * multi_step_last_idx);
     ypObject  *i_last = yp_intC(last);
     ypObject  *i_last_p1 = yp_intC(last + 1);
     ypObject  *i_last_m1 = yp_intC(last - 1);
-    yp_ssize_t multi_step_middle_idx = (yp_ssize_t)munit_rand_int_range(1, (int)multi_step_len);
-    yp_int_t   middle = first + (multi_step * multi_step_middle_idx);
-    ypObject  *i_middle = yp_intC(middle);
-    ypObject  *i_middle_p1 = yp_intC(middle + 1);
-    ypObject  *i_middle_m1 = yp_intC(middle - 1);
+    yp_ssize_t multi_step_middle_idx =
+            (yp_ssize_t)munit_rand_int_range(1, (int)(multi_step_last_idx - 1));
+    yp_int_t  middle = first + (multi_step * multi_step_middle_idx);
+    ypObject *i_middle = yp_intC(middle);
+    ypObject *i_middle_p1 = yp_intC(middle + 1);
+    ypObject *i_middle_m1 = yp_intC(middle - 1);
 
     // Empty range.
     {
