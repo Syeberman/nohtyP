@@ -905,8 +905,6 @@ static void rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
     }
 }
 
-// FIXME Separate the negative-step range from the positive-step. And figure out a way to avoid the
-// duplication of testing against all three (pos, neg, and rand)?
 static fixture_type_t fixture_type_range_struct = {
         "range",                     // name
         NULL,                        // type (initialized at runtime)

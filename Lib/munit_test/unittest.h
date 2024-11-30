@@ -1104,6 +1104,7 @@ SUITE_OF_TESTS_DECLS(test_exception);
 SUITE_OF_TESTS_DECLS(test_frozendict);
 SUITE_OF_TESTS_DECLS(test_frozenset);
 SUITE_OF_TESTS_DECLS(test_function);
+SUITE_OF_TESTS_DECLS(test_range);
 
 SUITE_OF_SUITES_DECLS(test_protocols);
 SUITE_OF_TESTS_DECLS(test_all);
