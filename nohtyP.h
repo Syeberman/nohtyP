@@ -331,6 +331,7 @@ ypAPI ypObject *yp_set(ypObject *iterable);
 // last value will be retained.
 //
 // Ex: yp_dictK(3, key0, value0, key1, value1, key2, value2)
+// FIXME Rename `n` to `k` to reflect `K`?
 ypAPI ypObject *yp_frozendictK(int n, ...);
 ypAPI ypObject *yp_frozendictKV(int n, va_list args);
 ypAPI ypObject *yp_dictK(int n, ...);
@@ -1528,6 +1529,8 @@ ypAPI ypObject *yp_type(ypObject *object);
 // yp_t_invalidated does not currently support yp_call.
 ypAPI ypObject *const yp_t_invalidated;
 // yp_t_exception does not currently support yp_call.
+// FIXME Should this be yp_t_BaseException? Or drop the `t_` and treat all exceptions as objects?
+// Or call it yp_t_ExceptionType like for None?
 ypAPI ypObject *const yp_t_exception;
 // yp_call signature: yp_t_type(object, /)
 ypAPI ypObject *const yp_t_type;

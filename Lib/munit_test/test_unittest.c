@@ -621,6 +621,15 @@ static MunitResult test_rand_obj_uniqueness(const MunitParameter params[], fixtu
     return MUNIT_OK;
 }
 
+static MunitResult test_munit_rand(const MunitParameter params[], fixture_t *fixture)
+{
+    // There was a divide-by-zero error when min equals max.
+    // FIXME link
+    munit_assert_int(munit_rand_int_range(42, 42), ==, 42);
+
+    return MUNIT_OK;
+}
+
 static MunitParameterEnum test_types_all_params[] = {
         {param_key_type, param_values_types_all}, {NULL}};
 
@@ -628,7 +637,7 @@ MunitTest test_unittest_tests[] = {TEST(test_PRI_formats, NULL),
         TEST(test_assert_setlike_helper, NULL), TEST(test_assert_mapping_helper, NULL),
         TEST(test_fixture_types, NULL), TEST(test_param_values_types, NULL),
         TEST(test_fixture_type, test_types_all_params), TEST(test_rand_obj, test_types_all_params),
-        TEST(test_rand_obj_uniqueness, test_types_all_params), {NULL}};
+        TEST(test_rand_obj_uniqueness, test_types_all_params), TEST(test_munit_rand, NULL), {NULL}};
 
 
 extern void test_unittest_initialize(void) {}
