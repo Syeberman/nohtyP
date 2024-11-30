@@ -2102,6 +2102,13 @@ extern yp_ssize_t yp_lenC_not_raises(ypObject *container)
     return result;
 }
 
+extern yp_int_t yp_asintC_not_raises(ypObject *number)
+{
+    yp_int_t result;
+    assert_not_raises_exc(result = yp_asintC(number, &exc));
+    return result;
+}
+
 
 #define MALLOC_TRACKER_MAX_LEN 4000
 

@@ -1060,6 +1060,10 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 // yp_lenC, asserting an exception is not raised.
 yp_ssize_t yp_lenC_not_raises(ypObject *container);
 
+// yp_asintC, asserting an exception is not raised.
+// FIXME Most tests should probably be using the "index" version of this, without rounding.
+yp_int_t yp_asintC_not_raises(ypObject *number);
+
 
 // Simulate an out-of-memory condition after the given number of successful allocations. If
 // successful is zero, the next allocation will fail. All allocations will fail once the OOM counter
