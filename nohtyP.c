@@ -6476,57 +6476,68 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 #define ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength)
 #endif
 
-// Using the given length, in-place converts the given start/stop/step values to valid indices, and
-// also calculates the length of the slice. Returns yp_ValueError if *step is zero. Recall there are
-// no out-of-bounds errors with slices.
-// XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
-// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is a very large number that is handled the same as any
-// value that's greater than length.
+// A version of ypSlice_AdjustIndicesC that does not return an error. Requires step to be valid
+// (nonzero and negatable).
 // XXX Adapted from PySlice_GetIndicesEx
-static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
-        yp_ssize_t *step, yp_ssize_t *slicelength)
+static void ypSlice_AdjustIndicesC_validstep(yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
+        yp_ssize_t step, yp_ssize_t *slicelength)
 {
-    if (*step == 0) return yp_ValueError;
-    if (*step < -yp_SSIZE_T_MAX) return yp_SystemLimitationError;  // Ensure *step can be negated.
+    yp_ASSERT1(step != 0);
+    yp_ASSERT1(step >= -yp_SSIZE_T_MAX);
 
     if (length < 1) {
         *start = *stop = *slicelength = 0;
-        return yp_None;
+        return;
     }
 
     // Adjust start
     if (*start == yp_SLICE_DEFAULT) {
-        *start = (*step < 0) ? length - 1 : 0;
+        *start = (step < 0) ? length - 1 : 0;
     } else {
         if (*start < 0) *start += length;
-        if (*start < 0) *start = (*step < 0) ? -1 : 0;
-        if (*start >= length) *start = (*step < 0) ? length - 1 : length;
+        if (*start < 0) *start = (step < 0) ? -1 : 0;
+        if (*start >= length) *start = (step < 0) ? length - 1 : length;
     }
 
     // Adjust stop
     if (*stop == yp_SLICE_DEFAULT) {
-        *stop = (*step < 0) ? -1 : length;
+        *stop = (step < 0) ? -1 : length;
     } else {
         if (*stop < 0) *stop += length;
-        if (*stop < 0) *stop = (*step < 0) ? -1 : 0;
-        if (*stop >= length) *stop = (*step < 0) ? length - 1 : length;
+        if (*stop < 0) *stop = (step < 0) ? -1 : 0;
+        if (*stop >= length) *stop = (step < 0) ? length - 1 : length;
     }
 
     // Calculate slicelength
-    if (*step < 0) {
+    if (step < 0) {
         if (*stop >= *start) {
             *slicelength = 0;
         } else {
-            *slicelength = (*stop - *start + 1) / (*step) + 1;
+            *slicelength = (*stop - *start + 1) / (step) + 1;
         }
     } else {
         if (*start >= *stop) {
             *slicelength = 0;
         } else {
-            *slicelength = (*stop - *start - 1) / (*step) + 1;
+            *slicelength = (*stop - *start - 1) / (step) + 1;
         }
     }
+}
 
+// Using the given length, in-place converts the given start and stop  values to valid indices, and
+// also calculates the length of the slice. Returns yp_ValueError if step is zero, and
+// yp_SystemLimitationError if step cannot be negated. Recall there are no out-of-bounds errors with
+// slices.
+// XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
+// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is a very large number that is handled the same as any
+// value that's greater than length.
+static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
+        yp_ssize_t step, yp_ssize_t *slicelength)
+{
+    if (step == 0) return yp_ValueError;
+    // Ensure step can always be negated by ypSlice_InvertIndicesC.
+    if (step < -yp_SSIZE_T_MAX) return yp_SystemLimitationError;
+    ypSlice_AdjustIndicesC_validstep(length, start, stop, step, slicelength);
     return yp_None;
 }
 
@@ -7831,7 +7842,7 @@ static ypObject *ypStringLib_getslice(
     yp_ssize_t                 newLen;
     ypObject                  *newS;
 
-    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &newLen);
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, step, &newLen);
     if (yp_isexceptionC(result)) return result;
 
     if (newLen < 1) return ypStringLib_new_empty(ypObject_TYPE_CODE(s));
@@ -8080,7 +8091,7 @@ static ypObject *ypStringLib_setslice_fromstring7(ypObject *s, yp_ssize_t start,
         return ypStringLib_delslice(s, start, stop, step);
     }
 
-    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, step, &slicelength);
     if (yp_isexceptionC(result)) return result;
 
     // Extended slices (step!=1) cannot change the length of s.
@@ -8172,7 +8183,7 @@ static ypObject *ypStringLib_delslice(
     ypObject  *result;
     yp_ssize_t slicelength;
 
-    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, step, &slicelength);
     if (yp_isexceptionC(result)) return result;
     if (slicelength < 1) return yp_None;  // no-op
     if (slicelength >= ypStringLib_LEN(s)) return ypStringLib_clear(s);
@@ -9960,7 +9971,6 @@ static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize
     yp_uint8_t *x_data;
     yp_ssize_t  x_len;
     yp_uint8_t  storage;
-    yp_ssize_t  step = 1;
     yp_ssize_t  slicelength;
     ypObject   *result;
 
@@ -9971,8 +9981,7 @@ static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
     // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(b), &start, &stop, &step, &slicelength);
-    if (yp_isexceptionC(result)) return result;
+    ypSlice_AdjustIndicesC_validstep(ypStringLib_LEN(b), &start, &stop, 1, &slicelength);
 
     *i = _ypStringLib_find(b, x_data, x_len, start, slicelength, direction);
     return yp_None;
@@ -10189,7 +10198,6 @@ static ypObject *bytes_count(
     yp_ssize_t  x_len;
     yp_uint8_t  storage;
     ypObject   *result;
-    yp_ssize_t  step = 1;
     yp_ssize_t  slicelength;
 
     result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
@@ -10199,8 +10207,7 @@ static ypObject *bytes_count(
     // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
     // Python behaves peculiarly when stop<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &slicelength);
-    if (yp_isexceptionC(result)) return result;
+    ypSlice_AdjustIndicesC_validstep(ypBytes_LEN(b), &start, &stop, 1, &slicelength);
 
     *n = _ypStringLib_count(b, x_data, x_len, start, slicelength);
     return yp_None;
@@ -10229,9 +10236,7 @@ static ypObject *bytes_isupper(ypObject *b) { return yp_NotImplementedError; }
 static ypObject *_bytes_tailmatch(
         ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
-    yp_ssize_t step = 1;
     yp_ssize_t slice_len;
-    ypObject  *result;
     yp_ssize_t cmp_start;
     int        memcmp_result;
 
@@ -10240,8 +10245,7 @@ static ypObject *_bytes_tailmatch(
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
     // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &end, &step, &slice_len);
-    if (yp_isexceptionC(result)) return result;
+    ypSlice_AdjustIndicesC_validstep(ypBytes_LEN(b), &start, &end, 1, &slice_len);
 
     // If the prefix is longer than the slice, the slice can't possibly start with it
     if (ypBytes_LEN(x) > slice_len) return yp_False;
@@ -11152,7 +11156,6 @@ static ypObject *str_find(ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t
 {
     void      *x_data;
     yp_ssize_t x_len;
-    yp_ssize_t step = 1;
     yp_ssize_t slicelength;
     ypObject  *result;
 
@@ -11162,8 +11165,7 @@ static ypObject *str_find(ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
     // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
-    if (yp_isexceptionC(result)) return result;
+    ypSlice_AdjustIndicesC_validstep(ypStringLib_LEN(s), &start, &stop, 1, &slicelength);
 
     if (x_data == NULL) {
         *i = -1;  // We could not coerce to the target encoding, so it must not be in s.
@@ -11179,7 +11181,6 @@ static ypObject *str_count(
 {
     void      *x_data;
     yp_ssize_t x_len;
-    yp_ssize_t step = 1;
     yp_ssize_t slicelength;
     ypObject  *result;
 
@@ -11189,8 +11190,7 @@ static ypObject *str_count(
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
     // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
-    if (yp_isexceptionC(result)) return result;
+    ypSlice_AdjustIndicesC_validstep(ypStringLib_LEN(s), &start, &stop, 1, &slicelength);
 
     if (x_data == NULL) {
         *n = 0;  // We could not coerce to the target encoding, so it must not be in s.
@@ -11240,9 +11240,7 @@ static ypObject *str_isupper(ypObject *s) { return yp_NotImplementedError; }
 static ypObject *_str_tailmatch(
         ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
-    yp_ssize_t step = 1;
     yp_ssize_t slice_len;
-    ypObject  *result;
     yp_ssize_t cmp_start;
 
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
@@ -11250,8 +11248,7 @@ static ypObject *_str_tailmatch(
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
     // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypStr_LEN(s), &start, &end, &step, &slice_len);
-    if (yp_isexceptionC(result)) return result;
+    ypSlice_AdjustIndicesC_validstep(ypStr_LEN(s), &start, &end, 1, &slice_len);
 
     // If the prefix is longer than the slice, the slice can't possibly start with it
     if (ypStr_LEN(x) > slice_len) return yp_False;
@@ -12714,7 +12711,7 @@ static ypObject *_ypTuple_setslice_fromtuple(
     // breaking with Python here.
     if (step == 1 && ypTuple_LEN(x) == 0) return list_delslice(sq, start, stop, step);
 
-    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &slicelength);
+    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, step, &slicelength);
     if (yp_isexceptionC(result)) return result;
 
     if (step == 1) {
@@ -12861,7 +12858,7 @@ static ypObject *tuple_getslice(ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
     ypObject  *newSq;
     yp_ssize_t i;
 
-    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &newLen);
+    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, step, &newLen);
     if (yp_isexceptionC(result)) return result;
 
     if (sq_type == ypTuple_CODE) {
@@ -12899,8 +12896,7 @@ static ypObject *tuple_find(ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssiz
     yp_ssize_t sq_rlen;   // remaining length
     yp_ssize_t i;
 
-    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &sq_rlen);
-    if (yp_isexceptionC(result)) return result;
+    ypSlice_AdjustIndicesC_validstep(ypTuple_LEN(sq), &start, &stop, step, &sq_rlen);
     if (sq_rlen < 1) {
         if (yp_isexceptionC(x)) return x;
         goto not_found;
@@ -12927,14 +12923,11 @@ static ypObject *tuple_count(
         ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *count)
 {
     ypObject  *result;
-    yp_ssize_t step = 1;  // ignored; assumed unchanged by ypSlice_AdjustIndicesC
     yp_ssize_t slicelength;
     yp_ssize_t i;
     yp_ssize_t n = 0;
 
-    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &slicelength);
-    if (yp_isexceptionC(result)) return result;
-
+    ypSlice_AdjustIndicesC_validstep(ypTuple_LEN(sq), &start, &stop, 1, &slicelength);
     if (slicelength < 1) {
         if (yp_isexceptionC(x)) return x;
         goto succeed;
@@ -13027,7 +13020,7 @@ static ypObject *list_delslice(ypObject *sq, yp_ssize_t start, yp_ssize_t stop, 
     yp_ssize_t slicelength;
     yp_ssize_t i;
 
-    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &slicelength);
+    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, step, &slicelength);
     if (yp_isexceptionC(result)) return result;
     if (slicelength < 1) return yp_None;  // no-op
     if (slicelength >= ypTuple_LEN(sq)) return list_clear(sq);
@@ -18599,7 +18592,7 @@ static ypObject *range_getslice(ypObject *r, yp_ssize_t start, yp_ssize_t stop, 
     yp_ssize_t newR_len;
     ypObject  *newR;
 
-    result = ypSlice_AdjustIndicesC(ypRange_LEN(r), &start, &stop, &step, &newR_len);
+    result = ypSlice_AdjustIndicesC(ypRange_LEN(r), &start, &stop, step, &newR_len);
     if (yp_isexceptionC(result)) return result;
 
     if (newR_len < 1) return yp_range_empty;
@@ -18630,14 +18623,12 @@ static ypObject *range_contains(ypObject *r, ypObject *x)
 static ypObject *range_find(ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *_index)
 {
-    yp_ssize_t step = 1;     // won't actually change
     yp_ssize_t slicelength;  // unnecessary
     yp_ssize_t index;
     ypObject  *result = _ypRange_find(r, x, &index);
     if (yp_isexceptionC(result)) return result;
 
-    result = ypSlice_AdjustIndicesC(ypRange_LEN(r), &start, &stop, &step, &slicelength);
-    if (yp_isexceptionC(result)) return result;
+    ypSlice_AdjustIndicesC_validstep(ypRange_LEN(r), &start, &stop, 1, &slicelength);
 
     // This assertion assures that index==-1 (ie item not in range) won't be confused
     yp_ASSERT(start >= 0, "ypSlice_AdjustIndicesC returned negative start");
@@ -18653,14 +18644,12 @@ static ypObject *range_find(ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize
 static ypObject *range_count(
         ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *count)
 {
-    yp_ssize_t step = 1;     // won't actually change
     yp_ssize_t slicelength;  // unnecessary
     yp_ssize_t index;
     ypObject  *result = _ypRange_find(r, x, &index);
     if (yp_isexceptionC(result)) return result;
 
-    result = ypSlice_AdjustIndicesC(ypRange_LEN(r), &start, &stop, &step, &slicelength);
-    if (yp_isexceptionC(result)) return result;
+    ypSlice_AdjustIndicesC_validstep(ypRange_LEN(r), &start, &stop, 1, &slicelength);
 
     // This assertion assures that index==-1 (ie item not in range) won't be confused
     yp_ASSERT(start >= 0, "ypSlice_AdjustIndicesC returned negative start");
