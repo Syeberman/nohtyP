@@ -18667,18 +18667,53 @@ static ypObject *range_len(ypObject *r, yp_ssize_t *len)
     return yp_None;
 }
 
-static ypObject *range_eq(ypObject *r, ypObject *x)
+// Here be range_lt, range_le, range_ge, range_gt. Unlike Python, we support ordering for ranges.
+// FIXME Rather than this complicated macro, could define this as a cmp (-1, 0, 1) function.
+// FIXME ...similarly, inspect and standardize how the other types implement this.
+#define _ypRange_RELATIVE_CMP_FUNCTION(name, cmp_op)                                        \
+    static ypObject *range_##name(ypObject *r, ypObject *x)                                 \
+    {                                                                                       \
+        int len_cmp;                                                                        \
+        int result;                                                                         \
+                                                                                            \
+        if (ypObject_TYPE_PAIR_CODE(x) != ypRange_CODE) return yp_ComparisonNotImplemented; \
+        ypRange_ASSERT_NORMALIZED(r);                                                       \
+        ypRange_ASSERT_NORMALIZED(x);                                                       \
+                                                                                            \
+        len_cmp = ypRange_LEN(r) cmp_op ypRange_LEN(x);                                     \
+        if (ypRange_LEN(r) < 1 || ypRange_LEN(x) < 1) {                                     \
+            result = len_cmp;                                                               \
+        } else if (ypRange_START(r) != ypRange_START(x)) {                                  \
+            result = ypRange_START(r) cmp_op ypRange_START(x);                              \
+        } else if (ypRange_LEN(r) < 2 || ypRange_LEN(x) < 2) {                              \
+            result = len_cmp;                                                               \
+        } else if (ypRange_STEP(r) != ypRange_STEP(x)) {                                    \
+            result = ypRange_STEP(r) cmp_op ypRange_STEP(x);                                \
+        } else {                                                                            \
+            result = len_cmp;                                                               \
+        }                                                                                   \
+        return ypBool_FROM_C(result);                                                       \
+    }
+_ypRange_RELATIVE_CMP_FUNCTION(lt, <);
+_ypRange_RELATIVE_CMP_FUNCTION(le, <=);
+_ypRange_RELATIVE_CMP_FUNCTION(ge, >=);
+_ypRange_RELATIVE_CMP_FUNCTION(gt, >);
+
+static ypObject *_range_equality(ypObject *r, ypObject *x, ypObject *on_eq, ypObject *on_ne)
 {
-    if (r == x) return yp_True;
+    if (r == x) return on_eq;
     if (ypObject_TYPE_PAIR_CODE(x) != ypRange_CODE) return yp_ComparisonNotImplemented;
     ypRange_ASSERT_NORMALIZED(r);
     ypRange_ASSERT_NORMALIZED(x);
-    return ypBool_FROM_C(ypRange_ARE_EQUAL(r, x));
+    return ypRange_ARE_EQUAL(r, x) ? on_eq : on_ne;
+}
+static ypObject *range_eq(ypObject *r, ypObject *x)
+{
+    return _range_equality(r, x, yp_True, yp_False);
 }
 static ypObject *range_ne(ypObject *r, ypObject *x)
 {
-    ypObject *result = range_eq(r, x);
-    return ypBool_NOT(result);
+    return _range_equality(r, x, yp_False, yp_True);
 }
 
 /* Hash function for range objects. Rough C equivalent of
@@ -18785,13 +18820,13 @@ static ypTypeObject ypRange_Type = {
         MethodError_objproc,    // tp_invalidate
 
         // Boolean operations and comparisons
-        range_bool,                  // tp_bool
-        NotImplemented_comparefunc,  // tp_lt
-        NotImplemented_comparefunc,  // tp_le
-        range_eq,                    // tp_eq
-        range_ne,                    // tp_ne
-        NotImplemented_comparefunc,  // tp_ge
-        NotImplemented_comparefunc,  // tp_gt
+        range_bool,  // tp_bool
+        range_lt,    // tp_lt
+        range_le,    // tp_le
+        range_eq,    // tp_eq
+        range_ne,    // tp_ne
+        range_ge,    // tp_ge
+        range_gt,    // tp_gt
 
         // Generic object operations
         range_currenthash,    // tp_currenthash
