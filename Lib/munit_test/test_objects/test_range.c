@@ -2,8 +2,6 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME There's a few branches not tested in range_eq/_ne.
-
 // Like assert_sequence, but also asserts that obj is a range object.
 #define assert_range(obj, ...)                                                                   \
     do {                                                                                         \

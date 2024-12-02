@@ -313,6 +313,7 @@ extern "C" {
 // exception argument. Example:
 //
 //      assert_isexception_exc(yp_lenC(yp_SyntaxError, &exc), yp_SyntaxError);
+//
 // TODO nohtyP does not currently make a distinction between returning and raising an exception, so
 // this is currently an alias to assert_raises_exc.
 #define assert_isexception_exc assert_raises_exc
@@ -871,6 +872,10 @@ typedef struct _fixture_type_t {
     // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys).
     objvarargfunc  newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
     rand_objs_func rand_values;  // Fills an array with n random objects for values.
+
+    // Similar to rand_items, except the objects returned all support ordered comparisons with each
+    // other, and the items are returned in ascending order (i.e. i[0] < i[1] < ...).
+    rand_objs_func rand_ordered_items;
 
     // Flags to describe the properties of the type.
     int is_mutable;

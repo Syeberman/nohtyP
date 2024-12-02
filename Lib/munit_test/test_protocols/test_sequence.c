@@ -1,14 +1,18 @@
 
 #include "munit_test/unittest.h"
 
-// TODO Is the behaviour of the comparison methods (yp_lt/etc) part of this interface?
-
 // Sequences should accept themselves, their pairs, iterators, and tuple/list as valid types for the
 // "x" (i.e. "other iterable") argument.
 #define x_types_init(type) \
     {(type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, NULL}
 
 #define friend_types_init(type) {(type), (type)->pair, NULL}
+
+// Returns true iff type supports comparison operators (lt/etc) with other.
+static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
+{
+    return type->type == other->type || type->type == other->pair->type;
+}
 
 
 typedef struct _slice_args_t {
@@ -39,6 +43,382 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
 
     obj_array_decref(items);
     uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
+// expected is either the exception which is expected to be raised, or the boolean expected to be
+// returned.
+static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t *x_type,
+        ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject                   *expected)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[2];
+    ypObject     *sq;
+    ypObject     *empty = type->newN(0);
+    obj_array_fill(items, uq, type->rand_items);
+    sq = type->newN(N(items[0], items[1]));
+
+#define assert_not_supported(expression)      \
+    do {                                      \
+        ypObject *result = (expression);      \
+        if (yp_isexceptionC(expected)) {      \
+            assert_raises(result, expected);  \
+        } else {                              \
+            assert_obj(result, is, expected); \
+        }                                     \
+    } while (0)
+
+    ead(x, rand_obj(NULL, x_type), assert_not_supported(any_cmp(sq, x)));
+    ead(x, rand_obj(NULL, x_type), assert_not_supported(any_cmp(empty, x)));
+
+    if (x_type->is_collection) {
+        ead(x, x_type->newN(0), assert_not_supported(any_cmp(sq, x)));
+        ead(x, x_type->newN(0), assert_not_supported(any_cmp(empty, x)));
+    }
+
+#undef assert_not_supported
+
+    obj_array_decref(items);
+    yp_decrefN(N(sq, empty));
+    uniqueness_dealloc(uq);
+}
+
+// cmp_fails is what to expect when two sequences fail to compare because the corresponding items
+// cannot be compared: either an exception or a bool.
+static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
+        ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_lt, ypObject *x_eq,
+        ypObject *x_gt, ypObject *cmp_fails)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[5];  // items are in ascending order
+    obj_array_fill(items, uq, type->rand_ordered_items);
+
+#define assert_cmp_fails(expression)                 \
+    do {                                             \
+        if (yp_isexceptionC(cmp_fails)) {            \
+            assert_raises((expression), cmp_fails);  \
+        } else {                                     \
+            assert_obj((expression), is, cmp_fails); \
+        }                                            \
+    } while (0)
+
+    // Two-item sq.
+    {
+        ypObject *sq = type->newN(N(items[1], items[3]));
+
+        // x has the same items.
+        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_eq));
+
+        // The first item in x is different.
+        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // The second item in x is different.
+        ead(x, x_type->newN(N(items[1], items[2])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // One-item x.
+        ead(x, x_type->newN(N(items[1])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // Empty x.
+        ead(x, x_type->newN(0), assert_obj(any_cmp(sq, x), is, x_gt));
+
+        // x is sq.
+        assert_obj(any_cmp(sq, sq), is, x_eq);
+
+        // Exception passthrough.
+        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+
+        assert_sequence(sq, items[1], items[3]);  // sq unchanged.
+        yp_decrefN(N(sq));
+    }
+
+    // One-item sq.
+    {
+        ypObject *sq = type->newN(N(items[1]));
+
+        // x has the same items.
+        ead(x, x_type->newN(N(items[1])), assert_obj(any_cmp(sq, x), is, x_eq));
+
+        // x has a different item.
+        ead(x, x_type->newN(N(items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // Two-item x.
+        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // Empty x.
+        ead(x, x_type->newN(0), assert_obj(any_cmp(sq, x), is, x_gt));
+
+        // x is sq.
+        assert_obj(any_cmp(sq, sq), is, x_eq);
+
+        // Exception passthrough.
+        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+
+        assert_sequence(sq, items[1]);  // sq unchanged.
+        yp_decrefN(N(sq));
+    }
+
+    // Empty sq.
+    {
+        ypObject *sq = type->newN(0);
+
+        // Two-item x.
+        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // One-item x.
+        ead(x, x_type->newN(N(items[1])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // Empty x.
+        ead(x, x_type->newN(0), assert_obj(any_cmp(sq, x), is, x_eq));
+
+        // x is sq.
+        assert_obj(any_cmp(sq, sq), is, x_eq);
+
+        // Exception passthrough.
+        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+
+        assert_len(sq, 0);  // sq unchanged.
+        yp_decrefN(N(sq));
+    }
+
+    // XXX original_object_return isn't _quite_ the right flag to use here.
+    if (type->original_object_return && x_type->original_object_return) {
+        ypObject *int_item = rand_obj(uq, fixture_type_int);
+        ypObject *str_item = rand_obj(uq, fixture_type_str);
+        ypObject *sq = type->newN(N(int_item, int_item));
+
+        // sq and x contains items that cannot be compared with each other (int and str).
+        ead(x, x_type->newN(N(str_item)), assert_cmp_fails(any_cmp(sq, x)));
+        ead(x, x_type->newN(N(int_item, str_item)), assert_cmp_fails(any_cmp(sq, x)));
+
+        // x contains an incomparable item...but after sq's items.
+        ead(x, x_type->newN(N(int_item, int_item, str_item)), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // x contains sq.
+        ead(x, x_type->newN(N(sq)), assert_cmp_fails(any_cmp(sq, x)));
+
+        assert_sequence(sq, int_item, int_item);  // sq unchanged.
+        yp_decrefN(N(sq, str_item, int_item));
+    }
+
+    // Implementations may use the cached hash as a quick inequality test. Recall that only
+    // immutables can cache their hash, which occurs when yp_hashC is called. Because the cached
+    // hash is an internal optimization, it should only be used with friendly types.
+    if (!type->is_mutable && !x_type->is_mutable && type_is_comparable(type, x_type)) {
+        yp_ssize_t i, j;
+        ypObject  *h_items[yp_lengthof_array(items)];  // hashable values
+        ypObject  *sq;
+        ypObject  *empty = type->newN(0);
+        for (i = 0; i < yp_lengthof_array(items); i++) h_items[i] = yp_frozen_deepcopy(items[i]);
+        sq = type->newN(N(h_items[1], h_items[3]));
+
+        // Run the tests twice: once where sq has not cached the hash, and once where it has.
+        for (i = 0; i < 2; i++) {
+            ypObject *x_is_same = x_type->newN(N(items[1], items[3]));
+            ypObject *x_first_is_lt = x_type->newN(N(items[0], items[3]));
+            ypObject *x_first_is_gt = x_type->newN(N(items[2], items[3]));
+            ypObject *x_second_is_lt = x_type->newN(N(items[1], items[2]));
+            ypObject *x_second_is_gt = x_type->newN(N(items[1], items[4]));
+            ypObject *x_only_is_same = x_type->newN(N(items[1]));
+            ypObject *x_only_is_lt = x_type->newN(N(items[0]));
+            ypObject *x_only_is_gt = x_type->newN(N(items[2]));
+            ypObject *x_is_empty = x_type->newN(0);
+
+            // Run the tests twice: once where x has not cached the hash, and once where it has.
+            for (j = 0; j < 2; j++) {
+                assert_obj(any_cmp(sq, x_is_same), is, x_eq);
+                assert_obj(any_cmp(sq, x_first_is_lt), is, x_gt);
+                assert_obj(any_cmp(sq, x_first_is_gt), is, x_lt);
+                assert_obj(any_cmp(sq, x_second_is_lt), is, x_gt);
+                assert_obj(any_cmp(sq, x_second_is_gt), is, x_lt);
+                assert_obj(any_cmp(sq, x_only_is_same), is, x_gt);
+                assert_obj(any_cmp(sq, x_only_is_lt), is, x_gt);
+                assert_obj(any_cmp(sq, x_only_is_gt), is, x_lt);
+                assert_obj(any_cmp(sq, x_is_empty), is, x_gt);
+
+                assert_obj(any_cmp(empty, x_is_same), is, x_lt);
+                assert_obj(any_cmp(empty, x_is_empty), is, x_eq);
+
+                // Trigger the hash to be cached on "x" and try again.
+                assert_not_raises_exc(yp_hashC(x_is_same, &exc));
+                assert_not_raises_exc(yp_hashC(x_first_is_lt, &exc));
+                assert_not_raises_exc(yp_hashC(x_first_is_gt, &exc));
+                assert_not_raises_exc(yp_hashC(x_second_is_lt, &exc));
+                assert_not_raises_exc(yp_hashC(x_second_is_gt, &exc));
+                assert_not_raises_exc(yp_hashC(x_only_is_same, &exc));
+                assert_not_raises_exc(yp_hashC(x_only_is_lt, &exc));
+                assert_not_raises_exc(yp_hashC(x_only_is_gt, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_empty, &exc));
+            }
+
+            assert_obj(any_cmp(sq, sq), is, x_eq);
+            assert_obj(any_cmp(empty, empty), is, x_eq);
+
+            // Trigger the hash to be cached on "sq" and try again.
+            assert_not_raises_exc(yp_hashC(sq, &exc));
+            assert_not_raises_exc(yp_hashC(empty, &exc));
+
+            yp_decrefN(N(x_is_same, x_first_is_lt, x_first_is_gt, x_second_is_lt, x_second_is_gt,
+                    x_only_is_same, x_only_is_lt, x_only_is_gt, x_is_empty));
+        }
+
+        yp_decrefN(N(sq, empty));
+        obj_array_decref(h_items);
+    }
+
+#undef assert_cmp_fails
+
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+}
+
+static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+
+    // lt is only supported for friendly x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (type_is_comparable(type, (*x_type))) {
+            _test_comparisons(type, (*x_type), yp_lt, /*x_lt=*/yp_True, /*x_eq=*/yp_False,
+                    /*x_gt=*/yp_False, /*cmp_fails=*/yp_TypeError);
+        } else {
+            _test_comparisons_not_supported(type, *x_type, yp_lt, yp_TypeError);
+        }
+    }
+
+    // x is not an iterable.
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        _test_comparisons_not_supported(type, *x_type, yp_lt, yp_TypeError);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+
+    // le is only supported for friendly x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (type_is_comparable(type, (*x_type))) {
+            _test_comparisons(type, (*x_type), yp_le, /*x_lt=*/yp_True, /*x_eq=*/yp_True,
+                    /*x_gt=*/yp_False, /*cmp_fails=*/yp_TypeError);
+        } else {
+            _test_comparisons_not_supported(type, *x_type, yp_le, yp_TypeError);
+        }
+    }
+
+    // x is not an iterable.
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        _test_comparisons_not_supported(type, *x_type, yp_le, yp_TypeError);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+
+    // eq is only supported for friendly x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (type_is_comparable(type, (*x_type))) {
+            _test_comparisons(type, (*x_type), yp_eq, /*x_lt=*/yp_False, /*x_eq=*/yp_True,
+                    /*x_gt=*/yp_False, /*cmp_fails=*/yp_False);
+        } else {
+            _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
+        }
+    }
+
+    // x is not an iterable.
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+
+    // ne is only supported for friendly x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (type_is_comparable(type, (*x_type))) {
+            _test_comparisons(type, (*x_type), yp_ne, /*x_lt=*/yp_True, /*x_eq=*/yp_False,
+                    /*x_gt=*/yp_True, /*cmp_fails=*/yp_True);
+        } else {
+            _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
+        }
+    }
+
+    // x is not an iterable.
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+
+    // ge is only supported for friendly x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (type_is_comparable(type, (*x_type))) {
+            _test_comparisons(type, (*x_type), yp_ge, /*x_lt=*/yp_False, /*x_eq=*/yp_True,
+                    /*x_gt=*/yp_True, /*cmp_fails=*/yp_TypeError);
+        } else {
+            _test_comparisons_not_supported(type, *x_type, yp_ge, yp_TypeError);
+        }
+    }
+
+    // x is not an iterable.
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        _test_comparisons_not_supported(type, *x_type, yp_ge, yp_TypeError);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+
+    // gt is only supported for friendly x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if (type_is_comparable(type, (*x_type))) {
+            _test_comparisons(type, (*x_type), yp_gt, /*x_lt=*/yp_False, /*x_eq=*/yp_False,
+                    /*x_gt=*/yp_True, /*cmp_fails=*/yp_TypeError);
+        } else {
+            _test_comparisons_not_supported(type, *x_type, yp_gt, yp_TypeError);
+        }
+    }
+
+    // x is not an iterable.
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        _test_comparisons_not_supported(type, *x_type, yp_gt, yp_TypeError);
+    }
+
     return MUNIT_OK;
 }
 
@@ -2560,6 +2940,9 @@ static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
 
 MunitTest test_sequence_tests[] = {TEST(test_contains, test_sequence_params),
+        TEST(test_lt, test_sequence_params), TEST(test_le, test_sequence_params),
+        TEST(test_eq, test_sequence_params), TEST(test_ne, test_sequence_params),
+        TEST(test_ge, test_sequence_params), TEST(test_gt, test_sequence_params),
         TEST(test_concat, test_sequence_params), TEST(test_repeatC, test_sequence_params),
         TEST(test_getindexC, test_sequence_params), TEST(test_getsliceC, test_sequence_params),
         TEST(test_getitem, test_sequence_params), TEST(test_getdefault, test_sequence_params),

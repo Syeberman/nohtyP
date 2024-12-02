@@ -81,6 +81,29 @@ static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
     return FALSE;
 }
 
+static int _array_sort_cmp(const void *_x, const void *_y)
+{
+    ypObject *x = *((ypObject **)_x);
+    ypObject *y = *((ypObject **)_y);
+    ypObject *result;
+    assert_not_raises(result = yp_lt(x, y));
+    if (result == yp_True) return -1;
+    assert_not_raises(result = yp_gt(x, y));
+    if (result == yp_True) return 1;
+    // GCOVR_EXCL_START The arrays we are sorting contain unique elements.
+    assert_not_raises(result = yp_eq(x, y));
+    assert_obj(result, is, yp_True);
+    return 0;
+    // GCOVR_EXCL_STOP
+}
+
+// Sorts the array of objects in ascending order. The objects must all support total ordering with
+// each other.
+static void array_sort(yp_ssize_t n, ypObject **array)
+{
+    qsort(array, (size_t)n, sizeof(ypObject *), _array_sort_cmp);
+}
+
 
 // If something should happen 2 in 23 times: RAND_BOOL_FRACTION(2, 23)
 // TODO Better name? Better argument names?
@@ -303,6 +326,8 @@ static ypObject *rand_obj_any_keyvalue_memo(const rand_obj_supplier_memo_t *memo
     return result;
 }
 
+static ypObject *rand_obj_int(uniqueness_t *uq) { _return_unique(uq, yp_intC(rand_intC())); }
+
 // XXX Interesting. 0 is a falsy byte, but '\x00' is not a falsy char.
 static ypObject *rand_obj_byte(uniqueness_t *uq)
 {
@@ -384,6 +409,12 @@ extern ypObject *rand_obj_any(uniqueness_t *uq)
     _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_all)));
 }
 
+static void rand_objs_int(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) array[i] = rand_obj_int(uq);  // new ref
+}
+
 static void rand_objs_byte(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
     yp_ssize_t i;
@@ -406,6 +437,34 @@ static void rand_objs_any(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
     yp_ssize_t i;
     for (i = 0; i < n; i++) array[i] = rand_obj_any(uq);  // new ref
+}
+
+static void rand_objs_int_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    rand_objs_int(uq, n, array);
+    array_sort(n, array);
+}
+
+static void rand_objs_byte_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    rand_objs_byte(uq, n, array);
+    array_sort(n, array);
+}
+
+static void rand_objs_chr_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    rand_objs_chr(uq, n, array);
+    array_sort(n, array);
+}
+
+// All objects will be of the same type that supports total ordering.
+// TODO There are other types of objects we _could_ support here: tuples of strs fit the criteria,
+// ints and floats can be compared, mutable and immutable forms can, etc.
+static void rand_objs_any_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    void (*funcs[])(uniqueness_t *uq, yp_ssize_t n, ypObject **array) = {
+            rand_objs_int_ordered, rand_objs_byte_ordered, rand_objs_chr_ordered};
+    rand_choice_array(funcs)(uq, n, array);
 }
 
 
@@ -540,6 +599,8 @@ static fixture_type_t fixture_type_type_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_func_error,  // rand_ordered_items
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         FALSE,  // is_iterable
@@ -572,6 +633,8 @@ static fixture_type_t fixture_type_NoneType_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -612,6 +675,8 @@ static fixture_type_t fixture_type_bool_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_func_error,  // rand_ordered_items
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         FALSE,  // is_iterable
@@ -648,6 +713,8 @@ static fixture_type_t fixture_type_int_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -686,6 +753,8 @@ static fixture_type_t fixture_type_intstore_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_func_error,  // rand_ordered_items
+
         TRUE,   // is_mutable
         TRUE,   // is_numeric
         FALSE,  // is_iterable
@@ -723,6 +792,8 @@ static fixture_type_t fixture_type_float_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_func_error,  // rand_ordered_items
+
         FALSE,  // is_mutable
         TRUE,   // is_numeric
         FALSE,  // is_iterable
@@ -759,6 +830,8 @@ static fixture_type_t fixture_type_floatstore_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -812,6 +885,8 @@ static fixture_type_t fixture_type_iter_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_any_ordered,  // rand_ordered_items
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -851,6 +926,7 @@ static ypObject *new_rand_range(const rand_obj_supplier_memo_t *memo)
 
 // XXX The arguments must follow a valid range pattern, in order. Note that rand_items_range creates
 // objects that follow this pattern.
+// FIXME We should be using the index forms here that don't accept floats.
 static ypObject *newN_range(int n, ...)
 {
     va_list   args;
@@ -888,12 +964,14 @@ args_end:
 
 // Fills array with n integers that cover a range with a random start and step. Any slice of these
 // integers is suitable to pass to newN_range to construct a new range.
-static void rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+static void _rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array, int ordered)
 {
     while (1) {
         yp_ssize_t i;
         yp_int_t   start = range_rand_start();
         yp_int_t   step = range_rand_step();
+        if (ordered && step < 0) step = -step;  // rand_ordered_items requires ascending values.
+
         for (i = 0; i < n; i++) {
             assert_not_raises(array[i] = yp_intC(start + (i * step)));
         }
@@ -903,6 +981,16 @@ static void rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
         if (uniqueness_push_array(uq, n, array)) return;
         obj_array_decref2(n, array);
     }
+}
+
+static void rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    _rand_items_range(uq, n, array, /*ordered=*/FALSE);
+}
+
+static void rand_ordered_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    _rand_items_range(uq, n, array, /*ordered=*/TRUE);
 }
 
 static fixture_type_t fixture_type_range_struct = {
@@ -920,6 +1008,8 @@ static fixture_type_t fixture_type_range_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_ordered_items_range,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -983,6 +1073,8 @@ static fixture_type_t fixture_type_bytes_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_byte_ordered,  // rand_ordered_items
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1044,6 +1136,8 @@ static fixture_type_t fixture_type_bytearray_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_byte_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1108,6 +1202,8 @@ static fixture_type_t fixture_type_str_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_chr_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1174,6 +1270,8 @@ static fixture_type_t fixture_type_chrarray_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_chr_ordered,  // rand_ordered_items
+
         TRUE,   // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1218,6 +1316,8 @@ static fixture_type_t fixture_type_tuple_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_any_ordered,  // rand_ordered_items
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1261,6 +1361,8 @@ static fixture_type_t fixture_type_list_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_any_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1307,6 +1409,8 @@ static fixture_type_t fixture_type_frozenset_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_func_error,  // rand_ordered_items
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1351,6 +1455,8 @@ static fixture_type_t fixture_type_set_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1438,6 +1544,8 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
 
+        rand_objs_func_error,  // rand_ordered_items
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1496,6 +1604,8 @@ static fixture_type_t fixture_type_set_dirty_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1590,6 +1700,8 @@ static fixture_type_t fixture_type_frozendict_struct = {
         yp_frozendictK,  // newK
         rand_objs_any,   // rand_values
 
+        rand_objs_func_error,  // rand_ordered_items
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1653,6 +1765,8 @@ static fixture_type_t fixture_type_dict_struct = {
 
         yp_dictK,       // newK
         rand_objs_any,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1755,6 +1869,8 @@ static fixture_type_t fixture_type_frozendict_dirty_struct = {
         new_frozendict_dirtyK,  // newK
         rand_objs_any,          // rand_values
 
+        rand_objs_func_error,  // rand_ordered_items
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1826,6 +1942,8 @@ static fixture_type_t fixture_type_dict_dirty_struct = {
         new_dict_dirtyK,  // newK
         rand_objs_any,    // rand_values
 
+        rand_objs_func_error,  // rand_ordered_items
+
         TRUE,   // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1872,6 +1990,8 @@ static fixture_type_t fixture_type_function_struct = {
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric

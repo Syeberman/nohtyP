@@ -10393,13 +10393,22 @@ static ypObject *bytes_gt(ypObject *b, ypObject *x)
     return ypBool_FROM_C(_ypBytes_relative_cmp(b, x) > 0);
 }
 
-// Returns true (1) if the two bytes/bytearrays are equal. Size is a quick way to check equality.
-// TODO Would the pre-computed hash be a quick check for inequality before the memcmp?
+// Returns true iff the two bytes/bytearrays are equal.
 static int _ypBytes_are_equal(ypObject *b, ypObject *x)
 {
     yp_ssize_t b_len = ypBytes_LEN(b);
     yp_ssize_t x_len = ypBytes_LEN(x);
-    if (b_len != x_len) return 0;
+    if (b_len != x_len) return FALSE;
+
+    // The pre-computed hash, if available, can save us some time when b!=x.
+    // TODO Is this worth it? We would need to have two strings that have a long shared prefix for
+    // this to be beneficial. How often does that happen?
+    if (ypObject_CACHED_HASH(b) != ypObject_HASH_INVALID &&
+            ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
+            ypObject_CACHED_HASH(b) != ypObject_CACHED_HASH(x)) {
+        return FALSE;
+    }
+
     return yp_memcmp(ypBytes_DATA(b), ypBytes_DATA(x), b_len) == 0;
 }
 static ypObject *bytes_eq(ypObject *b, ypObject *x)
@@ -11415,16 +11424,26 @@ static ypObject *str_gt(ypObject *s, ypObject *x)
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) > 0);
 }
 
-// Returns true (1) if the two str/chrarrays are equal. Size is a quick way to check equality.
-// TODO Would the pre-computed hash be a quick check for inequality before the memcmp?
+// Returns true iff the two str/chrarrays are equal.
 static int _ypStr_are_equal(ypObject *s, ypObject *x)
 {
     yp_ssize_t s_len = ypStr_LEN(s);
     yp_ssize_t x_len = ypStr_LEN(x);
     if (s_len != x_len) return 0;
+
     // Recall strs are stored in the smallest encoding that can hold them, so different encodings
     // means differing characters
     if (ypStr_ENC_CODE(s) != ypStr_ENC_CODE(x)) return 0;
+
+    // The pre-computed hash, if available, can save us some time when s!=x.
+    // TODO Is this worth it? We would need to have two strings that have a long shared prefix for
+    // this to be beneficial. How often does that happen?
+    if (ypObject_CACHED_HASH(s) != ypObject_HASH_INVALID &&
+            ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
+            ypObject_CACHED_HASH(s) != ypObject_CACHED_HASH(x)) {
+        return FALSE;
+    }
+
     return ypStr_MEMCMP(ypStr_ENC(s)->sizeshift, ypStr_DATA(s), (yp_ssize_t)0, ypStr_DATA(x),
                    (yp_ssize_t)0, s_len) == 0;
 }
@@ -13176,7 +13195,7 @@ _ypTuple_RELATIVE_CMP_FUNCTION(le, <=);
 _ypTuple_RELATIVE_CMP_FUNCTION(ge, >=);
 _ypTuple_RELATIVE_CMP_FUNCTION(gt, >);
 
-// Returns yp_True if the two tuples/lists are equal. Size is a quick way to check equality.
+// Returns yp_True iff the two tuples/lists are equal.
 // TODO comparison functions can recurse, just like currenthash...fix!
 static ypObject *tuple_eq(ypObject *sq, ypObject *x)
 {
@@ -13187,8 +13206,7 @@ static ypObject *tuple_eq(ypObject *sq, ypObject *x)
     if (ypObject_TYPE_PAIR_CODE(x) != ypTuple_CODE) return yp_ComparisonNotImplemented;
     if (sq_len != ypTuple_LEN(x)) return yp_False;
 
-    // We need to inspect all our items for equality, which could be time-intensive. It's fairly
-    // obvious that the pre-computed hash, if available, can save us some time when sq!=x.
+    // The pre-computed hash, if available, can save us some time when sq!=x.
     if (ypObject_CACHED_HASH(sq) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(sq) != ypObject_CACHED_HASH(x)) {
@@ -16393,8 +16411,7 @@ static ypObject *frozenset_eq(ypObject *so, ypObject *x)
     if (ypSet_LEN(so) != ypSet_LEN(x)) return yp_False;
     if (ypSet_LEN(so) < 1) return yp_True;
 
-    // We need to inspect all our items for equality, which could be time-intensive. It's fairly
-    // obvious that the pre-computed hash, if available, can save us some time when so!=x.
+    // The pre-computed hash, if available, can save us some time when so!=x.
     if (ypObject_CACHED_HASH(so) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(so) != ypObject_CACHED_HASH(x)) {
@@ -17537,8 +17554,7 @@ static ypObject *frozendict_eq(ypObject *mp, ypObject *x)
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE) return yp_ComparisonNotImplemented;
     if (ypDict_LEN(mp) != ypDict_LEN(x)) return yp_False;
 
-    // We need to inspect all our items for equality, which could be time-intensive. It's fairly
-    // obvious that the pre-computed hash, if available, can save us some time when mp!=x.
+    // The pre-computed hash, if available, can save us some time when mp!=x.
     if (ypObject_CACHED_HASH(mp) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(mp) != ypObject_CACHED_HASH(x)) {

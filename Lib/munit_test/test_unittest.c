@@ -624,7 +624,7 @@ static MunitResult test_rand_obj_uniqueness(const MunitParameter params[], fixtu
 static MunitResult test_munit_rand(const MunitParameter params[], fixture_t *fixture)
 {
     // There was a divide-by-zero error when min equals max.
-    // FIXME link
+    // https://github.com/nemequ/munit/pull/106
     munit_assert_int(munit_rand_int_range(42, 42), ==, 42);
 
     return MUNIT_OK;
