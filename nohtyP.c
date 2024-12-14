@@ -10359,14 +10359,12 @@ static ypObject *bytes_splitlines(ypObject *b, ypObject *keepends)
     return yp_NotImplementedError;
 }
 
-// Returns -1, 0, or 1 as per memcmp
-static int _ypBytes_relative_cmp(ypObject *b, ypObject *x)
+static yp_ssize_t _ypBytes_relative_cmp(ypObject *b, ypObject *x)
 {
     yp_ssize_t b_len = ypBytes_LEN(b);
     yp_ssize_t x_len = ypBytes_LEN(x);
-    int        cmp = yp_memcmp(ypBytes_DATA(b), ypBytes_DATA(x), MIN(b_len, x_len));
-    if (cmp == 0) cmp = b_len < x_len ? -1 : (b_len > x_len);
-    return cmp;
+    yp_ssize_t cmp = yp_memcmp(ypBytes_DATA(b), ypBytes_DATA(x), MIN(b_len, x_len));
+    return cmp == 0 ? b_len - x_len : cmp;
 }
 static ypObject *bytes_lt(ypObject *b, ypObject *x)
 {
@@ -11377,15 +11375,12 @@ static ypObject *str_rsplit(ypObject *s, ypObject *sep, yp_ssize_t maxsplit)
 
 static ypObject *str_splitlines(ypObject *s, ypObject *keepends) { return yp_NotImplementedError; }
 
-
-// Returns -1, 0, or 1 as per memcmp
-static int _ypStr_relative_cmp(ypObject *s, ypObject *x)
+static yp_ssize_t _ypStr_relative_cmp(ypObject *s, ypObject *x)
 {
     yp_ssize_t s_len = ypStr_LEN(s);
     yp_ssize_t x_len = ypStr_LEN(x);
-    int        cmp = yp_memcmp(ypStr_DATA(s), ypStr_DATA(x), MIN(s_len, x_len));
-    if (cmp == 0) cmp = s_len < x_len ? -1 : (s_len > x_len);
-    return cmp;
+    yp_ssize_t cmp = yp_memcmp(ypStr_DATA(s), ypStr_DATA(x), MIN(s_len, x_len));
+    return cmp == 0 ? s_len - x_len : cmp;
 }
 static ypObject *str_lt(ypObject *s, ypObject *x)
 {
@@ -13195,39 +13190,42 @@ _ypTuple_RELATIVE_CMP_FUNCTION(le, <=);
 _ypTuple_RELATIVE_CMP_FUNCTION(ge, >=);
 _ypTuple_RELATIVE_CMP_FUNCTION(gt, >);
 
-// Returns yp_True iff the two tuples/lists are equal.
+// Returns on_eq if the two tuples/lists are equal, else on_ne.
 // TODO comparison functions can recurse, just like currenthash...fix!
-static ypObject *tuple_eq(ypObject *sq, ypObject *x)
+static ypObject *_tuple_equality(ypObject *sq, ypObject *x, ypObject *on_eq, ypObject *on_ne)
 {
     yp_ssize_t sq_len = ypTuple_LEN(sq);
     yp_ssize_t i;
 
-    if (sq == x) return yp_True;
+    if (sq == x) return on_eq;
     if (ypObject_TYPE_PAIR_CODE(x) != ypTuple_CODE) return yp_ComparisonNotImplemented;
-    if (sq_len != ypTuple_LEN(x)) return yp_False;
+    if (sq_len != ypTuple_LEN(x)) return on_ne;
 
     // The pre-computed hash, if available, can save us some time when sq!=x.
     if (ypObject_CACHED_HASH(sq) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(sq) != ypObject_CACHED_HASH(x)) {
-        return yp_False;
+        return on_ne;
     }
-    // TODO What if we haven't cached this hash yet, but we could?  Calculating the hash now could
-    // speed up future comparisons against these objects. But!  What if we're a tuple of mutable
-    // objects...we will then attempt to calculate the hash on every comparison, only to fail. If
-    // we had a flag to differentiate "tuple of mutables" with "not yet computed"...crap, that
-    // still wouldn't quite work, because what if we freeze those mutables?
 
+    // Loop until we find the first non-equal element, if any.
     for (i = 0; i < sq_len; i++) {
         ypObject *result = yp_eq(ypTuple_ARRAY(sq)[i], ypTuple_ARRAY(x)[i]);
-        if (result != yp_True) return result;  // returns on yp_False or an exception
+        if (result != yp_True) {
+            if (result == yp_False) return on_ne;
+            yp_ASSERT1(yp_isexceptionC(result));
+            return result;
+        }
     }
-    return yp_True;
+    return on_eq;
+}
+static ypObject *tuple_eq(ypObject *sq, ypObject *x)
+{
+    return _tuple_equality(sq, x, yp_True, yp_False);
 }
 static ypObject *tuple_ne(ypObject *sq, ypObject *x)
 {
-    ypObject *result = tuple_eq(sq, x);
-    return ypBool_NOT(result);
+    return _tuple_equality(sq, x, yp_False, yp_True);
 }
 
 // XXX Adapted from Python's tuplehash
@@ -16404,27 +16402,37 @@ static ypObject *frozenset_le(ypObject *so, ypObject *x)
 }
 
 // TODO comparison functions can recurse, just like currenthash...fix!
-static ypObject *frozenset_eq(ypObject *so, ypObject *x)
+static ypObject *_frozenset_equality(ypObject *so, ypObject *x, ypObject *on_eq, ypObject *on_ne)
 {
-    if (so == x) return yp_True;
+    ypObject *result;
+
+    if (so == x) return on_eq;
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenSet_CODE) return yp_ComparisonNotImplemented;
-    if (ypSet_LEN(so) != ypSet_LEN(x)) return yp_False;
-    if (ypSet_LEN(so) < 1) return yp_True;
+    if (ypSet_LEN(so) != ypSet_LEN(x)) return on_ne;
+    if (ypSet_LEN(so) < 1) return on_eq;
 
     // The pre-computed hash, if available, can save us some time when so!=x.
     if (ypObject_CACHED_HASH(so) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(so) != ypObject_CACHED_HASH(x)) {
-        return yp_False;
+        return on_ne;
     }
 
-    return _ypSet_issubset_withset(so, x);
+    // Recall that we've checked that so and x have the same lengths, so if so is a subset then
+    // it must have all the same items as x.
+    result = _ypSet_issubset_withset(so, x);
+    if (result == yp_True) return on_eq;
+    if (result == yp_False) return on_ne;
+    yp_ASSERT1(yp_isexceptionC(result));
+    return result;
 }
-
+static ypObject *frozenset_eq(ypObject *so, ypObject *x)
+{
+    return _frozenset_equality(so, x, yp_True, yp_False);
+}
 static ypObject *frozenset_ne(ypObject *so, ypObject *x)
 {
-    ypObject *result = frozenset_eq(so, x);
-    return ypBool_NOT(result);
+    return _frozenset_equality(so, x, yp_False, yp_True);
 }
 
 static ypObject *frozenset_ge(ypObject *so, ypObject *x)
@@ -17540,7 +17548,7 @@ static ypObject *frozendict_frozen_deepcopy(ypObject *x, visitfunc copy_visitor,
 static ypObject *frozendict_bool(ypObject *mp) { return ypBool_FROM_C(ypDict_LEN(mp)); }
 
 // TODO comparison functions can recurse, just like currenthash...fix!
-static ypObject *frozendict_eq(ypObject *mp, ypObject *x)
+static ypObject *_frozendict_equality(ypObject *mp, ypObject *x, ypObject *on_eq, ypObject *on_ne)
 {
     yp_ssize_t      valuesleft;
     yp_ssize_t      mp_i;
@@ -17550,15 +17558,15 @@ static ypObject *frozendict_eq(ypObject *mp, ypObject *x)
     ypObject       *x_value;
     ypObject       *result;
 
-    if (mp == x) return yp_True;
+    if (mp == x) return on_eq;
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE) return yp_ComparisonNotImplemented;
-    if (ypDict_LEN(mp) != ypDict_LEN(x)) return yp_False;
+    if (ypDict_LEN(mp) != ypDict_LEN(x)) return on_ne;
 
     // The pre-computed hash, if available, can save us some time when mp!=x.
     if (ypObject_CACHED_HASH(mp) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(mp) != ypObject_CACHED_HASH(x)) {
-        return yp_False;
+        return on_ne;
     }
 
     // TODO yp_eq may mutate mp, invalidating valuesleft!
@@ -17574,19 +17582,25 @@ static ypObject *frozendict_eq(ypObject *mp, ypObject *x)
                 ypDict_KEYSET(x), mp_key_loc->se_key, mp_key_loc->se_hash, &x_key_loc);
         if (yp_isexceptionC(result)) return result;
         x_value = *ypDict_VALUE_ENTRY(x, x_key_loc);
-        if (x_value == NULL) return yp_False;
+        if (x_value == NULL) return on_ne;
 
         // If the values are not equal, then neither are mp and x
         result = yp_eq(mp_value, x_value);
-        if (result != yp_True) return result;  // yp_False or an exception
+        if (result != yp_True) {
+            if (result == yp_False) return on_ne;
+            yp_ASSERT1(yp_isexceptionC(result));
+            return result;
+        }
     }
-    return yp_True;
+    return on_eq;
 }
-
+static ypObject *frozendict_eq(ypObject *mp, ypObject *x)
+{
+    return _frozendict_equality(mp, x, yp_True, yp_False);
+}
 static ypObject *frozendict_ne(ypObject *mp, ypObject *x)
 {
-    ypObject *result = frozendict_eq(mp, x);
-    return ypBool_NOT(result);
+    return _frozendict_equality(mp, x, yp_False, yp_True);
 }
 
 // Essentially: hash((key, value))
@@ -18683,32 +18697,31 @@ static ypObject *range_len(ypObject *r, yp_ssize_t *len)
     return yp_None;
 }
 
+static yp_int_t _range_relative_cmp(ypObject *r, ypObject *x)
+{
+    yp_int_t len_cmp = ypRange_LEN(r) - ypRange_LEN(x);
+
+    if (ypRange_LEN(r) < 1 || ypRange_LEN(x) < 1) {
+        return len_cmp;
+    } else if (ypRange_START(r) != ypRange_START(x)) {
+        return ypRange_START(r) - ypRange_START(x);
+    } else if (ypRange_LEN(r) < 2 || ypRange_LEN(x) < 2) {
+        return len_cmp;
+    } else if (ypRange_STEP(r) != ypRange_STEP(x)) {
+        return ypRange_STEP(r) - ypRange_STEP(x);
+    } else {
+        return len_cmp;
+    }
+}
+
 // Here be range_lt, range_le, range_ge, range_gt. Unlike Python, we support ordering for ranges.
-// FIXME Rather than this complicated macro, could define this as a cmp (-1, 0, 1) function.
-// FIXME ...similarly, inspect and standardize how the other types implement this.
 #define _ypRange_RELATIVE_CMP_FUNCTION(name, cmp_op)                                        \
     static ypObject *range_##name(ypObject *r, ypObject *x)                                 \
     {                                                                                       \
-        int len_cmp;                                                                        \
-        int result;                                                                         \
-                                                                                            \
         if (ypObject_TYPE_PAIR_CODE(x) != ypRange_CODE) return yp_ComparisonNotImplemented; \
         ypRange_ASSERT_NORMALIZED(r);                                                       \
         ypRange_ASSERT_NORMALIZED(x);                                                       \
-                                                                                            \
-        len_cmp = ypRange_LEN(r) cmp_op ypRange_LEN(x);                                     \
-        if (ypRange_LEN(r) < 1 || ypRange_LEN(x) < 1) {                                     \
-            result = len_cmp;                                                               \
-        } else if (ypRange_START(r) != ypRange_START(x)) {                                  \
-            result = ypRange_START(r) cmp_op ypRange_START(x);                              \
-        } else if (ypRange_LEN(r) < 2 || ypRange_LEN(x) < 2) {                              \
-            result = len_cmp;                                                               \
-        } else if (ypRange_STEP(r) != ypRange_STEP(x)) {                                    \
-            result = ypRange_STEP(r) cmp_op ypRange_STEP(x);                                \
-        } else {                                                                            \
-            result = len_cmp;                                                               \
-        }                                                                                   \
-        return ypBool_FROM_C(result);                                                       \
+        return ypBool_FROM_C(_range_relative_cmp(r, x) cmp_op 0);                           \
     }
 _ypRange_RELATIVE_CMP_FUNCTION(lt, <);
 _ypRange_RELATIVE_CMP_FUNCTION(le, <=);
