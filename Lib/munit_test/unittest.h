@@ -81,6 +81,7 @@ extern "C" {
     19,18,17,16,15,14,13,12,11,10, \
      9, 8, 7, 6, 5, 4, 3, 2, 1, 0
 
+// FIXME Generate these using a script to ensure correctness.
 #define _STRINGIFY1(a) #a
 #define _STRINGIFY2(a, b) #a, #b
 #define _STRINGIFY3(a, b, c) #a, #b, #c
@@ -114,7 +115,9 @@ extern "C" {
 #define _STRINGIFY31(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E
 #define _STRINGIFY32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F
 #define _STRINGIFY33(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F, G) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F, #G
+#define _STRINGIFY34(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F, G, H) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F, #G, #H
 
+// FIXME Generate these using a script to ensure correctness.
 #define _COMMA_REPEAT1(x) x
 #define _COMMA_REPEAT2(x) x, x
 #define _COMMA_REPEAT3(x) x, x, x
@@ -1114,6 +1117,7 @@ SUITE_OF_TESTS_DECLS(test_frozendict);
 SUITE_OF_TESTS_DECLS(test_frozenset);
 SUITE_OF_TESTS_DECLS(test_function);
 SUITE_OF_TESTS_DECLS(test_range);
+SUITE_OF_TESTS_DECLS(test_tuple);
 
 SUITE_OF_SUITES_DECLS(test_protocols);
 SUITE_OF_TESTS_DECLS(test_all);

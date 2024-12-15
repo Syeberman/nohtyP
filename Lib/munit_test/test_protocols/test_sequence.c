@@ -682,6 +682,14 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
         yp_decrefN(N(sq, result));
     }
 
+    // Extremely-large factor.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises(yp_repeatC(sq, yp_SSIZE_T_MAX), yp_MemorySizeOverflowError);
+        assert_sequence(sq, items[0], items[1]);  // sq unchanged.
+        yp_decrefN(N(sq));
+    }
+
 tear_down:
     obj_array_decref(items);
     uniqueness_dealloc(uq);
@@ -1721,6 +1729,23 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         }
     }
 
+    // x is large, growing the sequence (likely triggering a resize).
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7]));
+        assert_not_raises_exc(yp_setsliceC6(sq, 1, 2, 1, x, &exc));
+        assert_sequence(sq, items[0], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7]);
+        yp_decrefN(N(sq, x));
+    }
+
     // Duplicates: 0 is duplicated in sq, 1 in x, and 2 shared between them.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *sq = type->newN(N(items[0], items[2], items[0]));
@@ -2229,7 +2254,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     fixture_type_t **x_type;
     uniqueness_t    *uq = uniqueness_new();
     ypObject        *not_iterable = rand_obj_any_not_iterable(uq);
-    ypObject        *items[4];
+    ypObject        *items[8];
     obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support extend.
@@ -2302,6 +2327,23 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
             }
             yp_decrefN(N(sq, x));
         }
+    }
+
+    // x is large (likely triggering a resize).
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7]));
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+        assert_sequence(sq, items[0], items[1], items[0], items[1], items[2], items[3], items[4],
+                items[5], items[6], items[7], items[0], items[1], items[2], items[3], items[4],
+                items[5], items[6], items[7], items[0], items[1], items[2], items[3], items[4],
+                items[5], items[6], items[7], items[0], items[1], items[2], items[3], items[4],
+                items[5], items[6], items[7]);
+        yp_decrefN(N(sq, x));
     }
 
     // Duplicates: 0 is duplicated in sq, 1 in x, and 2 shared between them.
@@ -2434,6 +2476,14 @@ static MunitResult test_irepeatC(const MunitParameter params[], fixture_t *fixtu
         assert_not_raises_exc(yp_irepeatC(sq, 2, &exc));
         assert_sequence(sq, items[0], items[1], items[0], items[0], items[1], items[0]);
         yp_decref(sq);
+    }
+
+    // Extremely-large factor.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_irepeatC(sq, yp_SSIZE_T_MAX, &exc), yp_MemorySizeOverflowError);
+        assert_sequence(sq, items[0], items[1]);  // sq unchanged.
+        yp_decrefN(N(sq));
     }
 
 tear_down:

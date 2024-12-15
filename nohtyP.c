@@ -12807,7 +12807,8 @@ static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
 
     newSq = _ypTuple_new(sq_type, ypTuple_LEN(sq) + length_hint, /*alloclen_fixed=*/FALSE);
     if (yp_isexceptionC(newSq)) return newSq;
-    result = _ypTuple_extend_fromtuple(newSq, sq);  // TODO We don't need extend's alloclen check
+    // FIXME We don't need extend's alloclen check, so instead use _ypTuple_copy, but add "extra".
+    result = _ypTuple_extend_fromtuple(newSq, sq);
     if (!yp_isexceptionC(result)) {
         result = _ypTuple_extend_fromiterable(newSq, length_hint, iterable);
     }
