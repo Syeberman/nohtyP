@@ -3,6 +3,12 @@
 
 // Sequences should accept themselves, their pairs, iterators, and tuple/list as valid types for the
 // "x" (i.e. "other iterable") argument.
+// FIXME Some sequences can work with any other iterable (i.e. tuple/list works with anything). The
+// test_tuple tests leverage this by using x_type->rand_items for items. Can we do the same here?
+// Perhaps x_types needs to be a field on fixture_type_t? This is preventing us testing all
+// paths, for example concat where x has a *length* (not lenhint) of zero but is not a friend.
+// FIXME It would need a rand_items and rand_keys for each x_type that is the minimum objects
+// supported by both types.
 #define x_types_init(type) \
     {(type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, NULL}
 

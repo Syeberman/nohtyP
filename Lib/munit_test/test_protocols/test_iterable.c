@@ -18,6 +18,9 @@
 
 // TODO Include original_object_return tests.
 
+// FIXME yp_sorted/etc. Ensure yp_sorted3 properly handles exception passthrough, even in cases
+// where one of the arguments would be ignored (e.g. empty list).
+
 
 // TODO More test cases are needed here.
 // TODO Share more of these tests with test_miniiter/etc by creating a generator to wrap around

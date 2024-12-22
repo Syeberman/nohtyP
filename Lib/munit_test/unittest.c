@@ -853,19 +853,24 @@ static ypObject *new_rand_iter(const rand_obj_supplier_memo_t *memo)
     return new_rand_iter3(n, rand_obj_any_memo, memo);
 }
 
-static ypObject *newN_iter(int n, ...)
+extern ypObject *new_iterNV(int n, va_list args)
+{
+    ypObject *tuple = yp_tupleNV(n, args);  // new ref
+    ypObject *result = yp_iter(tuple);
+    yp_decref(tuple);
+    assert_not_exception(result);
+    return result;
+}
+
+extern ypObject *new_iterN(int n, ...)
 {
     va_list   args;
-    ypObject *tuple;
     ypObject *result;
 
     va_start(args, n);
-    tuple = yp_tupleNV(n, args);  // new ref
+    result = new_iterNV(n, args);  // new ref
     va_end(args);
 
-    result = yp_iter(tuple);
-    yp_decref(tuple);
-    assert_not_exception(result);
     return result;
 }
 
@@ -879,7 +884,7 @@ static fixture_type_t fixture_type_iter_struct = {
 
         yp_iter,  // new_
 
-        newN_iter,      // newN
+        new_iterN,      // newN
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,   // newK

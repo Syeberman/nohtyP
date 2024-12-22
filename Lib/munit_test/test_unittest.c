@@ -33,6 +33,7 @@ static MunitResult test_PRI_formats(const MunitParameter params[], fixture_t *fi
 #endif
 
 #undef assert_PRI_format
+
     return MUNIT_OK;
 }
 

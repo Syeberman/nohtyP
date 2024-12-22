@@ -1031,6 +1031,10 @@ extern ypObject *rand_obj_any_not_iterable(uniqueness_t *uq);
 // fixture_type_bool, as there are too few values for these types to guarantee uniqueness.
 extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type);
 
+// Returns an iter yielding the n items in order.
+extern ypObject *new_iterN(int n, ...);
+extern ypObject *new_iterNV(int n, va_list args);
+
 // Returns an object of the given type containing the n (key, value) pairs as 2-tuples. The object
 // is constructed by calling type->new_ with a list of the pairs.
 extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...);
