@@ -21,7 +21,7 @@
 // the comparison methods (isdisjoint/etc), as those support any iterable.
 static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
 {
-    return type->type == other->type || type->type == other->pair->type;
+    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
 }
 
 
@@ -602,7 +602,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[2]));
         ypObject *result = yp_union(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0], items[1], items[2]);
         assert_setlike(so, items[0], items[1]);  // so unchanged.
         yp_decrefN(N(so, x, result));
@@ -613,7 +613,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
         ypObject *result = yp_union(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0], items[1]);
         yp_decrefN(N(so, x, result));
     }
@@ -623,7 +623,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_union(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0], items[1]);
         yp_decrefN(N(so, x, result));
     }
@@ -633,7 +633,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_union(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
     }
@@ -642,7 +642,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *result = yp_union(so, so);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0], items[1]);
         yp_decrefN(N(so, result));
     }
@@ -806,7 +806,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[2]));
         ypObject *result = yp_intersection(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[1]);
         assert_setlike(so, items[0], items[1]);  // so unchanged.
         yp_decrefN(N(so, x, result));
@@ -817,7 +817,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
         ypObject *result = yp_intersection(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
     }
@@ -827,7 +827,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_intersection(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
     }
@@ -837,7 +837,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_intersection(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
     }
@@ -846,7 +846,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *result = yp_intersection(so, so);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0], items[1]);
         yp_decrefN(N(so, result));
     }
@@ -994,7 +994,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[2]));
         ypObject *result = yp_difference(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0]);
         assert_setlike(so, items[0], items[1]);  // so unchanged.
         yp_decrefN(N(so, x, result));
@@ -1005,7 +1005,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
         ypObject *result = yp_difference(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
     }
@@ -1015,7 +1015,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_difference(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0], items[1]);
         yp_decrefN(N(so, x, result));
     }
@@ -1025,7 +1025,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_difference(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
     }
@@ -1034,7 +1034,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *result = yp_difference(so, so);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(so, result));
     }
@@ -1182,7 +1182,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[2]));
         ypObject *result = yp_symmetric_difference(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0], items[2]);
         assert_setlike(so, items[0], items[1]);  // so unchanged.
         yp_decrefN(N(so, x, result));
@@ -1193,7 +1193,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
         ypObject *result = yp_symmetric_difference(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0], items[1]);
         yp_decrefN(N(so, x, result));
     }
@@ -1203,7 +1203,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_symmetric_difference(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_setlike(result, items[0], items[1]);
         yp_decrefN(N(so, x, result));
     }
@@ -1213,7 +1213,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_symmetric_difference(so, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
     }
@@ -1222,7 +1222,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *result = yp_symmetric_difference(so, so);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(so, result));
     }

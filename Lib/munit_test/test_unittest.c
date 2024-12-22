@@ -438,11 +438,11 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
     fixture_type_t *type = fixture->type;
 
     assert_not_null(type->name);
-    assert_type_is(type->type, yp_t_type);
+    assert_type_is(type->yp_type, yp_t_type);
     if (type->is_mutable) {
         assert_null(type->falsy);
     } else if (type->falsy != NULL) {
-        assert_type_is(type->falsy, type->type);
+        assert_type_is(type->falsy, type->yp_type);
     }
     assert_not_null(type->pair);
 
@@ -452,7 +452,7 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
     if (type->is_collection && type != fixture_type_range) {
         ypObject *x = rand_obj(NULL, type);
         ypObject *self = type->new_(x);
-        assert_type_is(self, type->type);
+        assert_type_is(self, type->yp_type);
         yp_decrefN(N(self, x));
     }
 
@@ -512,7 +512,7 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
     {
         ypObject *of_type = rand_obj(NULL, type);
         assert_not_exception(of_type);
-        assert_type_is(of_type, type->type);
+        assert_type_is(of_type, type->yp_type);
         yp_decref(of_type);
     }
 

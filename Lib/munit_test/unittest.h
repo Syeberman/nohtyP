@@ -856,12 +856,12 @@ typedef void (*rand_objs_func)(uniqueness_t *, yp_ssize_t, ypObject **);
 // deleted items).
 typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
-    char           *name;   // The name of the type (i.e. int, bytearray, dict).
-    ypObject       *type;   // The type object (i.e. yp_t_float, yp_t_list).
-    ypObject       *falsy;  // The falsy/empty immortal for this type, or NULL. (Only immutables.)
-    fixture_type_t *pair;   // The other type in this object pair, or points back to this type.
+    char           *name;     // The name of the type (i.e. int, bytearray, dict).
+    ypObject       *yp_type;  // The type object (i.e. yp_t_float, yp_t_list).
+    ypObject       *falsy;    // The falsy immortal for this type, or NULL. (Only immutables.)
+    fixture_type_t *pair;     // The other type in this object pair, or points back to this type.
 
-    rand_obj_supplier_func _new_rand;  // Call via rand_obj/etc.
+    rand_obj_supplier_func _new_rand;  // Internal: used by rand_obj/etc.
 
     objobjfunc new_;  // The object converter, aka the single-argument constructor.
 

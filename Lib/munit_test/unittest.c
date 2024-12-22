@@ -580,7 +580,7 @@ extern ypObject *new_faulty_iter(
 // Returns a random type object, except invalidated and exception objects.
 static ypObject *new_rand_type(const rand_obj_supplier_memo_t *memo)
 {
-    return rand_choice_fixture_types(fixture_types_all)->type;
+    return rand_choice_fixture_types(fixture_types_all)->yp_type;
 }
 
 static fixture_type_t fixture_type_type_struct = {
@@ -2105,42 +2105,42 @@ static void fill_fixture_types_arrays(fixture_types_t *fixture_types, char **par
 static void initialize_fixture_types(void)
 {
     // These need to be initialized at runtime because they may be imported from a DLL.
-    fixture_type_type->type = yp_t_type;
-    fixture_type_NoneType->type = yp_t_NoneType;
+    fixture_type_type->yp_type = yp_t_type;
+    fixture_type_NoneType->yp_type = yp_t_NoneType;
     fixture_type_NoneType->falsy = yp_None;
-    fixture_type_bool->type = yp_t_bool;
+    fixture_type_bool->yp_type = yp_t_bool;
     fixture_type_bool->falsy = yp_False;
-    fixture_type_int->type = yp_t_int;
+    fixture_type_int->yp_type = yp_t_int;
     fixture_type_int->falsy = yp_i_zero;
-    fixture_type_intstore->type = yp_t_intstore;
-    fixture_type_float->type = yp_t_float;
+    fixture_type_intstore->yp_type = yp_t_intstore;
+    fixture_type_float->yp_type = yp_t_float;
     // TODO Falsy immortal for float?
-    fixture_type_floatstore->type = yp_t_floatstore;
-    fixture_type_iter->type = yp_t_iter;
-    fixture_type_range->type = yp_t_range;
+    fixture_type_floatstore->yp_type = yp_t_floatstore;
+    fixture_type_iter->yp_type = yp_t_iter;
+    fixture_type_range->yp_type = yp_t_range;
     fixture_type_range->falsy = yp_range_empty;
-    fixture_type_bytes->type = yp_t_bytes;
+    fixture_type_bytes->yp_type = yp_t_bytes;
     fixture_type_bytes->falsy = yp_bytes_empty;
-    fixture_type_bytearray->type = yp_t_bytearray;
-    fixture_type_str->type = yp_t_str;
+    fixture_type_bytearray->yp_type = yp_t_bytearray;
+    fixture_type_str->yp_type = yp_t_str;
     fixture_type_str->falsy = yp_str_empty;
-    fixture_type_chrarray->type = yp_t_chrarray;
-    fixture_type_tuple->type = yp_t_tuple;
+    fixture_type_chrarray->yp_type = yp_t_chrarray;
+    fixture_type_tuple->yp_type = yp_t_tuple;
     fixture_type_tuple->falsy = yp_tuple_empty;
-    fixture_type_list->type = yp_t_list;
-    fixture_type_frozenset->type = yp_t_frozenset;
+    fixture_type_list->yp_type = yp_t_list;
+    fixture_type_frozenset->yp_type = yp_t_frozenset;
     fixture_type_frozenset->falsy = yp_frozenset_empty;
-    fixture_type_set->type = yp_t_set;
-    fixture_type_frozenset_dirty->type = yp_t_frozenset;
+    fixture_type_set->yp_type = yp_t_set;
+    fixture_type_frozenset_dirty->yp_type = yp_t_frozenset;
     fixture_type_frozenset_dirty->falsy = yp_frozenset_empty;
-    fixture_type_set_dirty->type = yp_t_set;
-    fixture_type_frozendict->type = yp_t_frozendict;
+    fixture_type_set_dirty->yp_type = yp_t_set;
+    fixture_type_frozendict->yp_type = yp_t_frozendict;
     fixture_type_frozendict->falsy = yp_frozendict_empty;
-    fixture_type_dict->type = yp_t_dict;
-    fixture_type_frozendict_dirty->type = yp_t_frozendict;
+    fixture_type_dict->yp_type = yp_t_dict;
+    fixture_type_frozendict_dirty->yp_type = yp_t_frozendict;
     fixture_type_frozendict_dirty->falsy = yp_frozendict_empty;
-    fixture_type_dict_dirty->type = yp_t_dict;
-    fixture_type_function->type = yp_t_function;
+    fixture_type_dict_dirty->yp_type = yp_t_dict;
+    fixture_type_function->yp_type = yp_t_function;
 
     // The fixture_types_* and param_values_types_* arrays above were sized based on
     // FIXTURE_TYPES_ALL_LEN, so make sure that value is correct.
@@ -2192,7 +2192,7 @@ extern fixture_type_t *fixture_type_from_object(ypObject *object)
     fixture_type_t **fixture_type;
     ypObject        *type = yp_type(object);
     for (fixture_type = fixture_types_all->types; (*fixture_type) != NULL; fixture_type++) {
-        if ((*fixture_type)->type == type) break;
+        if ((*fixture_type)->yp_type == type) break;
     }
     yp_decref(type);
     assert_not_null(*fixture_type);

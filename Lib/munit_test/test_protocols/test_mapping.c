@@ -12,7 +12,7 @@
 // Returns true iff type supports comparison operators (eq/etc) with other.
 static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
 {
-    return type->type == other->type || type->type == other->pair->type;
+    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
 }
 
 

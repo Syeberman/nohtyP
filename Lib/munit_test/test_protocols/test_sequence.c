@@ -17,7 +17,7 @@
 // Returns true iff type supports comparison operators (lt/etc) with other.
 static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
 {
-    return type->type == other->type || type->type == other->pair->type;
+    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
 }
 
 
@@ -452,7 +452,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[2], items[3]));
         ypObject *result = yp_concat(sq, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_sequence(result, items[0], items[1], items[2], items[3]);
         assert_sequence(sq, items[0], items[1]);  // sq unchanged.
         yp_decrefN(N(sq, x, result));
@@ -463,7 +463,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         ypObject *sq = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
         ypObject *result = yp_concat(sq, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_sequence(result, items[0], items[1]);
         yp_decrefN(N(sq, x, result));
     }
@@ -473,7 +473,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_concat(sq, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_sequence(result, items[0], items[1]);
         yp_decrefN(N(sq, x, result));
     }
@@ -483,7 +483,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         ypObject *sq = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
         ypObject *result = yp_concat(sq, x);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(sq, x, result));
     }
@@ -492,7 +492,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *result = yp_concat(sq, sq);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_sequence(result, items[0], items[1], items[0], items[1]);
         yp_decrefN(N(sq, result));
     }
@@ -506,7 +506,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
                 assert_raises(yp_concat(sq, x), yp_ValueError, yp_TypeError);
             } else {
                 ypObject *result = yp_concat(sq, x);
-                assert_type_is(result, type->type);
+                assert_type_is(result, type->yp_type);
                 assert_sequence(result, items[0], items[1], items[2], sq);
                 yp_decref(result);
             }
@@ -607,7 +607,7 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *result = yp_repeatC(sq, 2);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_sequence(result, items[0], items[1], items[0], items[1]);
         assert_sequence(sq, items[0], items[1]);  // sq unchanged.
         yp_decrefN(N(sq, result));
@@ -617,7 +617,7 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *result = yp_repeatC(sq, 1);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_sequence(result, items[0], items[1]);
         yp_decrefN(N(sq, result));
     }
@@ -626,7 +626,7 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *result = yp_repeatC(sq, 0);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(sq, result));
     }
@@ -635,7 +635,7 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *result = yp_repeatC(sq, -1);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(sq, result));
     }
@@ -644,7 +644,7 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *result = yp_repeatC(sq, 8);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_sequence(result, items[0], items[1], items[0], items[1], items[0], items[1],
                 items[0], items[1], items[0], items[1], items[0], items[1], items[0], items[1],
                 items[0], items[1]);
@@ -655,7 +655,7 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *sq = type->newN(0);
         ypObject *result = yp_repeatC(sq, 2);
-        assert_type_is(result, type->type);
+        assert_type_is(result, type->yp_type);
         assert_len(result, 0);
         yp_decrefN(N(sq, result));
     }
@@ -774,9 +774,9 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     {
         ypObject *zero_one = yp_getsliceC4(sq, 0, 1, 1);
         ypObject *one_two = yp_getsliceC4(sq, 1, 2, 1);
-        assert_type_is(zero_one, type->type);
+        assert_type_is(zero_one, type->yp_type);
         assert_sequence(zero_one, items[0]);
-        assert_type_is(one_two, type->type);
+        assert_type_is(one_two, type->yp_type);
         assert_sequence(one_two, items[1]);
         assert_sequence(sq, items[0], items[1], items[2], items[3], items[4]);  // sq unchanged.
         yp_decrefN(N(zero_one, one_two));
@@ -786,9 +786,9 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     {
         ypObject *neg_one_neg_two = yp_getsliceC4(sq, -1, -2, -1);
         ypObject *neg_two_neg_three = yp_getsliceC4(sq, -2, -3, -1);
-        assert_type_is(neg_one_neg_two, type->type);
+        assert_type_is(neg_one_neg_two, type->yp_type);
         assert_sequence(neg_one_neg_two, items[4]);
-        assert_type_is(neg_two_neg_three, type->type);
+        assert_type_is(neg_two_neg_three, type->yp_type);
         assert_sequence(neg_two_neg_three, items[3]);
         yp_decrefN(N(neg_one_neg_two, neg_two_neg_three));
     }
@@ -797,9 +797,9 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     {
         ypObject *forward = yp_getsliceC4(sq, 0, 5, 1);
         ypObject *reverse = yp_getsliceC4(sq, -1, -6, -1);
-        assert_type_is(forward, type->type);
+        assert_type_is(forward, type->yp_type);
         assert_sequence(forward, items[0], items[1], items[2], items[3], items[4]);
-        assert_type_is(reverse, type->type);
+        assert_type_is(reverse, type->yp_type);
         assert_sequence(reverse, items[4], items[3], items[2], items[1], items[0]);
         yp_decrefN(N(forward, reverse));
     }
@@ -808,9 +808,9 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     {
         ypObject *forward = yp_getsliceC4(sq, 0, 5, 2);
         ypObject *reverse = yp_getsliceC4(sq, -1, -6, -2);
-        assert_type_is(forward, type->type);
+        assert_type_is(forward, type->yp_type);
         assert_sequence(forward, items[0], items[2], items[4]);
-        assert_type_is(reverse, type->type);
+        assert_type_is(reverse, type->yp_type);
         assert_sequence(reverse, items[4], items[2], items[0]);
         yp_decrefN(N(forward, reverse));
     }
@@ -831,7 +831,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         for (i = 0; i < yp_lengthof_array(slices); i++) {
             slice_args_t args = slices[i];
             ypObject    *empty = yp_getsliceC4(sq, args.start, args.stop, args.step);
-            assert_type_is(empty, type->type);
+            assert_type_is(empty, type->yp_type);
             assert_len(empty, 0);
             yp_decref(empty);
         }
@@ -2965,7 +2965,7 @@ static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
     obj_array_fill(items, uq, type->rand_items);
 
     // Sort is only implemented for list; it's not currently part of the sequence protocol.
-    if (type->type != yp_t_list) {
+    if (type->yp_type != yp_t_list) {
         ypObject *sq = type->newN(N(items[0], items[1]));
         assert_raises_exc(yp_sort(sq, &exc), yp_MethodError);
         assert_sequence(sq, items[0], items[1]);
