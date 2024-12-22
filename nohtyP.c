@@ -12913,6 +12913,7 @@ static ypObject *tuple_find(ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssiz
 
     ypSlice_AdjustIndicesC_validstep(ypTuple_LEN(sq), &start, &stop, step, &sq_rlen);
     if (sq_rlen < 1) {
+        // We must passthrough exceptions even if we are ignoring that argument.
         if (yp_isexceptionC(x)) return x;
         goto not_found;
     }
@@ -12944,6 +12945,7 @@ static ypObject *tuple_count(
 
     ypSlice_AdjustIndicesC_validstep(ypTuple_LEN(sq), &start, &stop, 1, &slicelength);
     if (slicelength < 1) {
+        // We must passthrough exceptions even if we are ignoring that argument.
         if (yp_isexceptionC(x)) return x;
         goto succeed;
     }
@@ -13253,7 +13255,11 @@ static ypObject *tuple_contains(ypObject *sq, ypObject *x)
 {
     yp_ssize_t i;
 
-    if (ypTuple_LEN(sq) < 1) return yp_isexceptionC(x) ? x : yp_False;
+    if (ypTuple_LEN(sq) < 1) {
+        // We must passthrough exceptions even if we are ignoring that argument.
+        if (yp_isexceptionC(x)) return x;
+        return yp_False;
+    }
 
     for (i = 0; i < ypTuple_LEN(sq); i++) {
         ypObject *result = yp_eq(x, ypTuple_ARRAY(sq)[i]);
@@ -13764,6 +13770,12 @@ static ypObject *_ypTuple_repeatCNV(int type, yp_ssize_t factor, int n, va_list 
     ypObject  *item;
 
     if (factor < 1 || n < 1) {
+        for (i = 0; i < n; i++) {
+            item = va_arg(args, ypObject *);  // borrowed
+            // We must passthrough exceptions even if we are ignoring that argument.
+            if (yp_isexceptionC(item)) return item;
+        }
+
         if (type == ypTuple_CODE) return yp_tuple_empty;
         return _ypTuple_new(ypList_CODE, 0, /*alloclen_fixed=*/FALSE);
     }

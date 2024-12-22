@@ -430,7 +430,7 @@ static void _test_new_repeatCN(
 
     // Exception passthrough.
     assert_isexception(any_new_repeatCN(2, N(yp_SyntaxError)), yp_SyntaxError);
-    // FIXME assert_isexception(any_new_repeatCN(0, N(yp_SyntaxError)), yp_SyntaxError);
+    assert_isexception(any_new_repeatCN(0, N(yp_SyntaxError)), yp_SyntaxError);
     assert_isexception(any_new_repeatCN(2, N(yp_None, yp_SyntaxError)), yp_SyntaxError);
 
     obj_array_decref(items);
