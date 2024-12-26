@@ -2,11 +2,11 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME tuple_concat needs more coverage (test against all types)
-
-static int is_friend_type(fixture_type_t *type, fixture_type_t *x_type)
+// Returns true iff type supports optimizations with other.
+// FIXME Make this common?
+static int is_friend_type(fixture_type_t *type, fixture_type_t *other)
 {
-    return x_type->yp_type == type->yp_type || x_type->yp_type == type->pair->yp_type;
+    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
 }
 
 

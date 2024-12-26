@@ -5,6 +5,16 @@
 #include "munit_test/unittest.h"
 
 
+// Finds the peer matching type in the null-terminated array of peers.
+static peer_type_t *find_peer_type(peer_type_t *peers, fixture_type_t *type)
+{
+    peer_type_t *peer;
+    for (peer = peers; peer->type != NULL; peer++) {
+        if (peer->type == type) return peer;
+    }
+    return NULL;  // GCOVR_EXCL_LINE
+}
+
 // Ensure PRIint, PRIssize, and similar are correct. Part of this test is ensuring it passes the
 // compiler's format string checks. Recall that these macros are copied in nohtyP.c and unittest.h.
 static MunitResult test_PRI_formats(const MunitParameter params[], fixture_t *fixture)
@@ -456,6 +466,21 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
         yp_decrefN(N(self, x));
     }
 
+    // peers should always contain the type and its pair.
+    assert_not_null(find_peer_type(type->peers, type));
+    assert_not_null(find_peer_type(type->peers, type->pair));
+
+    // peers should be reciprocal (i.e. a tuple is a peer of a str, so a str is a peer of a tuple).
+    {
+        peer_type_t *peer;
+        for (peer = type->peers; peer->type != NULL; peer++) {
+            peer_type_t *peer_peer = find_peer_type(peer->type->peers, type);
+            assert_not_null(peer_peer);
+            assert_ptr(peer_peer->rand_items, ==, peer->rand_items);
+            assert_ptr(peer_peer->rand_values, ==, peer->rand_values);
+        }
+    }
+
     return MUNIT_OK;
 }
 
@@ -517,7 +542,7 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
     }
 
     // Ensure generated functions are callable.
-    if (type == fixture_type_function) {
+    if (type->yp_type == yp_t_function) {
         ypObject *function = rand_obj(NULL, type);
         ypObject *result;
         assert_not_raises(result = yp_callN(function, 0));

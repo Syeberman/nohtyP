@@ -1,13 +1,6 @@
 
 #include "munit_test/unittest.h"
 
-// Mappings should accept themselves, their pairs, iterators, and frozendict/dict as
-// valid types for the "x" (i.e. "other iterable") argument.
-// TODO "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
-#define x_types_init(type)                                                             \
-    {(type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list,   \
-            fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
-            fixture_type_dict_dirty, NULL}
 
 // Returns true iff type supports comparison operators (eq/etc) with other.
 static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
@@ -15,6 +8,34 @@ static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
     return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
 }
 
+
+static MunitResult test_peers(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    peer_type_t    *peer;
+    int             found_self = FALSE;
+    int             found_pair = FALSE;
+    int             found_iter = FALSE;
+    int             found_frozendict = FALSE;
+    int             found_dict = FALSE;
+
+    // Mappings should accept themselves, their pairs, iterators, and frozendict/dict as valid types
+    // for the "x" (i.e. "other iterable") argument.
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        found_self |= peer->type == type;
+        found_pair |= peer->type == type->pair;
+        found_iter |= peer->type == fixture_type_iter;
+        found_frozendict |= peer->type == fixture_type_frozendict;
+        found_dict |= peer->type == fixture_type_dict;
+    }
+    assert_true(found_self);
+    assert_true(found_pair);
+    assert_true(found_iter);
+    assert_true(found_frozendict);
+    assert_true(found_dict);
+
+    return MUNIT_OK;
+}
 
 // The test_contains in test_collection checks for the behaviour shared amongst all collections;
 // this test_contains considers the behaviour unique to mappings.
@@ -37,8 +58,8 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
 
     // Item is unhashable.
     {
-        ypObject *mp = type->newN(N(keys[0], keys[1]));
         ypObject *unhashable = rand_obj_any_mutable(uq);
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
         assert_obj(yp_contains(mp, unhashable), is, yp_False);
         assert_obj(yp_in(unhashable, mp), is, yp_False);
         assert_obj(yp_not_in(unhashable, mp), is, yp_True);
@@ -77,12 +98,15 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
     ead(x, rand_obj(NULL, x_type), assert_obj(any_cmp(empty, x), is, expected));
 
     if (x_type->is_collection) {
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1])),
-                assert_obj(any_cmp(mp, x), is, expected));
-        ead(x, new_itemsK(x_type, 0), assert_obj(any_cmp(mp, x), is, expected));
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1])),
-                assert_obj(any_cmp(empty, x), is, expected));
-        ead(x, new_itemsK(x_type, 0), assert_obj(any_cmp(empty, x), is, expected));
+        ead(x, x_type->newN(0), assert_obj(any_cmp(mp, x), is, expected));
+        ead(x, x_type->newN(0), assert_obj(any_cmp(empty, x), is, expected));
+
+        if (!x_type->is_string && !x_type->is_setlike) {
+            ead(x, x_type->newK(K(keys[0], values[0], keys[1], values[1])),
+                    assert_obj(any_cmp(mp, x), is, expected));
+            ead(x, x_type->newK(K(keys[0], values[0], keys[1], values[1])),
+                    assert_obj(any_cmp(empty, x), is, expected));
+        }
     }
 
     obj_array_decref(values);
@@ -91,80 +115,78 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
     yp_decrefN(N(mp, empty));
 }
 
-static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
+static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_same, ypObject *x_different)
 {
-    uniqueness_t *uq = uniqueness_new();
-    ypObject     *keys[4];
-    ypObject     *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    fixture_type_t *x_type = peer->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *keys[4];
+    ypObject       *values[4];
+    obj_array_fill(keys, uq, peer->rand_items);
+    obj_array_fill(values, uq, peer->rand_values);
 
     // Non-empty mp.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
 
         // x has the same items.
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1])),
+        ead(x, x_type->newK(K(keys[0], values[0], keys[1], values[1])),
                 assert_obj(any_cmp(mp, x), is, x_same));
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0], keys[1], values[1])),
+        ead(x, x_type->newK(K(keys[0], values[0], keys[0], values[0], keys[1], values[1])),
                 assert_obj(any_cmp(mp, x), is, x_same));
 
         // x has the same keys with different values.
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[3])),
+        ead(x, x_type->newK(K(keys[0], values[0], keys[1], values[3])),
                 assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[0], values[2], keys[1], values[1])),
+        ead(x, x_type->newK(K(keys[0], values[2], keys[1], values[1])),
                 assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[0], values[2], keys[1], values[3])),
+        ead(x, x_type->newK(K(keys[0], values[2], keys[1], values[3])),
                 assert_obj(any_cmp(mp, x), is, x_different));
 
         // x is empty.
-        ead(x, new_itemsK(x_type, 0), assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, x_type->newK(0), assert_obj(any_cmp(mp, x), is, x_different));
 
         // x is is a proper subset and is not empty.
-        ead(x, new_itemsK(x_type, K(keys[0], values[0])),
-                assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[1], values[1])),
-                assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0])),
+        ead(x, x_type->newK(K(keys[0], values[0])), assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, x_type->newK(K(keys[1], values[1])), assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, x_type->newK(K(keys[0], values[0], keys[0], values[0])),
                 assert_obj(any_cmp(mp, x), is, x_different));
 
         // x is a proper superset.
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1], keys[2], values[2])),
+        ead(x, x_type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2])),
                 assert_obj(any_cmp(mp, x), is, x_different));
         ead(x,
-                new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1], keys[2], values[2],
-                                           keys[3], values[3])),
+                x_type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2], keys[3],
+                        values[3])),
                 assert_obj(any_cmp(mp, x), is, x_different));
         ead(x,
-                new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0], keys[1], values[1],
-                                           keys[2], values[2])),
+                x_type->newK(K(keys[0], values[0], keys[0], values[0], keys[1], values[1], keys[2],
+                        values[2])),
                 assert_obj(any_cmp(mp, x), is, x_different));
         ead(x,
-                new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1], keys[2], values[2],
-                                           keys[2], values[2])),
+                x_type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2], keys[2],
+                        values[2])),
                 assert_obj(any_cmp(mp, x), is, x_different));
 
         // x overlaps and contains additional items.
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[2], values[2])),
+        ead(x, x_type->newK(K(keys[0], values[0], keys[2], values[2])),
                 assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[2], values[2], keys[3], values[3])),
+        ead(x, x_type->newK(K(keys[0], values[0], keys[2], values[2], keys[3], values[3])),
                 assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[1], values[1], keys[2], values[2])),
+        ead(x, x_type->newK(K(keys[1], values[1], keys[2], values[2])),
                 assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[1], values[1], keys[2], values[2], keys[3], values[3])),
+        ead(x, x_type->newK(K(keys[1], values[1], keys[2], values[2], keys[3], values[3])),
                 assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0], keys[2], values[2])),
+        ead(x, x_type->newK(K(keys[0], values[0], keys[0], values[0], keys[2], values[2])),
                 assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[2], values[2], keys[2], values[2])),
+        ead(x, x_type->newK(K(keys[0], values[0], keys[2], values[2], keys[2], values[2])),
                 assert_obj(any_cmp(mp, x), is, x_different));
 
         // x does not overlap and contains additional items.
-        ead(x, new_itemsK(x_type, K(keys[2], values[2])),
+        ead(x, x_type->newK(K(keys[2], values[2])), assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, x_type->newK(K(keys[2], values[2], keys[3], values[3])),
                 assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[2], values[2], keys[3], values[3])),
-                assert_obj(any_cmp(mp, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[2], values[2], keys[2], values[2])),
+        ead(x, x_type->newK(K(keys[2], values[2], keys[2], values[2])),
                 assert_obj(any_cmp(mp, x), is, x_different));
 
         // x is mp.
@@ -172,12 +194,9 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
 
         // x contains mp.
         if (!x_type->hashable_items_only || object_is_hashable(mp)) {
-            ead(x, new_itemsK(x_type, K(mp, values[0])),
-                    assert_obj(any_cmp(mp, x), is, x_different));
-        } else {
-            assert_raises(new_itemsK(x_type, K(mp, values[0])), yp_TypeError);
+            ead(x, x_type->newK(K(mp, values[0])), assert_obj(any_cmp(mp, x), is, x_different));
         }
-        ead(x, new_itemsK(x_type, K(keys[0], mp)), assert_obj(any_cmp(mp, x), is, x_different));
+        ead(x, x_type->newK(K(keys[0], mp)), assert_obj(any_cmp(mp, x), is, x_different));
 
         // Exception passthrough.
         assert_isexception(any_cmp(mp, yp_SyntaxError), yp_SyntaxError);
@@ -191,28 +210,24 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
         ypObject *empty = type->newK(0);
 
         // Non-empty x.
-        ead(x, new_itemsK(x_type, K(keys[0], values[0])),
+        ead(x, x_type->newK(K(keys[0], values[0])), assert_obj(any_cmp(empty, x), is, x_different));
+        ead(x, x_type->newK(K(keys[0], values[0], keys[1], values[1])),
                 assert_obj(any_cmp(empty, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[1], values[1])),
-                assert_obj(any_cmp(empty, x), is, x_different));
-        ead(x, new_itemsK(x_type, K(keys[0], values[0], keys[0], values[0])),
+        ead(x, x_type->newK(K(keys[0], values[0], keys[0], values[0])),
                 assert_obj(any_cmp(empty, x), is, x_different));
 
         // Empty x.
-        ead(x, new_itemsK(x_type, 0), assert_obj(any_cmp(empty, x), is, x_same));
+        ead(x, x_type->newK(0), assert_obj(any_cmp(empty, x), is, x_same));
 
         // x is mp.
         assert_obj(any_cmp(empty, empty), is, x_same);
 
         // x contains mp.
         if (!x_type->hashable_items_only || !type->is_mutable) {
-            ead(x, new_itemsK(x_type, K(empty, values[0])),
+            ead(x, x_type->newK(K(empty, values[0])),
                     assert_obj(any_cmp(empty, x), is, x_different));
-        } else {
-            assert_raises(new_itemsK(x_type, K(empty, values[0])), yp_TypeError);
         }
-        ead(x, new_itemsK(x_type, K(keys[0], empty)),
-                assert_obj(any_cmp(empty, x), is, x_different));
+        ead(x, x_type->newK(K(keys[0], empty)), assert_obj(any_cmp(empty, x), is, x_different));
 
         // Exception passthrough.
         assert_isexception(any_cmp(empty, yp_SyntaxError), yp_SyntaxError);
@@ -235,16 +250,14 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
 
         // Run the tests twice: once where mp has not cached the hash, and once where it has.
         for (i = 0; i < 2; i++) {
-            ypObject *x_is_same = new_itemsK(x_type, K(keys[0], h_values[0], keys[1], h_values[1]));
-            ypObject *x_ne_value =
-                    new_itemsK(x_type, K(keys[0], h_values[0], keys[1], h_values[3]));
-            ypObject *x_is_empty = new_itemsK(x_type, 0);
-            ypObject *x_is_subset = new_itemsK(x_type, K(keys[0], h_values[0]));
-            ypObject *x_is_superset = new_itemsK(
-                    x_type, K(keys[0], h_values[0], keys[1], h_values[1], keys[2], h_values[2]));
-            ypObject *x_is_overlapped =
-                    new_itemsK(x_type, K(keys[0], h_values[0], keys[2], h_values[2]));
-            ypObject *x_is_not_overlapped = new_itemsK(x_type, K(keys[2], h_values[2]));
+            ypObject *x_is_same = x_type->newK(K(keys[0], h_values[0], keys[1], h_values[1]));
+            ypObject *x_ne_value = x_type->newK(K(keys[0], h_values[0], keys[1], h_values[3]));
+            ypObject *x_is_empty = x_type->newK(0);
+            ypObject *x_is_subset = x_type->newK(K(keys[0], h_values[0]));
+            ypObject *x_is_superset = x_type->newK(
+                    K(keys[0], h_values[0], keys[1], h_values[1], keys[2], h_values[2]));
+            ypObject *x_is_overlapped = x_type->newK(K(keys[0], h_values[0], keys[2], h_values[2]));
+            ypObject *x_is_not_overlapped = x_type->newK(K(keys[2], h_values[2]));
 
             // Run the tests twice: once where x has not cached the hash, and once where it has.
             for (j = 0; j < 2; j++) {
@@ -292,16 +305,16 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
 static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
+    peer_type_t     *peer;
     fixture_type_t **x_type;
 
     // eq is only supported for friendly x. All others compare unequal.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if (type_is_comparable(type, (*x_type))) {
-            _test_comparisons(type, (*x_type), yp_eq, /*x_same=*/yp_True,
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (type_is_comparable(type, peer->type)) {
+            _test_comparisons(type, peer, yp_eq, /*x_same=*/yp_True,
                     /*x_different=*/yp_False);
         } else {
-            _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
+            _test_comparisons_not_supported(type, peer->type, yp_eq, yp_False);
         }
     }
 
@@ -318,16 +331,16 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
 static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
+    peer_type_t     *peer;
     fixture_type_t **x_type;
 
     // ne is only supported for friendly x. All others compare unequal.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if (type_is_comparable(type, (*x_type))) {
-            _test_comparisons(type, (*x_type), yp_ne, /*x_same=*/yp_False,
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (type_is_comparable(type, peer->type)) {
+            _test_comparisons(type, peer, yp_ne, /*x_same=*/yp_False,
                     /*x_different=*/yp_True);
         } else {
-            _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
+            _test_comparisons_not_supported(type, peer->type, yp_ne, yp_True);
         }
     }
 
@@ -554,8 +567,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 
     // key is unhashable.
     {
-        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         ypObject *unhashable = rand_obj_any_mutable(uq);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_raises_exc(yp_setitem(mp, unhashable, values[2], &exc), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp, unhashable));
@@ -659,8 +672,8 @@ static void _test_delitem(
 
     // key is unhashable.
     {
-        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         ypObject *unhashable = rand_obj_any_mutable(uq);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_not_found_exc(any_delitem(mp, unhashable, &exc));
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp, unhashable));
@@ -782,8 +795,8 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
 
     // key is unhashable.
     {
-        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
         ypObject *unhashable = rand_obj_any_mutable(uq);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
         ead(value, yp_popvalue3(mp, unhashable, values[3]), assert_obj(value, eq, values[3]));
         assert_raises(yp_popvalue2(mp, unhashable), yp_KeyError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
@@ -1014,8 +1027,8 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
 
     // key is unhashable.
     {
-        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         ypObject *unhashable = rand_obj_any_mutable(uq);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_raises(yp_setdefault(mp, unhashable, values[2]), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp, unhashable));
@@ -1145,8 +1158,8 @@ static void _test_updateK(fixture_type_t *type,
 
     // key is unhashable.
     if (test_unhashables) {
-        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         ypObject *unhashable = rand_obj_any_mutable(uq);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_raises_exc(any_updateK(mp, &exc, K(unhashable, values[2])), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp, unhashable));
@@ -1243,120 +1256,135 @@ tear_down:
     return MUNIT_OK;
 }
 
-static void updateK_to_update_fromiter(ypObject *mapping, ypObject **exc, int n, ...)
+static void _test_update(fixture_type_t *type, peer_type_t *peer)
 {
-    va_list   args;
-    ypObject *x;
-    va_start(args, n);
-    x = new_itemsKV(fixture_type_iter, n, args);
-    va_end(args);
-    yp_update(mapping, x, exc);
-    yp_decref(x);
-}
+    fixture_type_t    *x_type = peer->type;
+    uniqueness_t      *uq = uniqueness_new();
+    hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
+    ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject          *keys[6];
+    ypObject          *values[6];
+    obj_array_fill(keys, uq, peer->rand_items);
+    obj_array_fill(values, uq, peer->rand_values);
 
-static void updateK_to_update_fromtuple(ypObject *mapping, ypObject **exc, int n, ...)
-{
-    va_list   args;
-    ypObject *x;
-    va_start(args, n);
-    x = new_itemsKV(fixture_type_tuple, n, args);
-    va_end(args);
-    yp_update(mapping, x, exc);
-    yp_decref(x);
-}
-
-static void updateK_to_update_fromlist(ypObject *mapping, ypObject **exc, int n, ...)
-{
-    va_list   args;
-    ypObject *x;
-    va_start(args, n);
-    x = new_itemsKV(fixture_type_list, n, args);
-    va_end(args);
-    yp_update(mapping, x, exc);
-    yp_decref(x);
-}
-
-static void updateK_to_update_fromfrozendict_dirty(ypObject *mapping, ypObject **exc, int n, ...)
-{
-    va_list   args;
-    ypObject *x;
-    va_start(args, n);
-    x = new_itemsKV(fixture_type_frozendict_dirty, n, args);
-    va_end(args);
-    yp_update(mapping, x, exc);
-    yp_decref(x);
-}
-
-static void updateK_to_update_fromdict_dirty(ypObject *mapping, ypObject **exc, int n, ...)
-{
-    va_list   args;
-    ypObject *x;
-    va_start(args, n);
-    x = new_itemsKV(fixture_type_dict_dirty, n, args);
-    va_end(args);
-    yp_update(mapping, x, exc);
-    yp_decref(x);
-}
-
-static void updateK_to_update_fromfrozendict(ypObject *mapping, ypObject **exc, int n, ...)
-{
-    va_list   args;
-    ypObject *x;
-    va_start(args, n);
-    assert_not_raises(x = yp_frozendictKV(n, args));
-    va_end(args);
-    yp_update(mapping, x, exc);
-    yp_decref(x);
-}
-
-static void updateK_to_update_fromdict(ypObject *mapping, ypObject **exc, int n, ...)
-{
-    va_list   args;
-    ypObject *x;
-    va_start(args, n);
-    assert_not_raises(x = yp_dictKV(n, args));
-    va_end(args);
-    yp_update(mapping, x, exc);
-    yp_decref(x);
-}
-
-static MunitResult test_update(const MunitParameter params[], fixture_t *fixture)
-{
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t **x_type;
-    uniqueness_t    *uq = uniqueness_new();
-    ypObject        *not_iterable = rand_obj_any_not_iterable(uq);
-    ypObject        *keys[6];
-    ypObject        *values[6];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
-
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        void (*updateK)(ypObject *, ypObject **, int, ...);
-        if ((*x_type) == fixture_type_iter) {
-            updateK = updateK_to_update_fromiter;
-        } else if ((*x_type) == fixture_type_tuple) {
-            updateK = updateK_to_update_fromtuple;
-        } else if ((*x_type) == fixture_type_list) {
-            updateK = updateK_to_update_fromlist;
-        } else if ((*x_type) == fixture_type_frozendict_dirty) {
-            updateK = updateK_to_update_fromfrozendict_dirty;
-        } else if ((*x_type) == fixture_type_dict_dirty) {
-            updateK = updateK_to_update_fromdict_dirty;
-        } else if ((*x_type) == fixture_type_frozendict) {
-            updateK = updateK_to_update_fromfrozendict;
-        } else {
-            assert_ptr((*x_type), ==, fixture_type_dict);
-            updateK = updateK_to_update_fromdict;
-        }
-
-        // Shared tests.
-        _test_updateK(type, updateK, /*test_unhashables=*/FALSE);
+    // Immutables don't support update.
+    if (!type->is_mutable) {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *x = x_type->newK(K(keys[1], values[3], keys[2], values[2]));
+        assert_raises_exc(yp_update(mp, x, &exc), yp_MethodError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decrefN(N(x, mp));
+        goto tear_down;  // Skip remaining tests.
     }
 
-    // Remaining tests only apply to mutable objects.
-    if (!type->is_mutable) goto tear_down;
+    // Basic update: keys[0] only in mp, keys[1] in both, keys[2] only in x.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *x = x_type->newK(K(keys[1], values[3], keys[2], values[2]));
+        assert_not_raises_exc(yp_update(mp, x, &exc));
+        assert_mapping(mp, keys[0], values[0], keys[1], values[3], keys[2], values[2]);
+        yp_decrefN(N(x, mp));
+    }
+
+    // Previously-deleted key.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *x = x_type->newK(K(keys[1], values[3]));
+        assert_not_raises_exc(yp_delitem(mp, keys[1], &exc));
+        assert_mapping(mp, keys[0], values[0]);
+        assert_not_raises_exc(yp_update(mp, x, &exc));
+        assert_mapping(mp, keys[0], values[0], keys[1], values[3]);
+        yp_decrefN(N(x, mp));
+    }
+
+    // Empty mp.
+    {
+        ypObject *mp = type->newK(0);
+        ypObject *x = x_type->newK(K(keys[0], values[0]));
+        assert_not_raises_exc(yp_update(mp, x, &exc));
+        assert_mapping(mp, keys[0], values[0]);
+        yp_decrefN(N(x, mp));
+    }
+
+    // Empty x.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *x = x_type->newK(0);
+        assert_not_raises_exc(yp_update(mp, x, &exc));
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decrefN(N(x, mp));
+    }
+
+    // Both are empty.
+    {
+        ypObject *mp = type->newK(0);
+        ypObject *x = x_type->newK(0);
+        assert_not_raises_exc(yp_update(mp, x, &exc));
+        assert_len(mp, 0);
+        yp_decrefN(N(x, mp));
+    }
+
+    // key is mp.
+    if (!x_type->hashable_items_only) {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *x = x_type->newK(K(mp, values[3]));
+        assert_raises_exc(yp_update(mp, x, &exc), yp_TypeError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decrefN(N(x, mp));
+    }
+
+    // value is mp.
+    if (!x_type->is_setlike) {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *x = x_type->newK(K(keys[1], mp));
+        assert_not_raises_exc(yp_update(mp, x, &exc));
+        assert_mapping(mp, keys[0], values[0], keys[1], mp);
+        assert_not_raises_exc(yp_clear(mp, &exc));  // nohtyP does not yet break circular refs.
+        yp_decrefN(N(x, mp));
+    }
+
+    // x contains duplicates; last value is retained.
+    // TODO Once the order items are yielded from sets/etc is guaranteed, we can support setlike.
+    if (!x_type->is_setlike) {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *x = x_type->newK(
+                K(keys[1], values[2], keys[1], values[3], keys[2], values[4], keys[2], values[5]));
+        assert_not_raises_exc(yp_update(mp, x, &exc));
+        assert_mapping(mp, keys[0], values[0], keys[1], values[3], keys[2], values[5]);
+        yp_decrefN(N(x, mp));
+    }
+
+    // key is unhashable.
+    if (!x_type->hashable_items_only) {
+        ypObject *unhashable = rand_obj_any_mutable(uq);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *x = x_type->newK(K(unhashable, values[2]));
+        assert_raises_exc(yp_update(mp, x, &exc), yp_TypeError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decrefN(N(x, mp, unhashable));
+    }
+
+    // Unhashable key rejected even if equal to other hashable key.
+    if (!x_type->hashable_items_only) {
+        ypObject *mp = type->newK(0);
+        ypObject *x_unh_h = x_type->newK(K(pair.unhashable, values[1], pair.hashable, values[2]));
+        ypObject *x_h_unh = x_type->newK(K(pair.hashable, values[1], pair.unhashable, values[2]));
+        assert_raises_exc(yp_update(mp, x_unh_h, &exc), yp_TypeError);
+        assert_len(mp, 0);
+        assert_raises_exc(yp_update(mp, x_h_unh, &exc), yp_TypeError);
+        // Optimization: updateK adds while it iterates.
+        assert_mapping(mp, pair.hashable, values[1]);
+        yp_decrefN(N(x_h_unh, x_unh_h, mp));
+    }
+
+    // Unhashable keys should always cause TypeError, even if that key is already in mp.
+    if (!x_type->hashable_items_only) {
+        ypObject *mp = type->newK(K(pair.hashable, values[0]));
+        ypObject *x = x_type->newK(K(pair.unhashable, values[2]));
+        assert_raises_exc(yp_update(mp, x, &exc), yp_TypeError);
+        assert_mapping(mp, pair.hashable, values[0]);
+        yp_decrefN(N(x, mp));
+    }
 
     // x can be mp.
     {
@@ -1368,7 +1396,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests_exc(ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1])), x,
-            new_itemsK(fixture_type_list, K(keys[1], values[3], keys[2], values[2])),
+            fixture_type_list->newK(K(keys[1], values[3], keys[2], values[2])),
             yp_update(mp, x, &exc),
             assert_mapping(mp, keys[0], values[0], keys[1], values[3], keys[2], values[2]),
             yp_decref(mp));
@@ -1376,8 +1404,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     // mp is not modified if the iterator fails at the start.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        ypObject *x_supplier =
-                new_itemsK(fixture_type_list, K(keys[1], values[3], keys[2], values[2]));
+        ypObject *x_supplier = fixture_type_list->newK(K(keys[1], values[3], keys[2], values[2]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
         assert_raises_exc(yp_update(mp, x, &exc), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
@@ -1388,8 +1415,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     // fails mid-way mp may have already been modified.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        ypObject *x_supplier =
-                new_itemsK(fixture_type_list, K(keys[1], values[3], keys[2], values[2]));
+        ypObject *x_supplier = fixture_type_list->newK(K(keys[1], values[3], keys[2], values[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_update(mp, x, &exc), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[3]);
@@ -1416,19 +1442,70 @@ tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
     uniqueness_dealloc(uq);
-    yp_decrefN(N(not_iterable));
+    yp_decrefN(N(not_iterable, pair.hashable, pair.unhashable));
+}
+
+static void updateK_to_update_fromiter(ypObject *mapping, ypObject **exc, int n, ...)
+{
+    va_list   args;
+    ypObject *x;
+    va_start(args, n);
+    x = new_itemsKV(fixture_type_iter, fixture_type_tuple, n, args);  // new ref
+    va_end(args);
+    yp_update(mapping, x, exc);
+    yp_decref(x);
+}
+
+static void updateK_to_update_fromfrozendict(ypObject *mapping, ypObject **exc, int n, ...)
+{
+    va_list   args;
+    ypObject *x;
+    va_start(args, n);
+    assert_not_raises(x = yp_frozendictKV(n, args));  // new ref
+    va_end(args);
+    yp_update(mapping, x, exc);
+    yp_decref(x);
+}
+
+static void updateK_to_update_fromdict(ypObject *mapping, ypObject **exc, int n, ...)
+{
+    va_list   args;
+    ypObject *x;
+    va_start(args, n);
+    assert_not_raises(x = yp_dictKV(n, args));  // new ref
+    va_end(args);
+    yp_update(mapping, x, exc);
+    yp_decref(x);
+}
+
+static MunitResult test_update(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    peer_type_t    *peer;
+
+    // Only run _test_updateK against a few types. _test_update also covers all of these cases.
+    _test_updateK(type, updateK_to_update_fromfrozendict, /*test_unhashables=*/FALSE);
+    _test_updateK(type, updateK_to_update_fromdict, /*test_unhashables=*/FALSE);
+    _test_updateK(type, updateK_to_update_fromiter, /*test_unhashables=*/TRUE);
+
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        _test_update(type, peer);
+    }
+
     return MUNIT_OK;
 }
 
 static MunitParameterEnum test_mapping_params[] = {
         {param_key_type, param_values_types_mapping}, {NULL}};
 
-MunitTest test_mapping_tests[] = {TEST(test_contains, test_mapping_params),
-        TEST(test_eq, test_mapping_params), TEST(test_ne, test_mapping_params),
-        TEST(test_getitem, test_mapping_params), TEST(test_getdefault, test_mapping_params),
-        TEST(test_setitem, test_mapping_params), TEST(test_delitem, test_mapping_params),
-        TEST(test_dropitem, test_mapping_params), TEST(test_popvalue, test_mapping_params),
-        TEST(test_popitem, test_mapping_params), TEST(test_setdefault, test_mapping_params),
-        TEST(test_updateK, test_mapping_params), TEST(test_update, test_mapping_params), {NULL}};
+MunitTest test_mapping_tests[] = {TEST(test_peers, test_mapping_params),
+        TEST(test_contains, test_mapping_params), TEST(test_eq, test_mapping_params),
+        TEST(test_ne, test_mapping_params), TEST(test_getitem, test_mapping_params),
+        TEST(test_getdefault, test_mapping_params), TEST(test_setitem, test_mapping_params),
+        TEST(test_delitem, test_mapping_params), TEST(test_dropitem, test_mapping_params),
+        TEST(test_popvalue, test_mapping_params), TEST(test_popitem, test_mapping_params),
+        TEST(test_setdefault, test_mapping_params), TEST(test_updateK, test_mapping_params),
+        TEST(test_update, test_mapping_params), {NULL}};
 
 extern void test_mapping_initialize(void) {}

@@ -842,6 +842,8 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
 extern void pprint(FILE *f, ypObject *obj);
 
 
+typedef struct _fixture_type_t fixture_type_t;
+typedef struct _peer_type_t    peer_type_t;
 typedef ypObject *(*objobjfunc)(ypObject *);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
@@ -854,7 +856,6 @@ typedef void (*rand_objs_func)(uniqueness_t *, yp_ssize_t, ypObject **);
 // objects). Any methods or arguments here that don't apply to a given type will fail the test. May
 // also be used to describe special-purpose objects (i.e. fixture_type_set_dirty is a set containing
 // deleted items).
-typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
     char           *name;     // The name of the type (i.e. int, bytearray, dict).
     ypObject       *yp_type;  // The type object (i.e. yp_t_float, yp_t_list).
@@ -863,7 +864,8 @@ typedef struct _fixture_type_t {
 
     rand_obj_supplier_func _new_rand;  // Internal: used by rand_obj/etc.
 
-    objobjfunc new_;  // The object converter, aka the single-argument constructor.
+    objobjfunc   new_;   // The object converter, aka the single-argument constructor.
+    peer_type_t *peers;  // An array of "peer types" (see peer_type_t). Null-terminated.
 
     // Functions for iterables, where rand_items returns objects that can be accepted by newN and
     // subsequently yielded by yp_iter. (For mappings, newN creates an object with the given keys
@@ -872,7 +874,8 @@ typedef struct _fixture_type_t {
     rand_objs_func rand_items;  // Fills an array with n random objects.
 
     // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
-    // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys).
+    // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys). newK is
+    // also supported for collections that can store key/value pairs (i.e. iter, tuple, and list).
     objvarargfunc  newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
     rand_objs_func rand_values;  // Fills an array with n random objects for values.
 
@@ -890,10 +893,29 @@ typedef struct _fixture_type_t {
     int is_setlike;
     int is_mapping;
     int is_callable;
-    int is_patterned;            // i.e. range doesn't store values, it stores a pattern
-    int original_object_return;  // A collection that *always* returns the object that was stored
-    int hashable_items_only;     // A collection that *requires* items to be hashable
+    int is_patterned;            // i.e. range doesn't store values, it stores a pattern.
+    int original_object_return;  // A collection that *always* returns the object that was stored.
+    int hashable_items_only;     // A collection that *requires* items to be hashable.
 } fixture_type_t;
+
+// A "peer type" is one that is similar to "self", such that it is possible under certain conditions
+// to convert between the two types, to compare instances of the two types, etc. For example, int
+// and float are peers: you can convert one to the other and compare them. As another example, tuple
+// is a peer to all iterable types: you can convert any iterable to a tuple, although comparisons
+// are not necessarily supported.
+//
+// Because one of the types may have restrictions on the values it can have or contain, each peer
+// type includes information on how to build compatible objects. For example, it is possible to
+// convert a tuple to a str, but only if the items are chrs. As another example, a float can be
+// losslessly converted to an int, but only if the float has an integral value.
+//
+// Note that pairs, and the types themselves, are all considered peers, and are all included in
+// fixture_type_t.peers. For example, a tuple can be converted to both a list and a tuple.
+typedef struct _peer_type_t {
+    fixture_type_t *type;         // The peer type.
+    rand_objs_func  rand_items;   // As per fixture_type_t.rand_items; NULL if not supported.
+    rand_objs_func  rand_values;  // As per fixture_type_t.rand_values; NULL if not supported.
+} peer_type_t;
 
 // TODO Versions of each of these that build as the mutable type and then freezes, to test that
 // the freezing process still yields a viable object.
@@ -1035,10 +1057,11 @@ extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type);
 extern ypObject *new_iterN(int n, ...);
 extern ypObject *new_iterNV(int n, va_list args);
 
-// Returns an object of the given type containing the n (key, value) pairs as 2-tuples. The object
-// is constructed by calling type->new_ with a list of the pairs.
-extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...);
-extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args);
+// Returns an object of the given outer type containing the n (key, value) pairs of the given inner
+// type. The pairs are constructed by calling inner->newN, while the object is constructed by
+// calling outer->new_ with a list of the pairs.
+extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int n, ...);
+extern ypObject *new_itemsKV(fixture_type_t *outer, fixture_type_t *inner, int n, va_list args);
 
 // Returns an iterator that yields values from supplier (an iterable) until n values have been
 // yielded, after which the given exception is raised. The iterator is initialized with the given

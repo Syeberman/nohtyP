@@ -2,17 +2,6 @@
 #include "munit_test/unittest.h"
 
 
-// TODO "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
-#define x_types_init()                                                                 \
-    {fixture_type_frozenset, fixture_type_set, fixture_type_iter, fixture_type_tuple,  \
-            fixture_type_list, fixture_type_frozenset_dirty, fixture_type_set_dirty,   \
-            fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
-            fixture_type_dict_dirty, NULL}
-
-#define friend_types_init()                                                  \
-    {fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
-            fixture_type_set_dirty, NULL}
-
 // A copy of ypSetMiState from nohtyP.c, as a union with yp_uint64_t to maintain strict aliasing.
 typedef union {
     struct {
@@ -27,6 +16,13 @@ typedef union {
 #define define_frozenset_mi_state(name, keysleft, index)          \
     ypSetMiState      _##name##_struct = {{(keysleft), (index)}}; \
     const yp_uint64_t name = (_##name##_struct.as_int)
+
+// Returns true iff type supports optimizations with other.
+// FIXME Make this common?
+static int is_friend_type(fixture_type_t *type, fixture_type_t *other)
+{
+    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
+}
 
 
 static void _test_newN(
@@ -99,21 +95,19 @@ static void _test_newN(
     uniqueness_dealloc(uq);
 }
 
-static void _test_new(
-        fixture_type_t *type, ypObject *(*any_new)(ypObject *), int test_exception_passthrough)
+static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_new)(ypObject *),
+        int test_exception_passthrough)
 {
-    fixture_type_t    *x_types[] = x_types_init();
-    fixture_type_t    *friend_types[] = friend_types_init();
-    fixture_type_t   **x_type;
+    fixture_type_t    *x_type = peer->type;
     uniqueness_t      *uq = uniqueness_new();
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, peer->rand_items);
 
     // Basic new.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+    {
+        ypObject *x = x_type->newN(N(items[0], items[1]));
         ypObject *so = any_new(x);
         assert_type_is(so, type->yp_type);
         assert_setlike(so, items[0], items[1]);
@@ -121,8 +115,8 @@ static void _test_new(
     }
 
     // x is empty.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = (*x_type)->newN(0);
+    {
+        ypObject *x = x_type->newN(0);
         ypObject *so = any_new(x);
         assert_type_is(so, type->yp_type);
         assert_len(so, 0);
@@ -130,43 +124,36 @@ static void _test_new(
     }
 
     // x contains duplicates.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = (*x_type)->newN(N(items[0], items[0], items[1]));
+    {
+        ypObject *x = x_type->newN(N(items[0], items[0], items[1]));
         ypObject *so = any_new(x);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so, x));
     }
 
     // x contains an unhashable item.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->hashable_items_only) {
-            ypObject *unhashable = rand_obj_any_mutable(uq);
-            ead(x, (*x_type)->newN(N(unhashable)), assert_raises(any_new(x), yp_TypeError));
-            ead(x, (*x_type)->newN(N(items[0], unhashable)),
-                    assert_raises(any_new(x), yp_TypeError));
-            ead(x, (*x_type)->newN(N(items[0], items[1], unhashable)),
-                    assert_raises(any_new(x), yp_TypeError));
-            yp_decrefN(N(unhashable));
-        }
+    if (!x_type->hashable_items_only) {
+        ypObject *unhashable = rand_obj_any_mutable(uq);
+        ead(x, x_type->newN(N(unhashable)), assert_raises(any_new(x), yp_TypeError));
+        ead(x, x_type->newN(N(items[0], unhashable)), assert_raises(any_new(x), yp_TypeError));
+        ead(x, x_type->newN(N(items[0], items[1], unhashable)),
+                assert_raises(any_new(x), yp_TypeError));
+        yp_decrefN(N(unhashable));
     }
 
     // Unhashable item rejected even if equal to other hashable item.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->hashable_items_only) {
-            ead(x, (*x_type)->newN(N(pair.hashable, pair.unhashable)),
-                    assert_raises(any_new(x), yp_TypeError));
-            ead(x, (*x_type)->newN(N(pair.unhashable, pair.hashable)),
-                    assert_raises(any_new(x), yp_TypeError));
-        }
+    if (!x_type->hashable_items_only) {
+        ead(x, x_type->newN(N(pair.hashable, pair.unhashable)),
+                assert_raises(any_new(x), yp_TypeError));
+        ead(x, x_type->newN(N(pair.unhashable, pair.hashable)),
+                assert_raises(any_new(x), yp_TypeError));
     }
 
     // Optimization: lazy shallow copy of a friendly immutable x to immutable so.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+    if (is_friend_type(type, x_type)) {
+        ypObject *x = x_type->newN(N(items[0], items[1]));
         ypObject *so = any_new(x);
-        if (type->is_mutable || (*x_type)->is_mutable) {
+        if (type->is_mutable || x_type->is_mutable) {
             assert_obj(so, is_not, x);
         } else {
             assert_obj(so, is, x);
@@ -176,12 +163,10 @@ static void _test_new(
 
     // Optimization: empty immortal when x is empty.
     if (type->falsy != NULL) {
-        for (x_type = x_types; (*x_type) != NULL; x_type++) {
-            ypObject *x = (*x_type)->newN(0);
-            ypObject *so = any_new(x);
-            assert_obj(so, is, type->falsy);
-            yp_decrefN(N(so, x));
-        }
+        ypObject *x = x_type->newN(0);
+        ypObject *so = any_new(x);
+        assert_obj(so, is, type->falsy);
+        yp_decrefN(N(so, x));
     }
 
     // Iterator exceptions and bad length hints.
@@ -280,6 +265,7 @@ static MunitResult test_new(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     ypObject *(*newN_to_new)(int, ...);
     ypObject *(*new_)(ypObject *);
+    peer_type_t *peer;
 
     if (type->yp_type == yp_t_frozenset) {
         newN_to_new = newN_to_frozenset;
@@ -292,7 +278,9 @@ static MunitResult test_new(const MunitParameter params[], fixture_t *fixture)
 
     // Shared tests.
     _test_newN(type, newN_to_new, /*test_exception_passthrough=*/FALSE);
-    _test_new(type, new_, /*test_exception_passthrough=*/TRUE);
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        _test_new(type, peer, new_, /*test_exception_passthrough=*/TRUE);
+    }
 
     return MUNIT_OK;
 }
@@ -339,6 +327,7 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     fixture_type_t *type = fixture->type;
     ypObject *(*newN_to_call_type)(int, ...);
     ypObject *(*new_to_call_type)(ypObject *);
+    peer_type_t  *peer;
     uniqueness_t *uq = uniqueness_new();
     ypObject     *str_iterable = yp_str_frombytesC2(-1, "iterable");
     ypObject     *str_cls = yp_str_frombytesC2(-1, "cls");
@@ -355,7 +344,9 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 
     // Shared tests.
     _test_newN(type, newN_to_call_type, /*test_exception_passthrough=*/FALSE);
-    _test_new(type, new_to_call_type, /*test_exception_passthrough=*/TRUE);
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        _test_new(type, peer, new_to_call_type, /*test_exception_passthrough=*/TRUE);
+    }
 
     // Zero arguments.
     {
