@@ -261,22 +261,30 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
     // state_decl.size cannot be negative.
     {
-        yp_state_decl_t    state_decl = {-1};
-        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        static yp_state_decl_t state_decl = {-1};
+        yp_function_decl_t     decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_ValueError);
+    }
+
+    // Excessively-large state_decl.size. Once state is implemented this should raise
+    // yp_MemorySizeOverflowError.
+    {
+        static yp_state_decl_t state_decl = {yp_SSIZE_T_MAX};
+        yp_function_decl_t     decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        assert_raises(yp_functionC(&decl), yp_NotImplementedError);
     }
 
     // state_decl.offsets_len == -1 (array of objects) is not yet implemented.
     {
-        yp_state_decl_t    state_decl = {yp_sizeof(ypObject *), -1};
-        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        static yp_state_decl_t state_decl = {yp_sizeof(ypObject *), -1};
+        yp_function_decl_t     decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_NotImplementedError);
     }
 
     // state_decl.offsets_len must be >= 0 or -1.
     {
-        yp_state_decl_t    state_decl = {yp_sizeof(ypObject *), -2};
-        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        static yp_state_decl_t state_decl = {yp_sizeof(ypObject *), -2};
+        yp_function_decl_t     decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_ValueError);
     }
 
@@ -289,7 +297,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
     // state_decl objects must be fully contained in state.
     {
-        static yp_state_decl_t state_decl = {yp_sizeof(ypObject *), 1, {1}};
+        static yp_state_decl_t state_decl = {yp_sizeof(ypObject *) - 1, 1, {0}};
         yp_function_decl_t     decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_ValueError);
     }

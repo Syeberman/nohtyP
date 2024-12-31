@@ -965,6 +965,7 @@ extern fixture_types_t *fixture_types_sequence;
 extern fixture_types_t *fixture_types_string;
 extern fixture_types_t *fixture_types_setlike;
 extern fixture_types_t *fixture_types_mapping;
+extern fixture_types_t *fixture_types_callable;
 extern fixture_types_t *fixture_types_immutable;
 extern fixture_types_t *fixture_types_not_numeric;
 extern fixture_types_t *fixture_types_not_iterable;
@@ -973,6 +974,7 @@ extern fixture_types_t *fixture_types_not_sequence;
 extern fixture_types_t *fixture_types_not_string;
 extern fixture_types_t *fixture_types_not_setlike;
 extern fixture_types_t *fixture_types_not_mapping;
+extern fixture_types_t *fixture_types_not_callable;
 extern fixture_types_t *fixture_types_immutable_not_str;
 extern fixture_types_t *fixture_types_immutable_paired;
 
@@ -987,6 +989,7 @@ extern char *param_values_types_sequence[];
 extern char *param_values_types_string[];
 extern char *param_values_types_setlike[];
 extern char *param_values_types_mapping[];
+extern char *param_values_types_callable[];
 extern char *param_values_types_immutable[];
 extern char *param_values_types_not_numeric[];
 extern char *param_values_types_not_iterable[];
@@ -995,6 +998,7 @@ extern char *param_values_types_not_sequence[];
 extern char *param_values_types_not_string[];
 extern char *param_values_types_not_setlike[];
 extern char *param_values_types_not_mapping[];
+extern char *param_values_types_not_callable[];
 extern char *param_values_types_immutable_not_str[];
 extern char *param_values_types_immutable_paired[];
 
@@ -1048,6 +1052,9 @@ extern hashability_pair_t rand_obj_any_hashability_pair(uniqueness_t *uq);
 
 // Returns a random object of any non-iterable type.
 extern ypObject *rand_obj_any_not_iterable(uniqueness_t *uq);
+
+// Returns a random object of any non-callable type.
+extern ypObject *rand_obj_any_not_callable(uniqueness_t *uq);
 
 // Returns a random object of the given type. uq must be NULL for fixture_type_NoneType and
 // fixture_type_bool, as there are too few values for these types to guarantee uniqueness.
@@ -1143,6 +1150,7 @@ SUITE_OF_TESTS_DECLS(test_exception);
 SUITE_OF_TESTS_DECLS(test_frozendict);
 SUITE_OF_TESTS_DECLS(test_frozenset);
 SUITE_OF_TESTS_DECLS(test_function);
+SUITE_OF_TESTS_DECLS(test_iter);
 SUITE_OF_TESTS_DECLS(test_range);
 SUITE_OF_TESTS_DECLS(test_tuple);
 

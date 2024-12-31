@@ -656,14 +656,13 @@ static MunitResult test_munit_rand(const MunitParameter params[], fixture_t *fix
     return MUNIT_OK;
 }
 
-static MunitParameterEnum test_types_all_params[] = {
-        {param_key_type, param_values_types_all}, {NULL}};
+static MunitParameterEnum test_all_params[] = {{param_key_type, param_values_types_all}, {NULL}};
 
 MunitTest test_unittest_tests[] = {TEST(test_PRI_formats, NULL),
         TEST(test_assert_setlike_helper, NULL), TEST(test_assert_mapping_helper, NULL),
         TEST(test_fixture_types, NULL), TEST(test_param_values_types, NULL),
-        TEST(test_fixture_type, test_types_all_params), TEST(test_rand_obj, test_types_all_params),
-        TEST(test_rand_obj_uniqueness, test_types_all_params), TEST(test_munit_rand, NULL), {NULL}};
+        TEST(test_fixture_type, test_all_params), TEST(test_rand_obj, test_all_params),
+        TEST(test_rand_obj_uniqueness, test_all_params), TEST(test_munit_rand, NULL), {NULL}};
 
 
 extern void test_unittest_initialize(void) {}

@@ -379,6 +379,11 @@ extern ypObject *rand_obj_any_not_iterable(uniqueness_t *uq)
     _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_not_iterable)));
 }
 
+extern ypObject *rand_obj_any_not_callable(uniqueness_t *uq)
+{
+    _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_not_callable)));
+}
+
 extern ypObject *rand_obj_any_hashable_not_str(uniqueness_t *uq)
 {
     _return_unique(
@@ -462,14 +467,22 @@ static void rand_objs_chr_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **arr
     array_sort(n, array);
 }
 
-// All objects will be of the same type that supports total ordering.
+// All objects will be of the same type that supports yp_hash and total ordering.
 // TODO There are other types of objects we _could_ support here: tuples of strs fit the criteria,
-// ints and floats can be compared, mutable and immutable forms can, etc.
-static void rand_objs_any_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+// ints and floats can be compared, etc.
+static void rand_objs_any_hashable_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
     void (*funcs[])(uniqueness_t *uq, yp_ssize_t n, ypObject **array) = {
             rand_objs_int_ordered, rand_objs_byte_ordered, rand_objs_chr_ordered};
     rand_choice_array(funcs)(uq, n, array);
+}
+
+// All objects will be of the same type that supports total ordering.
+// TODO We can support not just the rand_objs_any_hashable_ordered types (which can be expanded),
+// but we can support immutable forms.
+static void rand_objs_any_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    rand_objs_any_hashable_ordered(uq, n, array);
 }
 
 
@@ -1652,7 +1665,7 @@ static fixture_type_t fixture_type_frozenset_struct = {
         newK_frozenset,          // newK
         rand_objs_any_hashable,  // rand_values
 
-        rand_objs_func_error,  // rand_ordered_items
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1714,7 +1727,7 @@ static fixture_type_t fixture_type_set_struct = {
         newK_set,                // newK
         rand_objs_any_hashable,  // rand_values
 
-        rand_objs_func_error,  // rand_ordered_items
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1817,7 +1830,7 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         newK_frozenset_dirty,    // newK
         rand_objs_any_hashable,  // rand_values
 
-        rand_objs_func_error,  // rand_ordered_items
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1893,7 +1906,7 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         newK_set_dirty,          // newK
         rand_objs_any_hashable,  // rand_values
 
-        rand_objs_func_error,  // rand_ordered_items
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -2027,7 +2040,7 @@ static fixture_type_t fixture_type_frozendict_struct = {
         yp_frozendictK,  // newK
         rand_objs_any,   // rand_values
 
-        rand_objs_func_error,  // rand_ordered_items
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -2096,7 +2109,7 @@ static fixture_type_t fixture_type_dict_struct = {
         yp_dictK,       // newK
         rand_objs_any,  // rand_values
 
-        rand_objs_func_error,  // rand_ordered_items
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -2203,7 +2216,7 @@ static fixture_type_t fixture_type_frozendict_dirty_struct = {
         new_frozendict_dirtyK,  // newK
         rand_objs_any,          // rand_values
 
-        rand_objs_func_error,  // rand_ordered_items
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -2279,7 +2292,7 @@ static fixture_type_t fixture_type_dict_dirty_struct = {
         new_dict_dirtyK,  // newK
         rand_objs_any,    // rand_values
 
-        rand_objs_func_error,  // rand_ordered_items
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -2431,6 +2444,7 @@ DEFINE_FIXTURE_TYPES(sequence, not_sequence);
 DEFINE_FIXTURE_TYPES(string, not_string);
 DEFINE_FIXTURE_TYPES(setlike, not_setlike);
 DEFINE_FIXTURE_TYPES(mapping, not_mapping);
+DEFINE_FIXTURE_TYPES(callable, not_callable);
 #undef DEFINE_FIXTURE_TYPES
 DEFINE_FIXTURE_TYPES_ARRAYS(immutable_not_str);
 static int fixture_type_is_immutable_not_str(fixture_type_t *type)
@@ -2492,6 +2506,7 @@ static void initialize_fixture_types(void)
     FILL_FIXTURE_TYPES_ARRAYS(string);
     FILL_FIXTURE_TYPES_ARRAYS(setlike);
     FILL_FIXTURE_TYPES_ARRAYS(mapping);
+    FILL_FIXTURE_TYPES_ARRAYS(callable);
     FILL_FIXTURE_TYPES_ARRAYS(immutable);
     FILL_FIXTURE_TYPES_ARRAYS(not_numeric);
     FILL_FIXTURE_TYPES_ARRAYS(not_iterable);
@@ -2500,6 +2515,7 @@ static void initialize_fixture_types(void)
     FILL_FIXTURE_TYPES_ARRAYS(not_string);
     FILL_FIXTURE_TYPES_ARRAYS(not_setlike);
     FILL_FIXTURE_TYPES_ARRAYS(not_mapping);
+    FILL_FIXTURE_TYPES_ARRAYS(not_callable);
     FILL_FIXTURE_TYPES_ARRAYS(immutable_not_str);
     FILL_FIXTURE_TYPES_ARRAYS(immutable_paired);
 #undef FILL_FIXTURE_TYPES_ARRAYS

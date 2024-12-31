@@ -319,8 +319,8 @@ static ypObject *newN_to_call_t_set(int n, ...)
     yp_decref(iterable);
     return result;
 }
-static ypObject *new_to_call_t_set(ypObject *iterable) { return yp_callN(yp_t_set, 1, iterable); }
 
+static ypObject *new_to_call_t_set(ypObject *iterable) { return yp_callN(yp_t_set, 1, iterable); }
 
 static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixture)
 {
