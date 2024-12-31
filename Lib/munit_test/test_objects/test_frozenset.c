@@ -610,7 +610,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(so, x));
     }
 
-    // _ypSetNV
+    // _ypSetNV, new set
     {
         malloc_tracker_oom_after(0);
         if (type->yp_type == yp_t_frozenset) {
@@ -618,6 +618,16 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         } else {
             assert_raises(yp_setN(N(items[0])), yp_MemoryError);
         }
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypSetNV, new ob_data
+    if (type->yp_type == yp_t_set) {
+        malloc_tracker_oom_after(1);  // allow _ypSet_new (set) to succeed
+        assert_raises(yp_setN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                              items[6], items[7], items[8], items[9], items[10], items[11],
+                              items[12], items[13], items[14], items[15])),
+                yp_MemoryError);
         malloc_tracker_oom_disable();
     }
 

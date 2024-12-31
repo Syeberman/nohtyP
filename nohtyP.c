@@ -1700,13 +1700,15 @@ const yp_uint8_t _yp_ctype_toupper[256] = {
 // of these APIs depending on the target platform; you can also provide your own versions via
 // yp_initialize.
 
-// Dummy memory allocation functions that always fail, to ensure yp_initialize is called first
+// Dummy memory allocation functions that always fail, to ensure yp_initialize is called first.
+// GCOVR_EXCL_START
 static void *_dummy_yp_malloc(yp_ssize_t *actual, yp_ssize_t size) { return NULL; }
 static void *_dummy_yp_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     return NULL;
 }
 static void _dummy_yp_free(void *p) {}
+// GCOVR_EXCL_STOP
 
 // See docs for yp_initialize_parameters_t.yp_malloc in nohtyP.h
 static void *(*yp_malloc)(yp_ssize_t *actual, yp_ssize_t size) = _dummy_yp_malloc;

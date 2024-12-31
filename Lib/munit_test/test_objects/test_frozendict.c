@@ -3,7 +3,8 @@
 
 
 // FIXME Instead of always using tuples for key/value pairs, make tests for other 2-item
-// sequences. This would be for both new/etc (this file) and for update/etc (test_mapping).
+// sequences. This would be for both new/etc (this file) and for update/etc (test_mapping). Then
+// also test for too-short and too-long pairs.
 
 // Returns true iff type supports optimizations with other.
 // FIXME Make this common?
@@ -882,7 +883,6 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
-// FIXME Try some more things with valgrind?
 static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -1029,7 +1029,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(x));
     }
 
-    // _ypDict_fromkeysNV
+    // _ypDict_fromkeysNV, new keyset
     {
         malloc_tracker_oom_after(0);
         if (type->yp_type == yp_t_frozendict) {
@@ -1037,6 +1037,18 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         } else {
             assert_raises(yp_dict_fromkeysN(yp_None, N(keys[0])), yp_MemoryError);
         }
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypDict_fromkeysNV, new dict ob_data
+    if (type->yp_type == yp_t_dict) {
+        malloc_tracker_oom_after(2);  // allow _ypDict_new (keyset and dict) to succeed
+        assert_raises(yp_dict_fromkeysN(yp_None,
+                              N(str_keys[0], str_keys[1], str_keys[2], str_keys[3], str_keys[4],
+                                      str_keys[5], str_keys[6], str_keys[7], str_keys[8],
+                                      str_keys[9], str_keys[10], str_keys[11], str_keys[12],
+                                      str_keys[13], str_keys[14], str_keys[15])),
+                yp_MemoryError);
         malloc_tracker_oom_disable();
     }
 

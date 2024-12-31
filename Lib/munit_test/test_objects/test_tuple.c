@@ -546,9 +546,27 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(sq));
     }
 
-    // _ypTuple_extend_fromtuple
+    // _ypTuple_extend_fromtuple, inline to new ob_data
     if (type->is_mutable) {
         ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *x = yp_tupleN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7]));
+        malloc_tracker_oom_after(0);
+        assert_raises_exc(yp_extend(sq, x, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(sq, x));
+    }
+
+    // _ypTuple_extend_fromtuple, ob_data to new ob_data
+    if (type->is_mutable) {
+        ypObject *sq = type->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7]));
         ypObject *x = yp_tupleN(N(items[0], items[1], items[2], items[3], items[4], items[5],
                 items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
                 items[6], items[7], items[0], items[1], items[2], items[3], items[4], items[5],
@@ -682,7 +700,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(sq));
     }
 
-    // _ypTupleNV
+    // _ypTupleNV, new tuple
     {
         malloc_tracker_oom_after(0);
         if (type->yp_type == yp_t_tuple) {
@@ -690,6 +708,18 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         } else {
             assert_raises(yp_listN(N(items[0], items[1])), yp_MemoryError);
         }
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypTupleNV, new ob_data
+    if (type->yp_type == yp_t_list) {
+        malloc_tracker_oom_after(1);  // allow _ypTuple_new (list) to succeed
+        assert_raises(yp_listN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                              items[6], items[7], items[0], items[1], items[2], items[3], items[4],
+                              items[5], items[6], items[7], items[0], items[1], items[2], items[3],
+                              items[4], items[5], items[6], items[7], items[0], items[1], items[2],
+                              items[3], items[4], items[5], items[6], items[7])),
+                yp_MemoryError);
         malloc_tracker_oom_disable();
     }
 
