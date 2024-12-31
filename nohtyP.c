@@ -3334,7 +3334,8 @@ ypObject *yp_iter2(ypObject *callable, ypObject *sentinel)
 {
     ypObject *i;
 
-    if (!yp_iscallableC(callable)) return yp_TypeError;
+    if (!yp_iscallableC(callable)) return_yp_BAD_TYPE(callable);
+    if (yp_isexceptionC(sentinel)) return sentinel;
 
     // Allocate the iterator
     i = ypMem_MALLOC_FIXED(ypCallableIterObject, ypIter_CODE);

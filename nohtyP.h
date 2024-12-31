@@ -453,8 +453,8 @@ ypAPI yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc);
 
 // An "iterable" is an object that implements yp_iter, returning an "iterator" that yields values
 // from yp_next. Examples of iterables include range, bytes, str, tuple, set, and dict; examples of
-// iterators include files and generators. It is usually unwise to modify an object being iterated
-// over.
+// iterators include files and generators. All iterators are iterables: they all support yp_iter. It
+// is usually unwise to modify an object being iterated over.
 
 // Returns a new reference to an iterator for object x.
 ypAPI ypObject *yp_iter(ypObject *x);
