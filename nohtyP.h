@@ -464,9 +464,9 @@ ypAPI ypObject *yp_iter(ypObject *x);
 // arguments; the sentinel value is never yielded.
 ypAPI ypObject *yp_iter2(ypObject *callable, ypObject *sentinel);
 
-// Sets the given n ypObject**s to new references for the values yielded from iterable. Iterable
-// must yield exactly n objects, or else a yp_ValueError is raised. Sets all n ypObject**s to the
-// same exception on error.
+// Sets the given n ypObject**s to new references for the values yielded from iterable. iterable
+// must yield exactly n objects, or else a yp_ValueError is raised. Raises yp_ValueError if n is
+// zero. Sets all n ypObject**s to the same exception on error.
 ypAPI void yp_unpackN(ypObject *iterable, int n, ...);
 ypAPI void yp_unpackNV(ypObject *iterable, int n, va_list args);
 
@@ -479,7 +479,8 @@ ypAPI ypObject *yp_filterfalse(ypObject *function, ypObject *iterable);
 
 // Returns a new reference to the largest/smallest of the given n objects. key is a one-argument
 // function used to extract a comparison key from each element in iterable; to compare the elements
-// directly, use yp_None. Note that key is before n as you cannot have arguments after ellipsis.
+// directly, use yp_None. Raises yp_ValueError if n is zero. Note that key is before n as you cannot
+// have arguments after ellipsis.
 ypAPI ypObject *yp_max_keyN(ypObject *key, int n, ...);
 ypAPI ypObject *yp_max_keyNV(ypObject *key, int n, va_list args);
 ypAPI ypObject *yp_min_keyN(ypObject *key, int n, ...);
@@ -492,6 +493,7 @@ ypAPI ypObject *yp_minN(int n, ...);
 ypAPI ypObject *yp_minNV(int n, va_list args);
 
 // Returns a new reference to the largest/smallest element in iterable. key is as in yp_max_keyN.
+// Raises yp_ValueError if iterable is empty.
 ypAPI ypObject *yp_max_key(ypObject *iterable, ypObject *key);
 ypAPI ypObject *yp_min_key(ypObject *iterable, ypObject *key);
 
@@ -1430,11 +1432,16 @@ ypAPI yp_int_t     yp_asintLF(yp_float_t x, ypObject **exc);
 // Return a new reference to x rounded to ndigits after the decimal point.
 ypAPI ypObject *yp_roundC(ypObject *x, int ndigits);
 
-// Sums the n given objects and returns the total.
+// Sums the n given objects and returns the total. If n is zero yp_ValueError is raised.
+// FIXME Am I consistent on where I specify "new reference"/etc and where I don't?
 ypAPI ypObject *yp_sumN(int n, ...);
 ypAPI ypObject *yp_sumNV(int n, va_list args);
 
-// Sums the items of iterable and returns the total.
+// Sums the start value with the items of iterable using yp_add, returning the total. If iterable is
+// empty the start value is returned.
+ypAPI ypObject *yp_sum_start(ypObject *iterable, ypObject *start);
+
+// Equivalent to yp_sum_start(iterable, yp_i_zero).
 ypAPI ypObject *yp_sum(ypObject *iterable);
 
 // Return the number of bits necessary to represent an integer in binary, excluding the sign and
