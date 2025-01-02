@@ -3141,14 +3141,30 @@ ypObject *yp_iter_stateCX(ypObject *i, yp_ssize_t *size, void **state)
     return yp_None;
 }
 
-// TODO Double-check and test the boundary conditions in this function
 // XXX Yes, Python also allows unpacking of non-sequence iterables: a,b,c={1,2,3} is valid
-// TODO It seems very suspect to allow unpack to work on non-sequences. Is this important enough to
-// break with Python? Then again, Python has ordered dicts by default, and because we share dict/set
-// code, our yp_sets will be ordered too. So perhaps this is OK again.
 void yp_unpackN(ypObject *iterable, int n, ...)
 {
     return_yp_NV_FUNC_void(yp_unpackNV, (iterable, n, args), n);
+}
+
+// When an error occurs in yp_unpackNV, we need to discard the previously-yielded values and set all
+// dests to the exception.
+static void _yp_unpackNV_error(ypObject *e, int remaining, int n, va_list args_orig)
+{
+    va_list    args;
+    ypObject **dest;
+
+    va_copy(args, args_orig);  // new "ref"
+    for (/*n already set*/; n > remaining; n--) {
+        dest = va_arg(args, ypObject **);
+        yp_decref(*dest);
+        *dest = e;
+    }
+    for (/*n already set*/; n > 0; n--) {
+        dest = va_arg(args, ypObject **);
+        *dest = e;
+    }
+    va_end(args);
 }
 
 void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
@@ -3157,23 +3173,34 @@ void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
     ypObject   *mi;
     va_list     args;
     int         remaining;
-    ypObject   *x = yp_None;  // set to None in case n==0
+    ypObject   *x;
     ypObject  **dest;
 
-    // Set the given n arguments to the values yielded from iterable; if an exception occurs, we
-    // will need to restart and discard these values. Remember that if yp_miniiter fails,
-    // yp_miniiter_next will return the same exception.
-    // TODO Hmmm; let's say iterable was yp_StopIteration for some reason: this code would actually
-    // succeed when n=0 even though it should probably fail...we should check the yp_miniiter
-    // return (here and elsewhere)
+    // TODO When yp_raise is implemented, we can make n<1 raise yp_ValueError.
+    if (n < 1) return;
+
     mi = yp_miniiter(iterable, &mi_state);  // new ref
-    va_copy(args, args_orig);
+    if (yp_isexceptionC(mi)) {
+        _yp_unpackNV_error(mi, n, n, args_orig);
+        return;
+    }
+
+    // Set the given n arguments to the values yielded from iterable; if an exception occurs, we
+    // will need to restart and discard these values.
+    va_copy(args, args_orig);  // new "ref"
     for (remaining = n; remaining > 0; remaining--) {
         x = yp_miniiter_next(mi, &mi_state);  // new ref
         if (yp_isexceptionC(x)) {
-            // If the iterable is too short, raise yp_ValueError
-            if (yp_isexceptionC2(x, yp_StopIteration)) x = yp_ValueError;
-            break;
+            if (yp_isexceptionC2(x, yp_StopIteration)) {
+                // If the iterable is too short, raise yp_ValueError
+                _yp_unpackNV_error(yp_ValueError, remaining, n, args_orig);
+            } else {
+                // Some other exception occurred.
+                _yp_unpackNV_error(x, remaining, n, args_orig);
+            }
+            va_end(args);
+            yp_decref(mi);
+            return;
         }
 
         dest = va_arg(args, ypObject **);
@@ -3181,36 +3208,19 @@ void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
     }
     va_end(args);
 
-    // If we've been successful so far, then ensure we're at the end of iterable
-    if (!yp_isexceptionC(x)) {
-        x = yp_miniiter_next(mi, &mi_state);  // new ref
-        if (yp_isexceptionC2(x, yp_StopIteration)) {
-            x = yp_None;  // success!
-        } else if (yp_isexceptionC(x)) {
-            // some other exception occurred
-        } else {
-            // If the iterable is too long, raise yp_ValueError
-            yp_decref(x);
-            x = yp_ValueError;
-        }
-    }
-
-    // If an error occurred above, then we need to discard the previously-yielded values and set
-    // all dests to the exception; otherwise, we're successful, so return
-    if (yp_isexceptionC(x)) {
-        va_copy(args, args_orig);
-        for (/*n already set*/; n > remaining; n--) {
-            dest = va_arg(args, ypObject **);
-            yp_decref(*dest);
-            *dest = x;
-        }
-        for (/*n already set*/; n > 0; n--) {
-            dest = va_arg(args, ypObject **);
-            *dest = x;
-        }
-        va_end(args);
-    }
+    // We've been successful so far, so ensure we're at the end of iterable
+    x = yp_miniiter_next(mi, &mi_state);  // new ref
     yp_decref(mi);
+    if (yp_isexceptionC2(x, yp_StopIteration)) {
+        // Success!
+    } else if (yp_isexceptionC(x)) {
+        // Some other exception occurred.
+        _yp_unpackNV_error(x, remaining, n, args_orig);
+    } else {
+        // If the iterable is too long, raise yp_ValueError.
+        yp_decref(x);
+        _yp_unpackNV_error(yp_ValueError, remaining, n, args_orig);
+    }
 }
 
 // Generator Constructors
