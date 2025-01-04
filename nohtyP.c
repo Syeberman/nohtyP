@@ -15002,6 +15002,8 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
     yp_ASSERT1(self != NULL);
     yp_ASSERT1(ypObject_TYPE_CODE(self) == ypList_CODE);
 
+    if (yp_isexceptionC(keyfunc)) return keyfunc;
+
     // Convert arguments
     {
         ypObject *b = yp_bool(_reverse);
