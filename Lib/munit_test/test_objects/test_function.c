@@ -7,6 +7,9 @@
 #endif
 
 
+// Copied from nohtyP.c.
+#define ypFunction_MAX_ARGS_ON_STACK 32
+
 typedef struct _signature_t {
     yp_int32_t          n;
     yp_parameter_decl_t params[8];  // Increase length as necessary.
@@ -1220,8 +1223,7 @@ static void _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
     // More than ypFunction_MAX_ARGS_ON_STACK parameters
     {
-        // params has ypFunction_MAX_ARGS_ON_STACK + 1 elements. Note params contains new refs.
-        yp_parameter_decl_t params[32 + 1] = {{yp_incref(str_a)}};
+        yp_parameter_decl_t params[ypFunction_MAX_ARGS_ON_STACK + 1] = {{yp_incref(str_a)}};
         yp_ssize_t          params_len = yp_lengthof_array(params);
         yp_function_decl_t  decl = {capture_code, 0, (yp_int32_t)params_len, params, NULL, NULL};
         ypObject           *f;
@@ -2349,8 +2351,7 @@ static void _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
 
     // More than ypFunction_MAX_ARGS_ON_STACK parameters
     {
-        // params has ypFunction_MAX_ARGS_ON_STACK + 1 elements. Note params contains new refs.
-        yp_parameter_decl_t params[32 + 1] = {{yp_incref(str_a)}};
+        yp_parameter_decl_t params[ypFunction_MAX_ARGS_ON_STACK + 1] = {{yp_incref(str_a)}};
         yp_ssize_t          params_len = yp_lengthof_array(params);
         yp_function_decl_t  decl = {capture_code, 0, (yp_int32_t)params_len, params, NULL, NULL};
         ypObject           *f;
@@ -2535,6 +2536,10 @@ static MunitResult test_callN(const MunitParameter params[], fixture_t *fixture)
 
     // Shared tests.
     _test_callN(yp_callN);
+
+    // ypFunction_callNV_withself overflow calculating n_actual.
+    // XXX n is INT_MAX but the actual number of parameters is one: this could be dangerous.
+    assert_raises(yp_callN(yp_t_type, INT_MAX, yp_None), yp_MemorySizeOverflowError);
 
     yp_decrefN(N(str_a));
     return MUNIT_OK;
@@ -2941,11 +2946,79 @@ static MunitResult test_call_t_function(const MunitParameter params[], fixture_t
     return MUNIT_OK;
 }
 
+static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *args[] = obj_array_init(2, rand_obj_any(uq));
+    ypObject     *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject     *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject     *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject     *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+
+    // _ypFunction_validate_parameters, new set.
+    {
+        yp_parameter_decl_t f_params[] = {{str_a}};
+        yp_function_decl_t  f_decl = {None_code, 0, yp_lengthof_array(f_params), f_params};
+        malloc_tracker_oom_after(1);  // allow function malloc to succeed
+        assert_raises(yp_functionC(&f_decl), yp_MemoryError);
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypFunction_call_copy_var_kwargs, new frozendict.
+    {
+        define_function(f, None_code, ({str_star_args}, {str_star_star_kwargs}));
+        ypObject *kwargs = yp_dictK(K(str_a, args[0]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_call_stars(f, yp_tuple_empty, kwargs), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(kwargs, f));
+    }
+
+    // _ypFunction_call_make_var_kwargs, copy kwargs.
+    {
+        define_function(f, None_code, ({str_a}, {str_star_star_kwargs}));
+        ypObject *kwargs = yp_dictK(K(str_a, args[0], str_b, args[1]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_call_stars(f, yp_tuple_empty, kwargs), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(kwargs, f));
+    }
+
+    // _ypFunction_call_QuickIter, argarray (>ypFunction_MAX_ARGS_ON_STACK parameters).
+    {
+        yp_parameter_decl_t f_params[ypFunction_MAX_ARGS_ON_STACK + 1] = {0};
+        yp_ssize_t          f_params_len = yp_lengthof_array(f_params);
+        yp_function_decl_t  f_decl = {capture_code, 0, (yp_int32_t)f_params_len, f_params};
+        ypObject           *f;
+        parameter_decl_array_fill4(uq, f_params_len, f_params, "a");
+        assert_not_raises(f = yp_functionC(&f_decl));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_callN(f, 0), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        parameter_decl_array_decref(f_params);
+        yp_decref(f);
+    }
+
+    // yp_functionC, new function.
+    {
+        yp_parameter_decl_t f_params[] = {{str_a}};
+        yp_function_decl_t  f_decl = {None_code, 0, yp_lengthof_array(f_params), f_params};
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_functionC(&f_decl), yp_MemoryError);
+        malloc_tracker_oom_disable();
+    }
+
+    yp_decrefN(N(str_star_star_kwargs, str_star_args, str_b, str_a));
+    obj_array_decref(args);
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
 
 MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_new_immortal, NULL),
         TEST(test_callN, NULL), TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL),
         TEST(test_copy, NULL), TEST(test_deepcopy, NULL), TEST(test_bool, NULL),
-        TEST(test_hash, NULL), TEST(test_call_t_function, NULL), {NULL}};
+        TEST(test_hash, NULL), TEST(test_call_t_function, NULL), TEST(test_oom, NULL), {NULL}};
 
 
 extern void test_function_initialize(void) {}
