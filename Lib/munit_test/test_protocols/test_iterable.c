@@ -9,7 +9,7 @@
 static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
 {
     uniqueness_t *uq = uniqueness_new();
-    ypObject     *not_iterable = rand_obj_any_not_iterable(NULL);
+    ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[2];
     obj_array_fill(items, uq, type->rand_items);
 
@@ -83,7 +83,7 @@ static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
     }
 
     // x is not an iterable. yp_iter is yp_TypeError, yp_iter_keys is yp_MethodError.
-    assert_raises(yp_iter(not_iterable), yp_TypeError, yp_MethodError);
+    assert_raises(any_iter(not_iterable), yp_TypeError, yp_MethodError);
 
     // Exception passthrough.
     assert_raises(any_iter(yp_SyntaxError), yp_SyntaxError);
@@ -526,6 +526,272 @@ static MunitResult test_zipN(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
+// x_two contains items[0] and items[1], any_iter creates the iterator, send_value is the value to
+// use in yp_send (which the iterator ignores), and items are the objects yielded.
+static void _test_send(fixture_type_t *type, ypObject *x_two, ypObject *(*any_iter)(ypObject *),
+        ypObject *send_value, ypObject **items, int test_original_object_return)
+{
+    // Basic send.
+    {
+        ypObject *first;
+        ypObject *second;
+        ypObject *iter = any_iter(x_two);
+
+        assert_not_raises(first = yp_send(iter, send_value));
+        assert_not_raises(second = yp_send(iter, send_value));
+        assert_raises(yp_send(iter, send_value), yp_StopIteration);
+
+        if (yp_eq(first, items[0]) == yp_True) {
+            assert_obj(second, eq, items[1]);
+        } else {
+            // Only set-likes and mappings are allowed to iterate out of order.
+            assert_true(type->is_setlike || type->is_mapping);
+            assert_obj(first, eq, items[1]);
+            assert_obj(second, eq, items[0]);
+        }
+
+        yp_decrefN(N(second, first, iter));
+    }
+
+    // x is empty.
+    {
+        ypObject *x = type->newN(0);
+        ypObject *iter = any_iter(x);
+        assert_raises(yp_send(iter, send_value), yp_StopIteration);
+        yp_decrefN(N(iter, x));
+    }
+
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (test_original_object_return) {
+        ypObject *first;
+        ypObject *second;
+        ypObject *iter = any_iter(x_two);
+
+        assert_not_raises(first = yp_send(iter, send_value));
+        assert_not_raises(second = yp_send(iter, send_value));
+        assert_raises(yp_send(iter, send_value), yp_StopIteration);
+
+        if (first == items[0]) {
+            assert_obj(second, is, items[1]);
+        } else {
+            // Only set-likes and mappings are allowed to iterate out of order.
+            assert_true(type->is_setlike || type->is_mapping);
+            assert_obj(first, is, items[1]);
+            assert_obj(second, is, items[0]);
+        }
+
+        yp_decrefN(N(second, first, iter));
+    }
+
+    // Exception passthrough.
+    ead(iter, any_iter(x_two), assert_raises(yp_send(iter, yp_SyntaxError), yp_SyntaxError));
+}
+
+static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject       *send_value = rand_obj_any(uq);
+    ypObject       *items[2];
+    obj_array_fill(items, uq, type->rand_items);
+
+    // yp_send with yp_iter. x is reused so can't be an iter.
+    if (type != fixture_type_iter) {
+        ypObject *x = type->newN(N(items[0], items[1]));
+        _test_send(type, x, yp_iter, send_value, items, type->original_object_return);
+        yp_decrefN(N(x));
+    }
+
+    // yp_send with yp_iter_keys, yp_iter_values, and yp_iter_items.
+    if (type->is_mapping) {
+        ypObject *values[2];
+        ypObject *pairs[2];  // The key/value pairs.
+        ypObject *x;
+        obj_array_fill(values, uq, type->rand_values);
+        assert_not_raises(pairs[0] = yp_tupleN(2, items[0], values[0]));
+        assert_not_raises(pairs[1] = yp_tupleN(2, items[1], values[1]));
+        x = type->newK(K(items[0], values[0], items[1], values[1]));
+
+        _test_send(type, x, yp_iter_keys, send_value, items, type->original_object_return);
+        _test_send(type, x, yp_iter_values, send_value, values, type->original_object_return);
+        _test_send(
+                type, x, yp_iter_items, send_value, pairs, /*test_original_object_return=*/FALSE);
+
+        yp_decrefN(N(x));
+        obj_array_decref(pairs);
+        obj_array_decref(values);
+    }
+
+    // x is not an iterable.
+    assert_raises(yp_send(not_iterable, send_value), yp_TypeError);
+
+    // Exception passthrough.
+    assert_raises(yp_send(yp_SyntaxError, send_value), yp_SyntaxError);
+
+    obj_array_decref(items);
+    yp_decrefN(N(send_value, not_iterable));
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
+// There is no test_next: yp_next is tested throughout this file.
+
+// x_two contains items[0] and items[1], any_iter creates the iterator, default_ is the value to
+// use in yp_next2 (which the iterator ignores), and items are the objects yielded.
+static void _test_next2(fixture_type_t *type, ypObject *x_two, ypObject *(*any_iter)(ypObject *),
+        ypObject *default_, ypObject **items, int test_original_object_return)
+{
+    // Basic next2.
+    {
+        ypObject *first;
+        ypObject *second;
+        ypObject *iter = any_iter(x_two);
+
+        assert_not_raises(first = yp_next2(iter, default_));
+        assert_not_raises(second = yp_next2(iter, default_));
+        ead(third, yp_next2(iter, default_), assert_obj(third, is, default_));
+
+        if (yp_eq(first, items[0]) == yp_True) {
+            assert_obj(second, eq, items[1]);
+        } else {
+            // Only set-likes and mappings are allowed to iterate out of order.
+            assert_true(type->is_setlike || type->is_mapping);
+            assert_obj(first, eq, items[1]);
+            assert_obj(second, eq, items[0]);
+        }
+
+        yp_decrefN(N(second, first, iter));
+    }
+
+    // x is empty.
+    {
+        ypObject *x = type->newN(0);
+        ypObject *iter = any_iter(x);
+        ead(first, yp_next2(iter, default_), assert_obj(first, is, default_));
+        yp_decrefN(N(iter, x));
+    }
+
+    // Some types store references to the given objects and, thus, return exactly those objects.
+    if (test_original_object_return) {
+        ypObject *first;
+        ypObject *second;
+        ypObject *iter = any_iter(x_two);
+
+        assert_not_raises(first = yp_next2(iter, default_));
+        assert_not_raises(second = yp_next2(iter, default_));
+        ead(third, yp_next2(iter, default_), assert_obj(third, is, default_));
+
+        if (first == items[0]) {
+            assert_obj(second, is, items[1]);
+        } else {
+            // Only set-likes and mappings are allowed to iterate out of order.
+            assert_true(type->is_setlike || type->is_mapping);
+            assert_obj(first, is, items[1]);
+            assert_obj(second, is, items[0]);
+        }
+
+        yp_decrefN(N(second, first, iter));
+    }
+
+    // Exception passthrough.
+    ead(iter, any_iter(x_two), assert_raises(yp_next2(iter, yp_SyntaxError), yp_SyntaxError));
+}
+
+static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject       *default_ = rand_obj_any(uq);
+    ypObject       *items[2];
+    obj_array_fill(items, uq, type->rand_items);
+
+    // yp_next2 with yp_iter. x is reused so can't be an iter.
+    if (type != fixture_type_iter) {
+        ypObject *x = type->newN(N(items[0], items[1]));
+        _test_next2(type, x, yp_iter, default_, items, type->original_object_return);
+        yp_decrefN(N(x));
+    }
+
+    // yp_next2 with yp_iter_keys, yp_iter_values, and yp_iter_items.
+    if (type->is_mapping) {
+        ypObject *values[2];
+        ypObject *pairs[2];  // The key/value pairs.
+        ypObject *x;
+        obj_array_fill(values, uq, type->rand_values);
+        assert_not_raises(pairs[0] = yp_tupleN(2, items[0], values[0]));
+        assert_not_raises(pairs[1] = yp_tupleN(2, items[1], values[1]));
+        x = type->newK(K(items[0], values[0], items[1], values[1]));
+
+        _test_next2(type, x, yp_iter_keys, default_, items, type->original_object_return);
+        _test_next2(type, x, yp_iter_values, default_, values, type->original_object_return);
+        _test_next2(type, x, yp_iter_items, default_, pairs, /*test_original_object_return=*/FALSE);
+
+        yp_decrefN(N(x));
+        obj_array_decref(pairs);
+        obj_array_decref(values);
+    }
+
+    // x is not an iterable.
+    assert_raises(yp_next2(not_iterable, default_), yp_TypeError);
+
+    // Exception passthrough.
+    assert_raises(yp_next2(yp_SyntaxError, default_), yp_SyntaxError);
+
+    obj_array_decref(items);
+    yp_decrefN(N(default_, not_iterable));
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
+static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject       *not_exception = rand_obj_any(uq);
+    ypObject       *items[2];
+    obj_array_fill(items, uq, type->rand_items);
+
+    // yp_throw with yp_iter.
+    if (type != fixture_type_iter) {
+        ypObject *x = type->newN(N(items[0], items[1]));
+        ead(iter, yp_iter(x), assert_raises(yp_throw(iter, yp_SyntaxError), yp_SyntaxError));
+        ead(iter, yp_iter(x), assert_raises(yp_throw(iter, not_exception), yp_TypeError));
+        yp_decrefN(N(x));
+    }
+
+    // yp_throw with yp_iter_keys, yp_iter_values, and yp_iter_items.
+    if (type->is_mapping) {
+        ypObject *values[2];
+        ypObject *x;
+        obj_array_fill(values, uq, type->rand_values);
+        x = type->newK(K(items[0], values[0], items[1], values[1]));
+
+        ead(iter, yp_iter_keys(x), assert_raises(yp_throw(iter, yp_SyntaxError), yp_SyntaxError));
+        ead(iter, yp_iter_keys(x), assert_raises(yp_throw(iter, not_exception), yp_TypeError));
+        ead(iter, yp_iter_values(x), assert_raises(yp_throw(iter, yp_SyntaxError), yp_SyntaxError));
+        ead(iter, yp_iter_values(x), assert_raises(yp_throw(iter, not_exception), yp_TypeError));
+        ead(iter, yp_iter_items(x), assert_raises(yp_throw(iter, yp_SyntaxError), yp_SyntaxError));
+        ead(iter, yp_iter_items(x), assert_raises(yp_throw(iter, not_exception), yp_TypeError));
+
+        yp_decrefN(N(x));
+        obj_array_decref(values);
+    }
+
+    // x is not an iterable.
+    assert_raises(yp_throw(not_iterable, yp_SyntaxError), yp_TypeError);
+
+    // Exception passthrough.
+    assert_raises(yp_throw(yp_SyntaxError, yp_Exception), yp_SyntaxError);
+
+    obj_array_decref(items);
+    yp_decrefN(N(not_exception, not_iterable));
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
 static MunitResult test_iter_keys(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -652,11 +918,11 @@ static void _test_iter_items(fixture_type_t *type)
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *keys[2];
     ypObject     *values[2];
-    ypObject     *items[2];  // The key/value pairs.
+    ypObject     *pairs[2];  // The key/value pairs.
     obj_array_fill(keys, uq, type->rand_items);
     obj_array_fill(values, uq, type->rand_values);
-    assert_not_raises(items[0] = yp_tupleN(2, keys[0], values[0]));
-    assert_not_raises(items[1] = yp_tupleN(2, keys[1], values[1]));
+    assert_not_raises(pairs[0] = yp_tupleN(2, keys[0], values[0]));
+    assert_not_raises(pairs[1] = yp_tupleN(2, keys[1], values[1]));
 
     // Basic iter_items.
     {
@@ -676,11 +942,11 @@ static void _test_iter_items(fixture_type_t *type)
 
         assert_type_is(first, yp_t_tuple);
         assert_type_is(second, yp_t_tuple);
-        if (yp_eq(first, items[0]) == yp_True) {
-            assert_obj(second, eq, items[1]);
+        if (yp_eq(first, pairs[0]) == yp_True) {
+            assert_obj(second, eq, pairs[1]);
         } else {
-            assert_obj(first, eq, items[1]);
-            assert_obj(second, eq, items[0]);
+            assert_obj(first, eq, pairs[1]);
+            assert_obj(second, eq, pairs[0]);
         }
 
         yp_decrefN(N(second, first, iter, x));
@@ -707,7 +973,7 @@ static void _test_iter_items(fixture_type_t *type)
         assert_not_raises(second = yp_next(iter));
         assert_raises(yp_next(iter), yp_StopIteration);
 
-        if (yp_eq(first, items[0]) == yp_True) {
+        if (yp_eq(first, pairs[0]) == yp_True) {
             ead(item, yp_getindexC(first, 0), assert_obj(item, is, keys[0]));
             ead(item, yp_getindexC(first, 1), assert_obj(item, is, values[0]));
             ead(item, yp_getindexC(second, 0), assert_obj(item, is, keys[1]));
@@ -728,7 +994,7 @@ static void _test_iter_items(fixture_type_t *type)
     // Exception passthrough.
     assert_raises(yp_iter_items(yp_SyntaxError), yp_SyntaxError);
 
-    obj_array_decref(items);
+    obj_array_decref(pairs);
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(not_iterable));
@@ -1017,11 +1283,11 @@ static void _test_miniiter_items(fixture_type_t *type)
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *keys[2];
     ypObject     *values[2];
-    ypObject     *items[2];  // The key/value pairs.
+    ypObject     *pairs[2];  // The key/value pairs.
     obj_array_fill(keys, uq, type->rand_items);
     obj_array_fill(values, uq, type->rand_values);
-    assert_not_raises(items[0] = yp_tupleN(2, keys[0], values[0]));
-    assert_not_raises(items[1] = yp_tupleN(2, keys[1], values[1]));
+    assert_not_raises(pairs[0] = yp_tupleN(2, keys[0], values[0]));
+    assert_not_raises(pairs[1] = yp_tupleN(2, keys[1], values[1]));
 
     // Basic miniiter.
     {
@@ -1048,11 +1314,11 @@ static void _test_miniiter_items(fixture_type_t *type)
 
         if (yp_eq(first_key, keys[0]) == yp_True) {
             assert_obj(first_value, eq, values[0]);
-            assert_obj(second, eq, items[1]);
+            assert_obj(second, eq, pairs[1]);
         } else {
             assert_obj(first_key, eq, keys[1]);
             assert_obj(first_value, eq, values[1]);
-            assert_obj(second, eq, items[0]);
+            assert_obj(second, eq, pairs[0]);
         }
 
         yp_decrefN(N(second, first_value, first_key, mi, x));
@@ -1113,7 +1379,7 @@ static void _test_miniiter_items(fixture_type_t *type)
         assert_raises(yp_miniiter_items(yp_SyntaxError, &mi_state), yp_SyntaxError);
     }
 
-    obj_array_decref(items);
+    obj_array_decref(pairs);
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(not_iterable));
@@ -1149,9 +1415,11 @@ MunitTest test_iterable_tests[] = {TEST(test_iter, test_iterable_params),
         TEST(test_min_key, test_iterable_params), TEST(test_max, test_iterable_params),
         TEST(test_min, test_iterable_params), TEST(test_reversed, test_iterable_params),
         TEST(test_sorted, test_iterable_params), TEST(test_zipN, test_iterable_params),
-        TEST(test_iter_keys, test_iterable_params), TEST(test_iter_values, test_iterable_params),
-        TEST(test_iter_items, test_iterable_params), TEST(test_call_type, test_iterable_params),
-        TEST(test_miniiter, test_iterable_params), TEST(test_miniiter_keys, test_iterable_params),
+        TEST(test_send, test_iterable_params), TEST(test_next2, test_iterable_params),
+        TEST(test_throw, test_iterable_params), TEST(test_iter_keys, test_iterable_params),
+        TEST(test_iter_values, test_iterable_params), TEST(test_iter_items, test_iterable_params),
+        TEST(test_call_type, test_iterable_params), TEST(test_miniiter, test_iterable_params),
+        TEST(test_miniiter_keys, test_iterable_params),
         TEST(test_miniiter_values, test_iterable_params),
         TEST(test_miniiter_items, test_iterable_params), {NULL}};
 

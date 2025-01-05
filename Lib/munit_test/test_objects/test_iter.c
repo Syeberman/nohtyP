@@ -423,7 +423,6 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-// FIXME test_oom: yp_generatorC alloc, _ypMiIter_fromminiiter, yp_iter2
 static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 {
     uniqueness_t *uq = uniqueness_new();
