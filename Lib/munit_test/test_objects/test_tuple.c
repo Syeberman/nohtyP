@@ -511,7 +511,60 @@ static MunitResult test_repeatCN(const MunitParameter params[], fixture_t *fixtu
 // FIXME Ensure yp_sort4 properly handles exception passthrough, even in cases where one of the
 // arguments would be ignored (e.g. empty list).
 
-// FIXME yp_itemarrayCX
+static MunitResult test_itemarrayCX(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject       *items[2];
+    obj_array_fill(items, uq, type->rand_items);
+
+    // Basic itemarrayCX.
+    {
+        yp_ssize_t       len;
+        ypObject *const *array;
+        ypObject        *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises(yp_itemarrayCX(sq, &len, &array));
+        assert_ssizeC(len, ==, 2);
+        assert_not_null(array);
+        assert_ptr_array(array, items[0], items[1]);
+        yp_decrefN(N(sq));
+    }
+
+    // sq is empty.
+    {
+        yp_ssize_t       len;
+        ypObject *const *array;
+        ypObject        *sq = type->newN(0);
+        assert_not_raises(yp_itemarrayCX(sq, &len, &array));
+        assert_ssizeC(len, ==, 0);
+        assert_not_null(array);
+        yp_decrefN(N(sq));
+    }
+
+    // Object is not an iterable.
+    {
+        yp_ssize_t       len;
+        ypObject *const *array;
+        assert_raises(yp_itemarrayCX(not_iterable, &len, &array), yp_TypeError);
+        assert_ssizeC(len, ==, 0);
+        assert_null(array);
+    }
+
+    // Exception passthrough.
+    {
+        yp_ssize_t       len;
+        ypObject *const *array;
+        assert_raises(yp_itemarrayCX(yp_SyntaxError, &len, &array), yp_SyntaxError);
+        assert_ssizeC(len, ==, 0);
+        assert_null(array);
+    }
+
+    obj_array_decref(items);
+    yp_decrefN(N(not_iterable));
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
 
 static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 {
@@ -773,7 +826,8 @@ static MunitParameterEnum test_tuple_params[] = {{param_key_type, param_values_t
 
 MunitTest test_tuple_tests[] = {TEST(test_newN, test_tuple_params),
         TEST(test_new, test_tuple_params), TEST(test_call_type, test_tuple_params),
-        TEST(test_repeatCN, test_tuple_params), TEST(test_oom, test_tuple_params), {NULL}};
+        TEST(test_repeatCN, test_tuple_params), TEST(test_itemarrayCX, test_tuple_params),
+        TEST(test_oom, test_tuple_params), {NULL}};
 
 
 extern void test_tuple_initialize(void) {}
