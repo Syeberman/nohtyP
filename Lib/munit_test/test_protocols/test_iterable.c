@@ -335,18 +335,17 @@ static MunitResult test_min(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-static MunitResult test_reversed(const MunitParameter params[], fixture_t *fixture)
+static void _test_reversed(fixture_type_t *type, ypObject *(*any_reversed)(ypObject *))
 {
-    fixture_type_t *type = fixture->type;
-    uniqueness_t   *uq = uniqueness_new();
-    ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
-    ypObject       *items[2];
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject     *items[2];
     obj_array_fill(items, uq, type->rand_items);
 
     // reversed is not supported on iterators, set-likes, and mappings.
     if (type->yp_type == yp_t_iter || type->is_setlike || type->is_mapping) {
         ypObject *x = type->newN(N(items[0], items[1]));
-        assert_raises(yp_reversed(x), yp_TypeError);
+        assert_raises(any_reversed(x), yp_TypeError);
         yp_decrefN(N(x));
         goto tear_down;  // Skip remaining tests.
     }
@@ -356,7 +355,7 @@ static MunitResult test_reversed(const MunitParameter params[], fixture_t *fixtu
         ypObject *first;
         ypObject *second;
         ypObject *x = type->newN(N(items[0], items[1]));
-        ypObject *iter = yp_reversed(x);
+        ypObject *iter = any_reversed(x);
         assert_type_is(iter, yp_t_iter);
 
         assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 2);
@@ -376,7 +375,7 @@ static MunitResult test_reversed(const MunitParameter params[], fixture_t *fixtu
     // x is empty.
     {
         ypObject *x = type->newN(0);
-        ypObject *iter = yp_reversed(x);
+        ypObject *iter = any_reversed(x);
         assert_type_is(iter, yp_t_iter);
         assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 0);
         assert_raises(yp_next(iter), yp_StopIteration);
@@ -388,7 +387,7 @@ static MunitResult test_reversed(const MunitParameter params[], fixture_t *fixtu
         ypObject *first;
         ypObject *second;
         ypObject *x = type->newN(N(items[0], items[1]));
-        ypObject *iter = yp_reversed(x);
+        ypObject *iter = any_reversed(x);
 
         assert_not_raises(first = yp_next(iter));
         assert_not_raises(second = yp_next(iter));
@@ -401,15 +400,52 @@ static MunitResult test_reversed(const MunitParameter params[], fixture_t *fixtu
     }
 
     // x is not an iterable.
-    assert_raises(yp_reversed(not_iterable), yp_TypeError);
+    assert_raises(any_reversed(not_iterable), yp_TypeError);
 
     // Exception passthrough.
-    assert_raises(yp_reversed(yp_SyntaxError), yp_SyntaxError);
+    assert_raises(any_reversed(yp_SyntaxError), yp_SyntaxError);
 
 tear_down:
     obj_array_decref(items);
     yp_decrefN(N(not_iterable));
     uniqueness_dealloc(uq);
+}
+
+static MunitResult test_reversed(const MunitParameter params[], fixture_t *fixture)
+{
+    _test_reversed(fixture->type, yp_reversed);
+    return MUNIT_OK;
+}
+
+static ypObject *reversed_to_call_func_reversed(ypObject *obj)
+{
+    return yp_callN(yp_func_reversed, N(obj));
+}
+
+static MunitResult test_func_reversed(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *str_sequence = yp_str_frombytesC2(-1, "sequence");
+    ypObject       *str_rand = rand_obj(NULL, fixture_type_str);
+
+    _test_reversed(type, reversed_to_call_func_reversed);
+
+    // Invalid arguments.
+    {
+        ypObject *x = rand_obj(NULL, type);
+        ypObject *kwargs_sequence = yp_frozendictK(K(str_sequence, x));
+        ypObject *kwargs_rand = yp_frozendictK(K(str_rand, x));
+
+        assert_raises(yp_callN(yp_func_reversed, 0), yp_TypeError);
+        assert_raises(yp_callN(yp_func_reversed, N(x, yp_tuple_empty)), yp_TypeError);
+        assert_raises(
+                yp_call_stars(yp_func_reversed, yp_tuple_empty, kwargs_sequence), yp_TypeError);
+        assert_raises(yp_call_stars(yp_func_reversed, yp_tuple_empty, kwargs_rand), yp_TypeError);
+
+        yp_decrefN(N(kwargs_rand, kwargs_sequence, x));
+    }
+
+    yp_decrefN(N(str_rand, str_sequence));
     return MUNIT_OK;
 }
 
@@ -494,6 +530,62 @@ static MunitResult test_sorted(const MunitParameter params[], fixture_t *fixture
     assert_raises(yp_sorted3(yp_tuple_empty, yp_SyntaxError, yp_False), yp_SyntaxError);
     assert_raises(yp_sorted3(yp_tuple_empty, yp_None, yp_SyntaxError), yp_SyntaxError);
 
+    return MUNIT_OK;
+}
+
+static ypObject *sorted_to_call_func_sorted(ypObject *obj)
+{
+    return yp_callN(yp_func_sorted, N(obj));
+}
+
+static ypObject *sorted3_to_call_func_sorted3(ypObject *obj, ypObject *key, ypObject *reverse)
+{
+    ypObject *str_key = yp_str_frombytesC2(-1, "key");
+    ypObject *str_reverse = yp_str_frombytesC2(-1, "reverse");
+    ypObject *args = yp_tupleN(N(obj));
+    ypObject *kwargs = yp_frozendictK(K(str_key, key, str_reverse, reverse));
+    ypObject *result = yp_call_stars(yp_func_sorted, args, kwargs);
+    yp_decrefN(N(kwargs, args, str_reverse, str_key));
+    return result;
+}
+
+static ypObject *sorted_to_call_func_sorted3(ypObject *obj)
+{
+    return sorted3_to_call_func_sorted3(obj, yp_None, yp_False);
+}
+
+static ypObject *sorted_to_call_func_sorted3_reverse(ypObject *obj)
+{
+    return sorted3_to_call_func_sorted3(obj, yp_None, yp_True);
+}
+
+static MunitResult test_func_sorted(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *str_iterable = yp_str_frombytesC2(-1, "iterable");
+    ypObject       *str_rand = rand_obj(NULL, fixture_type_str);
+
+    // Shared tests.
+    _test_sorted(type, sorted_to_call_func_sorted, /*reversed=*/FALSE);
+    _test_sorted(type, sorted_to_call_func_sorted3, /*reversed=*/FALSE);
+    _test_sorted(type, sorted_to_call_func_sorted3_reverse, /*reversed=*/TRUE);
+
+    // Invalid arguments.
+    {
+        ypObject *x = rand_obj(NULL, type);
+        ypObject *kwargs_iterable = yp_frozendictK(K(str_iterable, x));
+        ypObject *kwargs_rand = yp_frozendictK(K(str_rand, x));
+
+        assert_raises(yp_callN(yp_func_sorted, 0), yp_TypeError);
+        assert_raises(yp_callN(yp_func_sorted, N(x, yp_None)), yp_TypeError);
+        assert_raises(yp_callN(yp_func_sorted, N(x, yp_None, yp_False)), yp_TypeError);
+        assert_raises(yp_call_stars(yp_func_sorted, yp_tuple_empty, kwargs_iterable), yp_TypeError);
+        assert_raises(yp_call_stars(yp_func_sorted, yp_tuple_empty, kwargs_rand), yp_TypeError);
+
+        yp_decrefN(N(kwargs_rand, kwargs_iterable, x));
+    }
+
+    yp_decrefN(N(str_rand, str_iterable));
     return MUNIT_OK;
 }
 
@@ -1414,7 +1506,8 @@ MunitTest test_iterable_tests[] = {TEST(test_iter, test_iterable_params),
         TEST(test_filterfalse, test_iterable_params), TEST(test_max_key, test_iterable_params),
         TEST(test_min_key, test_iterable_params), TEST(test_max, test_iterable_params),
         TEST(test_min, test_iterable_params), TEST(test_reversed, test_iterable_params),
-        TEST(test_sorted, test_iterable_params), TEST(test_zipN, test_iterable_params),
+        TEST(test_func_reversed, test_iterable_params), TEST(test_sorted, test_iterable_params),
+        TEST(test_func_sorted, test_iterable_params), TEST(test_zipN, test_iterable_params),
         TEST(test_send, test_iterable_params), TEST(test_next2, test_iterable_params),
         TEST(test_throw, test_iterable_params), TEST(test_iter_keys, test_iterable_params),
         TEST(test_iter_values, test_iterable_params), TEST(test_iter_items, test_iterable_params),

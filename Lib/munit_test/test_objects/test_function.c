@@ -2530,12 +2530,68 @@ static void _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
     uniqueness_dealloc(uq);
 }
 
+static MunitResult test_iscallableC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    if (type->is_callable) {
+        ead(x, rand_obj(NULL, type), assert_true(yp_iscallableC(x)));
+    } else {
+        ead(x, rand_obj(NULL, type), assert_false(yp_iscallableC(x)));
+    }
+
+    // x is an exception.
+    assert_false(yp_iscallableC(yp_SyntaxError));
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_func_iscallable(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *str_obj = yp_str_frombytesC2(-1, "obj");
+    ypObject       *str_rand = rand_obj(NULL, fixture_type_str);
+    ypObject       *x = rand_obj(NULL, type);
+
+    if (type->is_callable) {
+        assert_obj(yp_callN(yp_func_iscallable, N(x)), is, yp_True);
+    } else {
+        assert_obj(yp_callN(yp_func_iscallable, N(x)), is, yp_False);
+    }
+
+    // Invalid arguments.
+    {
+        ypObject *kwargs_obj = yp_frozendictK(K(str_obj, x));
+        ypObject *kwargs_rand = yp_frozendictK(K(str_rand, x));
+
+        assert_raises(yp_callN(yp_func_iscallable, 0), yp_TypeError);
+        assert_raises(yp_callN(yp_func_iscallable, N(x, yp_None)), yp_TypeError);
+        assert_raises(yp_call_stars(yp_func_iscallable, yp_tuple_empty, kwargs_obj), yp_TypeError);
+        assert_raises(yp_call_stars(yp_func_iscallable, yp_tuple_empty, kwargs_rand), yp_TypeError);
+
+        yp_decrefN(N(kwargs_rand, kwargs_obj));
+    }
+
+    // Exception passthrough.
+    assert_raises(yp_callN(yp_func_iscallable, N(yp_SyntaxError)), yp_SyntaxError);
+
+    yp_decrefN(N(x, str_rand, str_obj));
+    return MUNIT_OK;
+}
+
 static MunitResult test_callN(const MunitParameter params[], fixture_t *fixture)
 {
     ypObject *str_a = yp_str_frombytesC2(-1, "a");
 
     // Shared tests.
     _test_callN(yp_callN);
+
+    // Negative n.
+    {
+        define_function2(f, capture_code);
+        ead(capt, yp_callN(f, -1), assert_captured_is(capt, f, 0, NULL));
+        yp_decref(f);
+    }
 
     // ypFunction_callNV_withself overflow calculating n_actual.
     // XXX n is INT_MAX but the actual number of parameters is one: this could be dangerous.
@@ -3015,7 +3071,10 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 }
 
 
+static MunitParameterEnum test_all_params[] = {{param_key_type, param_values_types_all}, {NULL}};
+
 MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_new_immortal, NULL),
+        TEST(test_iscallableC, test_all_params), TEST(test_func_iscallable, test_all_params),
         TEST(test_callN, NULL), TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL),
         TEST(test_copy, NULL), TEST(test_deepcopy, NULL), TEST(test_bool, NULL),
         TEST(test_hash, NULL), TEST(test_call_t_function, NULL), TEST(test_oom, NULL), {NULL}};
