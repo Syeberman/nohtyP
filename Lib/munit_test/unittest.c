@@ -1061,7 +1061,7 @@ static ypObject *new_rand_range(const rand_obj_supplier_memo_t *memo)
 
 // XXX The arguments must follow a valid range pattern, in order. Note that rand_items_range creates
 // objects that follow this pattern.
-// FIXME We should be using the index forms here that don't accept floats.
+// TODO We should be using the index forms here that don't accept floats.
 static ypObject *newN_range(int n, ...)
 {
     va_list   args;
@@ -2535,6 +2535,17 @@ static void initialize_fixture_types(void)
     initialize_fixture_type_frozenset();
     initialize_fixture_type_frozendict();
     initialize_fixture_type_function();
+}
+
+extern int are_friend_types(fixture_type_t *type, fixture_type_t *other)
+{
+    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
+}
+
+extern int types_are_comparable(fixture_type_t *type, fixture_type_t *other)
+{
+    if (type->is_numeric && other->is_numeric) return TRUE;
+    return are_friend_types(type, other);
 }
 
 // TODO We could speed this up with a frozendict or somesuch.

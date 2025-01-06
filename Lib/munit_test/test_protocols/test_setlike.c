@@ -6,21 +6,6 @@
 // TODO Do this in nohtyP.h?
 
 
-// Returns true iff type supports optimizations with other.
-// FIXME Make this common?
-static int is_friend_type(fixture_type_t *type, fixture_type_t *other)
-{
-    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
-}
-
-// Returns true iff type supports comparison operators (lt/etc) with other. This does not apply to
-// the comparison methods (isdisjoint/etc), as those support any iterable.
-// FIXME Just use is_friend_type?
-static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
-{
-    return is_friend_type(type, other);
-}
-
 // There are a number of tests where so (the type under test) is added to x (a peer type) and then
 // operated on. This function returns true if we can execute those tests between the two types.
 static int x_can_contain_so(fixture_type_t *so_type, fixture_type_t *x_type)
@@ -287,7 +272,7 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
     // Implementations may use the cached hash as a quick inequality test. Recall that only
     // immutables can cache their hash, which occurs when yp_hashC is called. Because the cached
     // hash is an internal optimization, it should only be used with friendly types.
-    if (!type->is_mutable && !x_type->is_mutable && type_is_comparable(type, x_type)) {
+    if (!type->is_mutable && !x_type->is_mutable && are_friend_types(type, x_type)) {
         yp_ssize_t i, j;
         ypObject  *so = type->newN(N(items[0], items[1]));
         ypObject  *empty = type->newN(0);
@@ -466,7 +451,7 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
 
     // lt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_lt, /*x_same=*/yp_False,
                     /*x_empty=*/yp_False, /*x_subset=*/yp_False, /*x_superset=*/yp_True,
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_True,
@@ -494,7 +479,7 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
 
     // le is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_le, /*x_same=*/yp_True,
                     /*x_empty=*/yp_False, /*x_subset=*/yp_False, /*x_superset=*/yp_True,
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_True,
@@ -522,7 +507,7 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
 
     // eq is only supported for friendly x. All others compare unequal.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_eq, /*x_same=*/yp_True,
                     /*x_empty=*/yp_False, /*x_subset=*/yp_False, /*x_superset=*/yp_False,
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
@@ -550,7 +535,7 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
 
     // ne is only supported for friendly x. All others compare unequal.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_ne, /*x_same=*/yp_False,
                     /*x_empty=*/yp_True, /*x_subset=*/yp_True, /*x_superset=*/yp_True,
                     /*x_overlap=*/yp_True, /*x_no_overlap=*/yp_True, /*so_empty=*/yp_True,
@@ -578,7 +563,7 @@ static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
 
     // ge is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_ge, /*x_same=*/yp_True,
                     /*x_empty=*/yp_True, /*x_subset=*/yp_True, /*x_superset=*/yp_False,
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
@@ -606,7 +591,7 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
 
     // gt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_gt, /*x_same=*/yp_False,
                     /*x_empty=*/yp_True, /*x_subset=*/yp_True, /*x_superset=*/yp_False,
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
@@ -741,7 +726,7 @@ static void _test_union(fixture_type_t *type, peer_type_t *peer)
                       yp_decrefN(N(so, result)));
 
     // Optimization: lazy shallow copy of a friendly immutable x when immutable so is empty.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(0);
         ypObject *x = x_type->newN(N(items[0], items[1]));
         ypObject *result = yp_union(so, x);
@@ -755,7 +740,7 @@ static void _test_union(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: lazy shallow copy of an immutable so when friendly x is empty.
     // TODO This could apply for any iterable x that doesn't yield a value.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_union(so, x);
@@ -769,7 +754,7 @@ static void _test_union(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: empty immortal when immutable so is empty and friendly x is empty.
     // TODO This could apply for any iterable x that doesn't yield a value.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(0);
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_union(so, x);
@@ -929,7 +914,7 @@ static void _test_intersection(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: empty immortal when immutable so is empty.
     // TODO This could apply for any iterable x.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(0);
         ypObject *x = x_type->newN(N(items[0], items[1]));
         ypObject *result = yp_intersection(so, x);
@@ -943,7 +928,7 @@ static void _test_intersection(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: empty immortal when so is immutable and friendly x is empty.
     // TODO This could apply for any iterable x that doesn't yield a value.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_intersection(so, x);
@@ -957,7 +942,7 @@ static void _test_intersection(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: empty immortal when immutable so is empty and friendly x is empty.
     // TODO This could apply for any iterable x that doesn't yield a value.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(0);
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_intersection(so, x);
@@ -1117,7 +1102,7 @@ static void _test_difference(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: empty immortal when immutable so is empty.
     // TODO This could apply for any iterable x.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(0);
         ypObject *x = x_type->newN(N(items[0], items[1]));
         ypObject *result = yp_difference(so, x);
@@ -1131,7 +1116,7 @@ static void _test_difference(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: lazy shallow copy of an immutable so when friendly x is empty.
     // TODO This could apply for any iterable x that doesn't yield a value.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_difference(so, x);
@@ -1145,7 +1130,7 @@ static void _test_difference(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: empty immortal when immutable so is empty and friendly x is empty.
     // TODO This could apply for any iterable x that doesn't yield a value.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(0);
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_difference(so, x);
@@ -1316,7 +1301,7 @@ static void _test_symmetric_difference(fixture_type_t *type, peer_type_t *peer)
                       assert_setlike(result, items[0], items[2]), yp_decrefN(N(so, result)));
 
     // Optimization: lazy shallow copy of a friendly immutable x when immutable so is empty.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(0);
         ypObject *x = x_type->newN(N(items[0], items[1]));
         ypObject *result = yp_symmetric_difference(so, x);
@@ -1330,7 +1315,7 @@ static void _test_symmetric_difference(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: lazy shallow copy of an immutable so when friendly x is empty.
     // TODO This could apply for any iterable x that doesn't yield a value.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_symmetric_difference(so, x);
@@ -1344,7 +1329,7 @@ static void _test_symmetric_difference(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: empty immortal when immutable so is empty and friendly x is empty.
     // TODO This could apply for any iterable x that doesn't yield a value.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *so = type->newN(0);
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_symmetric_difference(so, x);

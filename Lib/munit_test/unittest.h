@@ -81,7 +81,13 @@ extern "C" {
     19,18,17,16,15,14,13,12,11,10, \
      9, 8, 7, 6, 5, 4, 3, 2, 1, 0
 
-// FIXME Generate these using a script to ensure correctness.
+/*
+import string
+for i in range(1, 35):
+    args = ", ".join(string.ascii_letters[:i])
+    body = ", ".join("#" + l for l in string.ascii_letters[:i])
+    print(f"#define _STRINGIFY{i}({args}) {body}")
+*/
 #define _STRINGIFY1(a) #a
 #define _STRINGIFY2(a, b) #a, #b
 #define _STRINGIFY3(a, b, c) #a, #b, #c
@@ -117,7 +123,11 @@ extern "C" {
 #define _STRINGIFY33(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F, G) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F, #G
 #define _STRINGIFY34(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F, G, H) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F, #G, #H
 
-// FIXME Generate these using a script to ensure correctness.
+/*
+for i in range(1, 35):
+    body = ", ".join("x" for _ in range(i))
+    print(f"#define _COMMA_REPEAT{i}(x) {body}")
+*/
 #define _COMMA_REPEAT1(x) x
 #define _COMMA_REPEAT2(x) x, x
 #define _COMMA_REPEAT3(x) x, x, x
@@ -151,6 +161,7 @@ extern "C" {
 #define _COMMA_REPEAT31(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 #define _COMMA_REPEAT32(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 #define _COMMA_REPEAT33(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT34(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 // clang-format on
 
 // Variadic macro tricks.
@@ -202,9 +213,6 @@ extern "C" {
     }
 
 
-// FIXME A suite of tests to ensure these assertions are working. They can be
-// MUNIT_TEST_OPTION_TODO, which will fail if they pass.
-
 // A different take on munit_assert_type_full that allows for formatting in the strings for a and b.
 // a and b may be evaluated multiple times (assign to a variable first).
 #define _assert_typeC(a, op, b, val_pri, a_fmt, b_fmt, ...)                                 \
@@ -230,7 +238,7 @@ extern "C" {
 #define assert_ssizeC(a, op, b) munit_assert_type(yp_ssize_t, PRIssize, a, op, b)
 #define assert_hashC(a, op, b) munit_assert_type(yp_hash_t, PRIssize, a, op, b)
 
-// FIXME A better error message to list the exception name.
+// TODO A better error message to list the exception name.
 #define _assert_not_exception(obj, obj_fmt, ...)                                          \
     do {                                                                                  \
         if (yp_isexceptionC(obj)) {                                                       \
@@ -838,6 +846,21 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
     } while (0)
 
 
+// Declares a variable name of type ypObject * and initializes it with a new reference to a function
+// object. The parameters argument must be surrounded by parentheses.
+// XXX Older compilers reject an empty parameters argument; use define_function2 instead.
+#define define_function(name, code, parameters)                                                     \
+    yp_parameter_decl_t _##name##_parameters[] = {UNPACK parameters};                               \
+    yp_function_decl_t  _##name##_declaration = {                                                   \
+            (code), 0, yp_lengthof_array(_##name##_parameters), _##name##_parameters, NULL, NULL}; \
+    ypObject *name = yp_functionC(&_##name##_declaration)
+
+// Equivalent to define_function(name, code, ()).
+#define define_function2(name, code)                                             \
+    yp_function_decl_t _##name##_declaration = {(code), 0, 0, NULL, NULL, NULL}; \
+    ypObject          *name = yp_functionC(&_##name##_declaration)
+
+
 // Pretty-prints the object to f, followed by a newline.
 extern void pprint(FILE *f, ypObject *obj);
 
@@ -1002,6 +1025,14 @@ extern char *param_values_types_not_callable[];
 extern char *param_values_types_immutable_not_str[];
 extern char *param_values_types_immutable_paired[];
 
+
+// Returns true iff type supports optimizations with other. Generally, types only support
+// optimizations with their pairs.
+extern int are_friend_types(fixture_type_t *type, fixture_type_t *other);
+
+// Returns true iff type supports ordered comparisons (lt/le/ge/gt) with other.
+extern int types_are_comparable(fixture_type_t *type, fixture_type_t *other);
+
 // Returns the test fixture type that corresponds with the type of the object. object cannot be
 // invalidated or an exception.
 // TODO Support invalidated and exception types?
@@ -1103,7 +1134,7 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 yp_ssize_t yp_lenC_not_raises(ypObject *container);
 
 // yp_asintC, asserting an exception is not raised.
-// FIXME Most tests should probably be using the "index" version of this, without rounding.
+// TODO Most tests should probably be using the "index" version of this, without rounding.
 yp_int_t yp_asintC_not_raises(ypObject *number);
 
 

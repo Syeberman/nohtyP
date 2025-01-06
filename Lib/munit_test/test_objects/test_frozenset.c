@@ -17,13 +17,6 @@ typedef union {
     ypSetMiState      _##name##_struct = {{(keysleft), (index)}}; \
     const yp_uint64_t name = (_##name##_struct.as_int)
 
-// Returns true iff type supports optimizations with other.
-// FIXME Make this common?
-static int is_friend_type(fixture_type_t *type, fixture_type_t *other)
-{
-    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
-}
-
 
 static void _test_newN(
         fixture_type_t *type, ypObject *(*any_newN)(int, ...), int test_exception_passthrough)
@@ -150,7 +143,7 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
     }
 
     // Optimization: lazy shallow copy of a friendly immutable x to immutable so.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *x = x_type->newN(N(items[0], items[1]));
         ypObject *so = any_new(x);
         if (type->is_mutable || x_type->is_mutable) {

@@ -3,8 +3,6 @@
 // test_iterable validates the behaviour for iterators of iterables. This file validates all other
 // iterator-related behaviour, in particular generators and yp_iter2.
 
-// FIXME More tests here?
-
 // TODO Ensure yp_max_keyN/etc properly handles exception passthrough, even in cases where
 // one of the arguments would be ignored.
 
@@ -35,29 +33,26 @@ static ypObject *count_down_iter_func(ypObject *g, ypObject *value)
     return result;
 }
 
+// Used as the func for a generator. Unconditionally returns a random object.
 static ypObject *rand_obj_any_iter_func(ypObject *g, ypObject *value) { return rand_obj_any(NULL); }
 
+// Used as the func for a generator. Unconditionally raises StopIteration.
+static ypObject *StopIteration_iter_func(ypObject *g, ypObject *value) { return yp_StopIteration; }
+
+// Used as the func for a generator. Unconditionally raises GeneratorExit.
+static ypObject *GeneratorExit_iter_func(ypObject *g, ypObject *value) { return yp_GeneratorExit; }
+
+// Used as the func for a generator. Unconditionally raises SyntaxError.
 static ypObject *SyntaxError_iter_func(ypObject *g, ypObject *value) { return yp_SyntaxError; }
 
 // Used as the code for a function. Unconditionally returns None.
 static ypObject *None_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray) { return yp_None; }
 
-// Used as the code for a function. Unconditionally throws SyntaxError.
+// Used as the code for a function. Unconditionally raises SyntaxError.
 static ypObject *SyntaxError_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     return yp_SyntaxError;
 }
-
-yp_IMMORTAL_STR_LATIN_1_static(s_star, "*");
-yp_IMMORTAL_STR_LATIN_1_static(s_star_args, "*args");
-yp_IMMORTAL_STR_LATIN_1_static(s_star_star_kwargs, "**kwargs");
-yp_IMMORTAL_STR_LATIN_1_static(s_keyword, "keyword");
-
-yp_IMMORTAL_FUNCTION_static(
-        func_required_keyword, None_code, ({yp_CONST_REF(s_star)}, {yp_CONST_REF(s_keyword)}));
-
-yp_IMMORTAL_FUNCTION_static(func_SyntaxError, SyntaxError_code,
-        ({yp_CONST_REF(s_star_args)}, {yp_CONST_REF(s_star_star_kwargs)}));
 
 
 static MunitResult test_generatorC(const MunitParameter params[], fixture_t *fixture)
@@ -148,7 +143,7 @@ static MunitResult test_generatorC(const MunitParameter params[], fixture_t *fix
 
         assert_not_raises(yp_iter_stateCX(iter, &iter_state_size, (void **)&iter_state));
         assert_ssizeC(iter_state_size, ==, 0);
-        assert_ptr(iter_state, !=, &state);  // It must be a copy. FIXME
+        assert_ptr(iter_state, !=, &state);
 
         yp_decrefN(N(iter));
     }
@@ -233,6 +228,10 @@ static void _test_new2(ypObject *(*any_new2)(ypObject *, ypObject *))
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_callable = rand_obj_any_not_callable(uq);
+    ypObject     *s_star = yp_str_frombytesC2(-1, "*");
+    ypObject     *s_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject     *s_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    ypObject     *s_keyword = yp_str_frombytesC2(-1, "keyword");
     ypObject     *items[2];
     obj_array_fill(items, uq, fixture_type_iter->rand_items);
 
@@ -261,10 +260,20 @@ static void _test_new2(ypObject *(*any_new2)(ypObject *, ypObject *))
     // Callable requires arguments.
     ead(iter, any_new2(yp_func_chr, yp_None), assert_raises(yp_next(iter), yp_TypeError));
     ead(iter, any_new2(yp_t_type, yp_None), assert_raises(yp_next(iter), yp_TypeError));
-    ead(iter, any_new2(func_required_keyword, yp_None), assert_raises(yp_next(iter), yp_TypeError));
+    {
+        define_function(func_required_keyword, None_code, ({s_star}, {s_keyword}));
+        ead(iter, any_new2(func_required_keyword, yp_None),
+                assert_raises(yp_next(iter), yp_TypeError));
+        yp_decrefN(N(func_required_keyword));
+    }
 
     // Callable raises an exception.
-    ead(iter, any_new2(func_SyntaxError, yp_None), assert_raises(yp_next(iter), yp_SyntaxError));
+    {
+        define_function(func_SyntaxError, SyntaxError_code, ({s_star_args}, {s_star_star_kwargs}));
+        ead(iter, any_new2(func_SyntaxError, yp_None),
+                assert_raises(yp_next(iter), yp_SyntaxError));
+        yp_decrefN(N(func_SyntaxError));
+    }
 
     // x is not callable.
     assert_raises(any_new2(not_callable, yp_None), yp_TypeError);
@@ -274,7 +283,7 @@ static void _test_new2(ypObject *(*any_new2)(ypObject *, ypObject *))
     assert_isexception(any_new2(yp_t_tuple, yp_SyntaxError), yp_SyntaxError);
 
     obj_array_decref(items);
-    yp_decrefN(N(not_callable));
+    yp_decrefN(N(s_keyword, s_star_star_kwargs, s_star_args, s_star, not_callable));
     uniqueness_dealloc(uq);
 }
 
@@ -355,9 +364,8 @@ static MunitResult test_bool(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-// FIXME yp_send, yp_next, yp_next2, yp_throw, yp_length_hintC. And also in test_iterable?
+// FIXME yp_send, yp_next, yp_next2, yp_throw, yp_length_hintC.
 
-// FIXME Should this be part of test_iterable??
 static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
 {
     uniqueness_t *uq = uniqueness_new();
@@ -392,12 +400,31 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(iter));
     }
 
-    // FIXME More tests?
+    // yp_GeneratorExit raised on close.
+    {
+        ypObject *iter;
+        yp_generator_decl_t decl = {GeneratorExit_iter_func, 3};
+        assert_not_raises(iter = yp_generatorC(&decl));
+        assert_not_raises_exc(yp_close(iter, &exc));
+        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_raises(yp_next(iter), yp_StopIteration);
+        yp_decrefN(N(iter));
+    }
+
+    // yp_StopIteration raised on close.
+    {
+        ypObject *iter;
+        yp_generator_decl_t decl = {StopIteration_iter_func, 3};
+        assert_not_raises(iter = yp_generatorC(&decl));
+        assert_not_raises_exc(yp_close(iter, &exc));
+        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_raises(yp_next(iter), yp_StopIteration);
+        yp_decrefN(N(iter));
+    }
 
     // Unexpectedly-yielded value on close.
     {
         ypObject *iter;
-        // rand_obj_any_iter_func returns new objects, even on close.
         yp_generator_decl_t decl = {rand_obj_any_iter_func, 3};
         assert_not_raises(iter = yp_generatorC(&decl));
         assert_raises_exc(yp_close(iter, &exc), yp_RuntimeError);
@@ -409,7 +436,6 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
     // Unexpected exception on close.
     {
         ypObject *iter;
-        // SyntaxError_iter_func always raises yp_SyntaxError, even on close.
         yp_generator_decl_t decl = {SyntaxError_iter_func, 3};
         assert_not_raises(iter = yp_generatorC(&decl));
         assert_raises_exc(yp_close(iter, &exc), yp_SyntaxError);
@@ -423,6 +449,7 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
+// FIXME Review use of immortals (yp_tuple_empty, yp_tupleN(0)): they hide ref leaks
 static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 {
     uniqueness_t *uq = uniqueness_new();

@@ -2,14 +2,6 @@
 #include "munit_test/unittest.h"
 
 
-// Returns true iff type supports optimizations with other.
-// FIXME Make this common?
-static int is_friend_type(fixture_type_t *type, fixture_type_t *other)
-{
-    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
-}
-
-
 static void _test_newN(
         fixture_type_t *type, ypObject *(*any_newN)(int, ...), int test_exception_passthrough)
 {
@@ -104,7 +96,7 @@ static void _test_new(fixture_type_t *type, fixture_type_t *x_type,
     }
 
     // Optimization: lazy shallow copy of a friendly immutable x to immutable sq.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *x = x_type->newN(N(items[0], items[1]));
         ypObject *sq = any_new(x);
         if (type->is_mutable || x_type->is_mutable) {
@@ -508,7 +500,7 @@ static MunitResult test_repeatCN(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
-// FIXME Ensure yp_sort4 properly handles exception passthrough, even in cases where one of the
+// TODO Ensure yp_sort4 properly handles exception passthrough, even in cases where one of the
 // arguments would be ignored (e.g. empty list).
 
 static MunitResult test_itemarrayCX(const MunitParameter params[], fixture_t *fixture)

@@ -2,16 +2,9 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME Instead of always using tuples for key/value pairs, make tests for other 2-item
+// TODO Instead of always using tuples for key/value pairs, make tests for other 2-item
 // sequences. This would be for both new/etc (this file) and for update/etc (test_mapping). Then
 // also test for too-short and too-long pairs.
-
-// Returns true iff type supports optimizations with other.
-// FIXME Make this common?
-static int is_friend_type(fixture_type_t *type, fixture_type_t *other)
-{
-    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
-}
 
 // A copy of ypDictMiState from nohtyP.c, as a union with yp_uint64_t to maintain strict aliasing.
 typedef union {
@@ -179,7 +172,7 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
     }
 
     // Optimization: lazy shallow copy of a friendly immutable x to immutable mp.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *x = x_type->newK(K(keys[0], values[0], keys[1], values[1]));
         ypObject *mp = any_new(x);
         if (type->is_mutable || x_type->is_mutable) {

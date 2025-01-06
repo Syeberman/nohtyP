@@ -2,13 +2,6 @@
 #include "munit_test/unittest.h"
 
 
-// Returns true iff type supports comparison operators (eq/etc) with other.
-static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
-{
-    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
-}
-
-
 static MunitResult test_peers(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -240,7 +233,7 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
     // immutables can cache their hash, which occurs when yp_hashC is called. Also recall that all
     // contained objects must be hashable, so we need a separate set of hashable values. Because the
     // cached hash is an internal optimization, it should only be used with friendly types.
-    if (!type->is_mutable && !x_type->is_mutable && type_is_comparable(type, x_type)) {
+    if (!type->is_mutable && !x_type->is_mutable && are_friend_types(type, x_type)) {
         yp_ssize_t i, j;
         ypObject  *h_values[4];  // hashable values
         ypObject  *mp;
@@ -310,7 +303,7 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
 
     // eq is only supported for friendly x. All others compare unequal.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_eq, /*x_same=*/yp_True,
                     /*x_different=*/yp_False);
         } else {
@@ -336,7 +329,7 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
 
     // ne is only supported for friendly x. All others compare unequal.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_ne, /*x_same=*/yp_False,
                     /*x_different=*/yp_True);
         } else {

@@ -150,21 +150,6 @@ static void parameter_decl_array_decref2(yp_ssize_t n, yp_parameter_decl_t *arra
     parameter_decl_array_decref2(yp_lengthof_array(array), (array))
 
 
-// Declares a variable name of type ypObject * and initializes it with a new reference to a function
-// object. The parameters argument must be surrounded by parentheses.
-// XXX Older compilers reject an empty parameters argument; use define_function2 instead.
-#define define_function(name, code, parameters)                                                     \
-    yp_parameter_decl_t _##name##_parameters[] = {UNPACK parameters};                               \
-    yp_function_decl_t  _##name##_declaration = {                                                   \
-            (code), 0, yp_lengthof_array(_##name##_parameters), _##name##_parameters, NULL, NULL}; \
-    ypObject *name = yp_functionC(&_##name##_declaration)
-
-// Equivalent to define_function(name, code, ()).
-#define define_function2(name, code)                                             \
-    yp_function_decl_t _##name##_declaration = {(code), 0, 0, NULL, NULL, NULL}; \
-    ypObject          *name = yp_functionC(&_##name##_declaration)
-
-
 static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 {
     ypObject *int_0 = yp_intC(0);

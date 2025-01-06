@@ -2,23 +2,6 @@
 #include "munit_test/unittest.h"
 
 
-// Returns true iff type supports optimizations with other.
-// FIXME Make this common?
-// FIXME Come up with some other terminology than "friend"?
-// FIXME Standardize on "other" in this case, not x_type?
-static int is_friend_type(fixture_type_t *type, fixture_type_t *other)
-{
-    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
-}
-
-// Returns true iff type supports comparison operators (lt/etc) with other.
-// FIXME Just use is_friend_type?
-static int type_is_comparable(fixture_type_t *type, fixture_type_t *other)
-{
-    return is_friend_type(type, other);
-}
-
-
 typedef struct _slice_args_t {
     yp_ssize_t start;
     yp_ssize_t stop;
@@ -243,7 +226,7 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
     // Implementations may use the cached hash as a quick inequality test. Recall that only
     // immutables can cache their hash, which occurs when yp_hashC is called. Because the cached
     // hash is an internal optimization, it should only be used with friendly types.
-    if (!type->is_mutable && !x_type->is_mutable && type_is_comparable(type, x_type)) {
+    if (!type->is_mutable && !x_type->is_mutable && are_friend_types(type, x_type)) {
         yp_ssize_t i, j;
         ypObject  *h_items[yp_lengthof_array(items)];  // hashable values
         ypObject  *sq;
@@ -319,7 +302,7 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
 
     // lt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_lt, /*x_lt=*/yp_True, /*x_eq=*/yp_False,
                     /*x_gt=*/yp_False, /*cmp_fails=*/yp_TypeError);
         } else {
@@ -343,7 +326,7 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
 
     // le is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_le, /*x_lt=*/yp_True, /*x_eq=*/yp_True,
                     /*x_gt=*/yp_False, /*cmp_fails=*/yp_TypeError);
         } else {
@@ -367,7 +350,7 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
 
     // eq is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_eq, /*x_lt=*/yp_False, /*x_eq=*/yp_True,
                     /*x_gt=*/yp_False, /*cmp_fails=*/yp_False);
         } else {
@@ -391,7 +374,7 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
 
     // ne is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_ne, /*x_lt=*/yp_True, /*x_eq=*/yp_False,
                     /*x_gt=*/yp_True, /*cmp_fails=*/yp_True);
         } else {
@@ -415,7 +398,7 @@ static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
 
     // ge is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_ge, /*x_lt=*/yp_False, /*x_eq=*/yp_True,
                     /*x_gt=*/yp_True, /*cmp_fails=*/yp_TypeError);
         } else {
@@ -439,7 +422,7 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
 
     // gt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (type_is_comparable(type, peer->type)) {
+        if (types_are_comparable(type, peer->type)) {
             _test_comparisons(type, peer, yp_gt, /*x_lt=*/yp_False, /*x_eq=*/yp_False,
                     /*x_gt=*/yp_True, /*cmp_fails=*/yp_TypeError);
         } else {
@@ -548,7 +531,7 @@ static void _test_concat(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: lazy shallow copy of an immutable sq when friendly x is empty.
     // TODO When this is rewritten like _ypSet_fromiterable, we can enable this for every x.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_concat(sq, x);
@@ -561,7 +544,7 @@ static void _test_concat(fixture_type_t *type, peer_type_t *peer)
     }
 
     // Optimization: lazy shallow copy of a friendly immutable x when immutable sq is empty.
-    if (is_friend_type(type, x_type)) {
+    if (are_friend_types(type, x_type)) {
         ypObject *sq = type->newN(0);
         ypObject *x = x_type->newN(N(items[0], items[1]));
         ypObject *result = yp_concat(sq, x);
@@ -575,7 +558,7 @@ static void _test_concat(fixture_type_t *type, peer_type_t *peer)
 
     // Optimization: empty immortal when immutable sq is empty and friendly x is empty.
     // TODO When this is rewritten like _ypSet_fromiterable, we can enable this for every x.
-    if (type->falsy != NULL && is_friend_type(type, x_type)) {
+    if (type->falsy != NULL && are_friend_types(type, x_type)) {
         ypObject *sq = type->newN(0);
         ypObject *x = x_type->newN(0);
         ypObject *result = yp_concat(sq, x);

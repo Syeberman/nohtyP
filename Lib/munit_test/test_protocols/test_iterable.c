@@ -884,6 +884,86 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
+// x_three contains three items, and any_iter creates the iterator.
+static void _test_close(fixture_type_t *type, ypObject *x_three, ypObject *(*any_iter)(ypObject *))
+{
+    // Basic close.
+    {
+        ypObject *iter = any_iter(x_three);
+        assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 3);
+        ead(first, yp_next(iter), assert_not_exception(first));
+        assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 2);
+        assert_not_raises_exc(yp_close(iter, &exc));
+        assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_raises(yp_next(iter), yp_StopIteration);
+        yp_decrefN(N(iter));
+    }
+
+    // close twice.
+    {
+        ypObject *iter = any_iter(x_three);
+        assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 3);
+        assert_not_raises_exc(yp_close(iter, &exc));
+        assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_not_raises_exc(yp_close(iter, &exc));
+        assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_raises(yp_next(iter), yp_StopIteration);
+        yp_decrefN(N(iter));
+    }
+
+    // x is empty.
+    {
+        ypObject *x = type->newN(0);
+        ypObject *iter = any_iter(x);
+        assert_not_raises_exc(yp_close(iter, &exc));
+        assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_raises(yp_next(iter), yp_StopIteration);
+        yp_decrefN(N(iter, x));
+    }
+}
+
+static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject       *items[3];
+    obj_array_fill(items, uq, type->rand_items);
+
+    // yp_close with yp_iter. x is reused so can't be an iter.
+    if (type != fixture_type_iter) {
+        ypObject *x = type->newN(N(items[0], items[1], items[2]));
+        _test_close(type, x, yp_iter);
+        yp_decrefN(N(x));
+    }
+
+    // yp_close with yp_iter_keys, yp_iter_values, and yp_iter_items.
+    if (type->is_mapping) {
+        ypObject *values[3];
+        ypObject *x;
+        obj_array_fill(values, uq, type->rand_values);
+        x = type->newK(K(items[0], values[0], items[1], values[1], items[2], values[2]));
+
+        _test_close(type, x, yp_iter_keys);
+        _test_close(type, x, yp_iter_values);
+        _test_close(type, x, yp_iter_items);
+
+        yp_decrefN(N(x));
+        obj_array_decref(values);
+    }
+
+    // x is not an iterable.
+    assert_raises_exc(yp_close(not_iterable, &exc), yp_MethodError);
+
+    // Exception passthrough.
+    assert_raises_exc(yp_close(yp_SyntaxError, &exc), yp_SyntaxError);
+
+    obj_array_decref(items);
+    yp_decrefN(N(not_iterable));
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
 static MunitResult test_iter_keys(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -1509,10 +1589,10 @@ MunitTest test_iterable_tests[] = {TEST(test_iter, test_iterable_params),
         TEST(test_func_reversed, test_iterable_params), TEST(test_sorted, test_iterable_params),
         TEST(test_func_sorted, test_iterable_params), TEST(test_zipN, test_iterable_params),
         TEST(test_send, test_iterable_params), TEST(test_next2, test_iterable_params),
-        TEST(test_throw, test_iterable_params), TEST(test_iter_keys, test_iterable_params),
-        TEST(test_iter_values, test_iterable_params), TEST(test_iter_items, test_iterable_params),
-        TEST(test_call_type, test_iterable_params), TEST(test_miniiter, test_iterable_params),
-        TEST(test_miniiter_keys, test_iterable_params),
+        TEST(test_throw, test_iterable_params), TEST(test_close, test_iterable_params),
+        TEST(test_iter_keys, test_iterable_params), TEST(test_iter_values, test_iterable_params),
+        TEST(test_iter_items, test_iterable_params), TEST(test_call_type, test_iterable_params),
+        TEST(test_miniiter, test_iterable_params), TEST(test_miniiter_keys, test_iterable_params),
         TEST(test_miniiter_values, test_iterable_params),
         TEST(test_miniiter_items, test_iterable_params), {NULL}};
 
