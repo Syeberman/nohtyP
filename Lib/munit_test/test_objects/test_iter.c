@@ -9,41 +9,95 @@
 
 #define ypIter_LENHINT_MAX 0x7FFFFFFF  // From nohtyP.c.
 
+
 typedef struct _count_down_state_t {
-    yp_int_t  count;
-    ypObject *object;
-    void     *pointer;
+    yp_int_t count;
 } count_down_state_t;
 
-static yp_state_decl_t count_down_state_decl = {
-        sizeof(count_down_state_t), 1, {yp_offsetof(count_down_state_t, object)}};
+static yp_state_decl_t count_down_state_decl = {sizeof(count_down_state_t)};
 
+// Used as the func for a generator. Yields ints from count to zero.
 static ypObject *count_down_iter_func(ypObject *g, ypObject *value)
 {
     count_down_state_t *state;
     yp_ssize_t          size;
     ypObject           *result;
-    if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
 
+    if (yp_isexceptionC(value)) return value;
     if (state->count < 0) return yp_StopIteration;
+
     assert_not_raises(result = yp_intC(state->count));
     state->count--;
     return result;
 }
 
+typedef struct _sample_types_state_t {
+    yp_int_t  integer;
+    ypObject *object;
+    void     *pointer;
+} sample_types_state_t;
+
+static yp_state_decl_t sample_types_state_decl = {
+        sizeof(sample_types_state_t), 1, {yp_offsetof(sample_types_state_t, object)}};
+
+typedef struct _scripted_generator_state_items_t {
+    ypObject *to_yield;
+    ypObject *sent;
+} scripted_generator_state_items_t;
+
+typedef struct _scripted_generator_state_t {
+    yp_ssize_t                       n;
+    scripted_generator_state_items_t items[4];
+    yp_ssize_t                       i;
+} scripted_generator_state_t;
+
+static yp_state_decl_t scripted_generator_state_decl = {sizeof(scripted_generator_state_t), 6,
+        {
+                yp_offsetof(scripted_generator_state_t, items[0].to_yield),
+                yp_offsetof(scripted_generator_state_t, items[0].sent),
+                yp_offsetof(scripted_generator_state_t, items[1].to_yield),
+                yp_offsetof(scripted_generator_state_t, items[1].sent),
+                yp_offsetof(scripted_generator_state_t, items[2].to_yield),
+                yp_offsetof(scripted_generator_state_t, items[2].sent),
+                yp_offsetof(scripted_generator_state_t, items[3].to_yield),
+                yp_offsetof(scripted_generator_state_t, items[3].sent),
+        }};
+
+// Used as the func for a generator. Each time it's invoked, it asserts that value is
+// state->items[state->i].sent, and it returns state->items[state->i].to_yield.
+static ypObject *scripted_generator_iter_func(ypObject *g, ypObject *value)
+{
+    yp_ssize_t lengthof_items = yp_lengthof_array_member(scripted_generator_state_t, items);
+    scripted_generator_state_items_t *items;
+    scripted_generator_state_t       *state;
+    yp_ssize_t                        size;
+    assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
+    assert_ssizeC(size, ==, yp_sizeof(*state));
+
+    assert_ssizeC(state->n, <=, lengthof_items);
+    assert_ssizeC(state->i, >=, 0);
+    assert_ssizeC(state->i, <, state->n);
+    items = &(state->items[state->i]);
+    state->i++;
+
+    assert_obj(value, is, items->sent);
+    return yp_incref(items->to_yield);
+}
+
+#define assert_script_completed(g)                                                     \
+    do {                                                                               \
+        scripted_generator_state_t *_ypMT_script_state;                                \
+        yp_ssize_t                  _ypMT_script_size;                                 \
+        assert_not_exception(                                                          \
+                yp_iter_stateCX(g, &_ypMT_script_size, (void **)&_ypMT_script_state)); \
+        assert_ssizeC(_ypMT_script_size, ==, yp_sizeof(*_ypMT_script_state));          \
+        assert_ssizeC(_ypMT_script_state->i, ==, _ypMT_script_state->n);               \
+    } while (0)
+
 // Used as the func for a generator. Unconditionally returns a random object.
 static ypObject *rand_obj_any_iter_func(ypObject *g, ypObject *value) { return rand_obj_any(NULL); }
-
-// Used as the func for a generator. Unconditionally raises StopIteration.
-static ypObject *StopIteration_iter_func(ypObject *g, ypObject *value) { return yp_StopIteration; }
-
-// Used as the func for a generator. Unconditionally raises GeneratorExit.
-static ypObject *GeneratorExit_iter_func(ypObject *g, ypObject *value) { return yp_GeneratorExit; }
-
-// Used as the func for a generator. Unconditionally raises SyntaxError.
-static ypObject *SyntaxError_iter_func(ypObject *g, ypObject *value) { return yp_SyntaxError; }
 
 // Used as the code for a function. Unconditionally returns None.
 static ypObject *None_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray) { return yp_None; }
@@ -59,24 +113,14 @@ static MunitResult test_generatorC(const MunitParameter params[], fixture_t *fix
 {
     uniqueness_t *uq = uniqueness_new();
     void         *pointer = (void *)(yp_ssize_t)munit_rand_uint32();  // Not a valid pointer!
-    ypObject     *items[4];
-    obj_array_fill(items, uq, fixture_type_iter->rand_items);
+    ypObject     *items[] = obj_array_init(4, rand_obj_any(uq));
 
     // Basic generatorC.
     {
         ypObject           *iter;
-        count_down_state_t *iter_state;  // iter's copy of the state.
-        yp_ssize_t          iter_state_size;
-        count_down_state_t  state = {2, items[0], pointer};  // items[0] is borrowed.
+        count_down_state_t  state = {2};
         yp_generator_decl_t decl = {count_down_iter_func, 3, &state, &count_down_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
-
-        assert_not_raises(yp_iter_stateCX(iter, &iter_state_size, (void **)&iter_state));
-        assert_ssizeC(iter_state_size, ==, yp_sizeof(count_down_state_t));
-        assert_ptr(iter_state, !=, &state);  // It must be a copy.
-        assert_intC(iter_state->count, ==, 2);
-        assert_obj(iter_state->object, is, items[0]);
-        assert_ptr(iter_state->pointer, ==, pointer);
 
         assert_intC_exc(yp_length_hintC(iter, &exc), ==, 3);
         ead(item, yp_next(iter), assert_obj(item, eq, yp_i_two));
@@ -87,29 +131,44 @@ static MunitResult test_generatorC(const MunitParameter params[], fixture_t *fix
         assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
         assert_raises(yp_next(iter), yp_StopIteration);
 
-        assert_intC(iter_state->count, ==, -1);
+        yp_decrefN(N(iter));
+    }
+
+    // Basic state initialization.
+    {
+        ypObject             *iter;
+        sample_types_state_t *iter_state;  // iter's copy of the state.
+        yp_ssize_t            iter_state_size;
+        sample_types_state_t  state = {2, items[0], pointer};  // items[0] is borrowed.
+        yp_generator_decl_t   decl = {rand_obj_any_iter_func, 3, &state, &sample_types_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_not_raises(yp_iter_stateCX(iter, &iter_state_size, (void **)&iter_state));
+        assert_ssizeC(iter_state_size, ==, yp_sizeof(sample_types_state_t));
+        assert_not_null(iter_state);
+        assert_ptr(iter_state, !=, &state);  // It must be a copy.
+        assert_intC(iter_state->integer, ==, 2);
         assert_obj(iter_state->object, is, items[0]);
         assert_ptr(iter_state->pointer, ==, pointer);
 
         yp_decrefN(N(iter));
     }
 
-    // FIXME More tests?
-
     // NULL object pointers in state are initialized to yp_None.
     {
-        ypObject           *iter;
-        count_down_state_t *iter_state;  // iter's copy of the state.
-        yp_ssize_t          iter_state_size;
-        count_down_state_t  state = {2, NULL, pointer};  // object is NULL.
-        yp_generator_decl_t decl = {count_down_iter_func, 3, &state, &count_down_state_decl};
+        ypObject             *iter;
+        sample_types_state_t *iter_state;  // iter's copy of the state.
+        yp_ssize_t            iter_state_size;
+        sample_types_state_t  state = {2, NULL, pointer};  // object is NULL.
+        yp_generator_decl_t   decl = {rand_obj_any_iter_func, 3, &state, &sample_types_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
 
         assert_not_raises(yp_iter_stateCX(iter, &iter_state_size, (void **)&iter_state));
-        assert_ssizeC(iter_state_size, ==, yp_sizeof(count_down_state_t));
+        assert_ssizeC(iter_state_size, ==, yp_sizeof(sample_types_state_t));
+        assert_not_null(iter_state);
         assert_ptr(iter_state, !=, &state);  // It must be a copy.
-        assert_intC(iter_state->count, ==, 2);
-        assert_obj(iter_state->object, is, yp_None);
+        assert_intC(iter_state->integer, ==, 2);
+        assert_obj(iter_state->object, is, yp_None);  // Initialized to yp_None.
         assert_ptr(iter_state->pointer, ==, pointer);
 
         yp_decrefN(N(iter));
@@ -117,32 +176,34 @@ static MunitResult test_generatorC(const MunitParameter params[], fixture_t *fix
 
     // A NULL state initializes object pointers to yp_None, pointers to NULL, and values to zero.
     {
-        ypObject           *iter;
-        count_down_state_t *iter_state;  // iter's copy of the state.
-        yp_ssize_t          iter_state_size;
-        yp_generator_decl_t decl = {count_down_iter_func, 1, NULL, &count_down_state_decl};
+        ypObject             *iter;
+        sample_types_state_t *iter_state;  // iter's copy of the state.
+        yp_ssize_t            iter_state_size;
+        yp_generator_decl_t   decl = {rand_obj_any_iter_func, 1, NULL, &sample_types_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
 
         assert_not_raises(yp_iter_stateCX(iter, &iter_state_size, (void **)&iter_state));
-        assert_ssizeC(iter_state_size, ==, yp_sizeof(count_down_state_t));
-        assert_intC(iter_state->count, ==, 0);
-        assert_obj(iter_state->object, is, yp_None);
-        assert_null(iter_state->pointer);
+        assert_ssizeC(iter_state_size, ==, yp_sizeof(sample_types_state_t));
+        assert_not_null(iter_state);
+        assert_intC(iter_state->integer, ==, 0);      // Initialized to zero.
+        assert_obj(iter_state->object, is, yp_None);  // Initialized to yp_None.
+        assert_null(iter_state->pointer);             // Initialized to NULL.
 
         yp_decrefN(N(iter));
     }
 
     // A NULL state declaration means there is no state.
     {
-        ypObject           *iter;
-        count_down_state_t *iter_state;  // iter's copy of the state.
-        yp_ssize_t          iter_state_size;
-        count_down_state_t  state = {2, items[0], pointer};  // Ignored.
-        yp_generator_decl_t decl = {count_down_iter_func, 3, &state, NULL};
+        ypObject             *iter;
+        sample_types_state_t *iter_state;  // iter's copy of the state.
+        yp_ssize_t            iter_state_size;
+        sample_types_state_t  state = {2, items[0], pointer};  // Ignored.
+        yp_generator_decl_t   decl = {rand_obj_any_iter_func, 3, &state, NULL};
         assert_not_raises(iter = yp_generatorC(&decl));
 
         assert_not_raises(yp_iter_stateCX(iter, &iter_state_size, (void **)&iter_state));
         assert_ssizeC(iter_state_size, ==, 0);
+        assert_not_null(iter_state);
         assert_ptr(iter_state, !=, &state);
 
         yp_decrefN(N(iter));
@@ -151,7 +212,7 @@ static MunitResult test_generatorC(const MunitParameter params[], fixture_t *fix
     // Large length hints are clamped to ypIter_LENHINT_MAX.
     if (yp_SSIZE_T_MAX > ypIter_LENHINT_MAX) {
         ypObject           *iter;
-        yp_generator_decl_t decl = {count_down_iter_func, yp_SSIZE_T_MAX, NULL, NULL};
+        yp_generator_decl_t decl = {rand_obj_any_iter_func, yp_SSIZE_T_MAX, NULL, NULL};
         assert_not_raises(iter = yp_generatorC(&decl));
 
         assert_intC_exc(yp_length_hintC(iter, &exc), ==, ypIter_LENHINT_MAX);
@@ -162,49 +223,49 @@ static MunitResult test_generatorC(const MunitParameter params[], fixture_t *fix
     // state_decl.size cannot be negative.
     {
         static yp_state_decl_t state_decl = {-1};
-        yp_generator_decl_t    decl = {count_down_iter_func, 1, NULL, &state_decl};
+        yp_generator_decl_t    decl = {rand_obj_any_iter_func, 1, NULL, &state_decl};
         assert_raises(yp_generatorC(&decl), yp_ValueError);
     }
 
     // Excessively-large state_decl.size.
     {
         static yp_state_decl_t state_decl = {yp_SSIZE_T_MAX};
-        yp_generator_decl_t    decl = {count_down_iter_func, 1, NULL, &state_decl};
+        yp_generator_decl_t    decl = {rand_obj_any_iter_func, 1, NULL, &state_decl};
         assert_raises(yp_generatorC(&decl), yp_MemorySizeOverflowError);
     }
 
     // state_decl.offsets_len == -1 (array of objects) is not yet implemented.
     {
         static yp_state_decl_t state_decl = {sizeof(ypObject *), -1};
-        yp_generator_decl_t    decl = {count_down_iter_func, 1, NULL, &state_decl};
+        yp_generator_decl_t    decl = {rand_obj_any_iter_func, 1, NULL, &state_decl};
         assert_raises(yp_generatorC(&decl), yp_NotImplementedError);
     }
 
     // state_decl.offsets_len must be >= 0 or -1.
     {
         static yp_state_decl_t state_decl = {sizeof(ypObject *), -2};
-        yp_generator_decl_t    decl = {count_down_iter_func, 1, NULL, &state_decl};
+        yp_generator_decl_t    decl = {rand_obj_any_iter_func, 1, NULL, &state_decl};
         assert_raises(yp_generatorC(&decl), yp_ValueError);
     }
 
     // state_decl offsets cannot be negative.
     {
         static yp_state_decl_t state_decl = {yp_sizeof(ypObject *), 1, {-1}};
-        yp_generator_decl_t    decl = {count_down_iter_func, 1, NULL, &state_decl};
+        yp_generator_decl_t    decl = {rand_obj_any_iter_func, 1, NULL, &state_decl};
         assert_raises(yp_generatorC(&decl), yp_ValueError);
     }
 
     // state_decl objects must be fully contained in state.
     {
         static yp_state_decl_t state_decl = {yp_sizeof(ypObject *) - 1, 1, {0}};
-        yp_generator_decl_t    decl = {count_down_iter_func, 1, NULL, &state_decl};
+        yp_generator_decl_t    decl = {rand_obj_any_iter_func, 1, NULL, &state_decl};
         assert_raises(yp_generatorC(&decl), yp_ValueError);
     }
 
     // state_decl objects must be aligned.
     {
         static yp_state_decl_t state_decl = {1 + yp_sizeof(ypObject *), 1, {1}};
-        yp_generator_decl_t    decl = {count_down_iter_func, 1, NULL, &state_decl};
+        yp_generator_decl_t    decl = {rand_obj_any_iter_func, 1, NULL, &state_decl};
         assert_raises(yp_generatorC(&decl), yp_SystemLimitationError);
     }
 
@@ -212,7 +273,7 @@ static MunitResult test_generatorC(const MunitParameter params[], fixture_t *fix
     {
         static yp_state_decl_t state_decl = {
                 33 * yp_sizeof(ypObject *), 1, {32 * yp_sizeof(ypObject *)}};
-        yp_generator_decl_t decl = {count_down_iter_func, 1, NULL, &state_decl};
+        yp_generator_decl_t decl = {rand_obj_any_iter_func, 1, NULL, &state_decl};
         assert_raises(yp_generatorC(&decl), yp_SystemLimitationError);
     }
 
@@ -223,7 +284,6 @@ static MunitResult test_generatorC(const MunitParameter params[], fixture_t *fix
 
 // XXX test_iter, aka test_new, is tested in test_iterable.
 
-// FIXME Improve these tests once function supports state (then we can track per-function state).
 static void _test_new2(ypObject *(*any_new2)(ypObject *, ypObject *))
 {
     uniqueness_t *uq = uniqueness_new();
@@ -232,16 +292,15 @@ static void _test_new2(ypObject *(*any_new2)(ypObject *, ypObject *))
     ypObject     *s_star_args = yp_str_frombytesC2(-1, "*args");
     ypObject     *s_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
     ypObject     *s_keyword = yp_str_frombytesC2(-1, "keyword");
-    ypObject     *items[2];
-    obj_array_fill(items, uq, fixture_type_iter->rand_items);
+    ypObject     *items[] = obj_array_init(2, rand_obj_any(uq));
 
     // Basic new.
     {
         ypObject *iter = any_new2(yp_t_tuple, yp_None);
         assert_type_is(iter, yp_t_iter);
         assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
-        ead(item, yp_next(iter), assert_obj(item, eq, yp_tuple_empty));
-        ead(item, yp_next(iter), assert_obj(item, eq, yp_tuple_empty));
+        ead(item, yp_next(iter), assert_obj(item, is, yp_tuple_empty));
+        ead(item, yp_next(iter), assert_obj(item, is, yp_tuple_empty));
         // FIXME Our test callable will never yield yp_None. We need a stateful callable.
         assert_not_raises_exc(yp_close(iter, &exc));
         assert_raises(yp_next(iter), yp_StopIteration);
@@ -364,85 +423,473 @@ static MunitResult test_bool(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-// FIXME yp_send, yp_next, yp_next2, yp_throw, yp_length_hintC.
-
-static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
+static void _test_next(ypObject *(*any_next)(ypObject *), int raises)
 {
+    ypObject     *iter_close_exceptions[] = {yp_StopIteration, yp_GeneratorExit, NULL};
+    ypObject     *syntax_genExit[] = {yp_SyntaxError, yp_GeneratorExit, NULL};
+    ypObject     *osErr_stopIter_genExit[] = {yp_OSError, yp_StopIteration, yp_GeneratorExit, NULL};
+    ypObject    **exception;
     uniqueness_t *uq = uniqueness_new();
-    void         *pointer = (void *)(yp_ssize_t)munit_rand_uint32();  // Not a valid pointer!
-    ypObject     *items[4];
-    obj_array_fill(items, uq, fixture_type_iter->rand_items);
+    ypObject     *items[] = obj_array_init(2, rand_obj_any(uq));
 
-    // Basic close.
+#define assert_exhausted(expression)                       \
+    do {                                                   \
+        if (raises) {                                      \
+            assert_raises((expression), yp_StopIteration); \
+        } else {                                           \
+            assert_obj((expression), is, yp_None);         \
+        }                                                  \
+    } while (0)
+
+    // Basic next.
     {
-        ypObject           *iter;
-        count_down_state_t *iter_state;  // iter's copy of the state.
-        yp_ssize_t          iter_state_size;
-        count_down_state_t  state = {2, items[0], pointer};  // items[0] is borrowed.
-        yp_generator_decl_t decl = {count_down_iter_func, 3, &state, &count_down_state_decl};
+        ypObject                  *iter;
+        scripted_generator_state_t state = {4,
+                {{items[0]}, {items[1]}, {yp_StopIteration}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t        decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
 
-        assert_not_raises(yp_iter_stateCX(iter, &iter_state_size, (void **)&iter_state));
-        assert_ptr(iter_state, !=, &state);  // It must be a copy.
-        assert_intC(iter_state->count, ==, 2);
-        assert_obj(iter_state->object, is, items[0]);
-        assert_ptr(iter_state->pointer, ==, pointer);
-
-        assert_not_raises_exc(yp_close(iter, &exc));
-
-        assert_intC(iter_state->count, ==, 2);
-        assert_obj(iter_state->object, is, items[0]);  // ...but it's decref'd.
-        assert_ptr(iter_state->pointer, ==, pointer);
-
-        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
-        assert_raises(yp_next(iter), yp_StopIteration);
+        ead(item, any_next(iter), assert_obj(item, is, items[0]));
+        ead(item, any_next(iter), assert_obj(item, is, items[1]));
+        assert_exhausted(any_next(iter));
+        assert_script_completed(iter);
+        assert_exhausted(any_next(iter));
 
         yp_decrefN(N(iter));
     }
 
-    // yp_GeneratorExit raised on close.
+    // Empty generator.
     {
-        ypObject *iter;
-        yp_generator_decl_t decl = {GeneratorExit_iter_func, 3};
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                2, {{yp_StopIteration}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 0, &state, &scripted_generator_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
-        assert_not_raises_exc(yp_close(iter, &exc));
-        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
-        assert_raises(yp_next(iter), yp_StopIteration);
+
+        assert_exhausted(any_next(iter));
+        assert_script_completed(iter);
+        assert_exhausted(any_next(iter));
+
         yp_decrefN(N(iter));
     }
 
-    // yp_StopIteration raised on close.
-    {
-        ypObject *iter;
-        yp_generator_decl_t decl = {StopIteration_iter_func, 3};
+    // Generator raises an exception (that is not yp_StopIteration).
+    for (exception = syntax_genExit; *exception != NULL; exception++) {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                3, {{items[0]}, {*exception}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 1, &state, &scripted_generator_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
-        assert_not_raises_exc(yp_close(iter, &exc));
-        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
-        assert_raises(yp_next(iter), yp_StopIteration);
+
+        // On the first call, the generator yields a value. The second call raises an unexpected
+        // exception. Because of the exception, the iterator is closed, which raises
+        // yp_GeneratorExit as expected. Because the iterator is closed, the third call behaves as
+        // if the iterator is exhausted.
+        ead(item, any_next(iter), assert_obj(item, is, items[0]));
+        assert_raises(any_next(iter), *exception);
+        assert_script_completed(iter);
+        assert_exhausted(any_next(iter));
+
+        yp_decrefN(N(iter));
+    }
+
+    // yp_GeneratorExit or yp_StopIteration raised on close.
+    for (exception = iter_close_exceptions; *exception != NULL; exception++) {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                2, {{yp_StopIteration}, {*exception, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 0, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        // On the first call, the generator raises yp_StopIteration. Because it's exhausted, the
+        // iterator is closed, which raises an expected exception. Because the iterator is closed,
+        // the second call behaves as if the iterator is exhausted.
+        assert_exhausted(any_next(iter));
+        assert_script_completed(iter);
+        assert_exhausted(any_next(iter));
+
         yp_decrefN(N(iter));
     }
 
     // Unexpectedly-yielded value on close.
     {
-        ypObject *iter;
-        yp_generator_decl_t decl = {rand_obj_any_iter_func, 3};
+        ypObject                  *iter;
+        scripted_generator_state_t state = {2, {{yp_StopIteration}, {items[0], yp_GeneratorExit}}};
+        yp_generator_decl_t        decl = {
+                scripted_generator_iter_func, 0, &state, &scripted_generator_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
-        assert_raises_exc(yp_close(iter, &exc), yp_RuntimeError);
-        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
-        assert_raises(yp_next(iter), yp_StopIteration);
+
+        // On the first call, the generator raises yp_StopIteration. Because it's exhausted, the
+        // iterator is closed, which unexpectedly returns a value, so close raises yp_RuntimeError.
+        // Because the iterator is closed, the second call behaves as if the iterator is exhausted.
+        assert_raises(any_next(iter), yp_RuntimeError);
+        assert_script_completed(iter);
+        assert_exhausted(any_next(iter));
+
+        yp_decrefN(N(iter));
+    }
+
+    // Unexpected exception on close.
+    for (exception = osErr_stopIter_genExit; *exception != NULL; exception++) {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                3, {{items[0]}, {*exception}, {yp_SyntaxError, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 1, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        // On the first call, the generator yields a value. The second call raises an exception.
+        // Because it's exhausted, the iterator is closed, which raises an unexpected exception,
+        // replacing the first exception. Because the iterator is closed, the third call behaves as
+        // if the iterator is exhausted.
+        ead(item, any_next(iter), assert_obj(item, is, items[0]));
+        assert_raises(any_next(iter), yp_SyntaxError);
+        assert_script_completed(iter);
+        assert_exhausted(any_next(iter));
+
+        yp_decrefN(N(iter));
+    }
+
+    // Exception passthrough.
+    assert_raises(any_next(yp_SyntaxError), yp_SyntaxError);
+
+#undef assert_exhausted
+
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+}
+
+static ypObject *next_to_send(ypObject *iterator) { return yp_send(iterator, yp_None); }
+
+static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *values[] = obj_array_init(4, rand_obj_any(uq));
+    ypObject     *items[] = obj_array_init(2, rand_obj_any(uq));
+
+    // Shared tests.
+    _test_next(next_to_send, /*raises=*/TRUE);
+
+    // Basic send.
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                4, {{items[0], values[0]}, {items[1], values[1]}, {yp_StopIteration, values[2]},
+                           {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        ead(item, yp_send(iter, values[0]), assert_obj(item, is, items[0]));
+        ead(item, yp_send(iter, values[1]), assert_obj(item, is, items[1]));
+        assert_raises(yp_send(iter, values[2]), yp_StopIteration);
+        assert_script_completed(iter);
+        assert_raises(yp_send(iter, values[3]), yp_StopIteration);
+
+        yp_decrefN(N(iter));
+    }
+
+    // Exception passthrough.
+    assert_raises(yp_send(yp_SyntaxError, values[0]), yp_SyntaxError);
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                2, {{items[0], values[0]}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_raises(yp_send(iter, yp_SyntaxError), yp_SyntaxError);
+        // Exception passthrough does not close the iterator.
+        ead(item, yp_send(iter, values[0]), assert_obj(item, is, items[0]));
+
+        yp_decrefN(N(iter));
+    }
+
+    obj_array_decref(items);
+    obj_array_decref(values);
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
+static MunitResult test_next(const MunitParameter params[], fixture_t *fixture)
+{
+    _test_next(yp_next, /*raises=*/TRUE);
+    return MUNIT_OK;
+}
+
+static ypObject *next_to_next2(ypObject *iterator) { return yp_next2(iterator, yp_None); }
+
+static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *defaults[] = obj_array_init(4, rand_obj_any(uq));
+    ypObject     *items[] = obj_array_init(2, rand_obj_any(uq));
+
+    // Shared tests.
+    _test_next(next_to_next2, /*raises=*/FALSE);
+
+    // Basic next2.
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {4,
+                {{items[0]}, {items[1]}, {yp_StopIteration}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t        decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        ead(item, yp_next2(iter, defaults[0]), assert_obj(item, is, items[0]));
+        ead(item, yp_next2(iter, defaults[1]), assert_obj(item, is, items[1]));
+        ead(item, yp_next2(iter, defaults[2]), assert_obj(item, is, defaults[2]));
+        assert_script_completed(iter);
+        ead(item, yp_next2(iter, defaults[3]), assert_obj(item, is, defaults[3]));
+
+        yp_decrefN(N(iter));
+    }
+
+    // Exception passthrough.
+    assert_raises(yp_next2(yp_SyntaxError, defaults[0]), yp_SyntaxError);
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {2, {{items[0]}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t        decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_raises(yp_next2(iter, yp_SyntaxError), yp_SyntaxError);
+        // Exception passthrough does not close the iterator.
+        ead(item, yp_next2(iter, defaults[0]), assert_obj(item, is, items[0]));
+
+        yp_decrefN(N(iter));
+    }
+
+    obj_array_decref(items);
+    obj_array_decref(defaults);
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
+static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
+{
+    ypObject *iter_close_exceptions[] = {yp_StopIteration, yp_GeneratorExit, NULL};
+    ypObject *syntax_stopIter_genExit[] = {
+            yp_SyntaxError, yp_StopIteration, yp_GeneratorExit, NULL};
+    ypObject    **exception;
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[] = obj_array_init(2, rand_obj_any(uq));
+
+    // Basic throw, including yp_StopIteration and yp_GeneratorExit.
+    for (exception = syntax_stopIter_genExit; *exception != NULL; exception++) {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                3, {{items[0]}, {*exception, *exception}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        ead(item, yp_next(iter), assert_obj(item, is, items[0]));
+        assert_raises(yp_throw(iter, *exception), *exception);
+        assert_script_completed(iter);
+        assert_raises(yp_throw(iter, *exception), yp_StopIteration);
+
+        yp_decrefN(N(iter));
+    }
+
+    // Generator ignores the exception.
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                3, {{items[0], yp_SyntaxError}, {yp_StopIteration, yp_SyntaxError},
+                           {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 1, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        ead(item, yp_throw(iter, yp_SyntaxError), assert_obj(item, is, items[0]));
+        assert_raises(yp_throw(iter, yp_SyntaxError), yp_StopIteration);
+        assert_script_completed(iter);
+        assert_raises(yp_throw(iter, yp_SyntaxError), yp_StopIteration);
+
+        yp_decrefN(N(iter));
+    }
+
+    // Generator raises a different exception.
+    for (exception = syntax_stopIter_genExit; *exception != NULL; exception++) {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                2, {{*exception, yp_OSError}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 1, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_raises(yp_throw(iter, yp_OSError), *exception);
+        assert_script_completed(iter);
+        assert_raises(yp_throw(iter, yp_OSError), yp_StopIteration);
+
+        yp_decrefN(N(iter));
+    }
+
+    // yp_GeneratorExit or yp_StopIteration raised on close.
+    for (exception = iter_close_exceptions; *exception != NULL; exception++) {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                2, {{yp_SyntaxError, yp_SyntaxError}, {*exception, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 1, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        // On the first call, the generator throws an exception. Because of the exception, the
+        // iterator is closed, which raises an expected exception. Because the iterator is closed,
+        // the second call behaves as if the iterator is exhausted.
+        assert_raises(yp_throw(iter, yp_SyntaxError), yp_SyntaxError);
+        assert_script_completed(iter);
+        assert_raises(yp_throw(iter, yp_SyntaxError), yp_StopIteration);
+
+        yp_decrefN(N(iter));
+    }
+
+    // Unexpectedly-yielded value on close.
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                2, {{yp_SyntaxError, yp_SyntaxError}, {items[0], yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 1, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        // On the first call, the generator throws an exception. Because of the exception, the
+        // iterator is closed, which unexpectedly returns a value, so close raises yp_RuntimeError,
+        // overriding the first exception. Because the iterator is closed, the second call behaves
+        // as if the iterator is exhausted.
+        assert_raises(yp_throw(iter, yp_SyntaxError), yp_RuntimeError);
+        assert_script_completed(iter);
+        assert_raises(yp_throw(iter, yp_SyntaxError), yp_StopIteration);
+
         yp_decrefN(N(iter));
     }
 
     // Unexpected exception on close.
     {
-        ypObject *iter;
-        yp_generator_decl_t decl = {SyntaxError_iter_func, 3};
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                2, {{yp_OSError, yp_OSError}, {yp_SyntaxError, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 1, &state, &scripted_generator_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
-        assert_raises_exc(yp_close(iter, &exc), yp_SyntaxError);
-        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
-        assert_raises(yp_next(iter), yp_StopIteration);
+
+        // On the first call, the generator throws an exception. Because of the exception, the
+        // iterator is closed, which raises an unexpected exception, overriding the first exception.
+        // Because the iterator is closed, the second call behaves as if the iterator is exhausted.
+        assert_raises(yp_throw(iter, yp_OSError), yp_SyntaxError);
+        assert_script_completed(iter);
+        assert_raises(yp_throw(iter, yp_OSError), yp_StopIteration);
+
         yp_decrefN(N(iter));
     }
+
+    // exception is not an exception.
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {2, {{items[0]}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t        decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_raises(yp_throw(iter, items[1]), yp_TypeError);
+        // "Not an exception" does not close the iterator.
+        ead(item, yp_next(iter), assert_obj(item, is, items[0]));
+
+        yp_decrefN(N(iter));
+    }
+
+    // Exception passthrough.
+    assert_raises(yp_throw(yp_SyntaxError, yp_Exception), yp_SyntaxError);
+
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
+static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
+{
+    ypObject     *iter_close_exceptions[] = {yp_StopIteration, yp_GeneratorExit, NULL};
+    ypObject    **exception;
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[] = obj_array_init(4, rand_obj_any(uq));
+
+    // Basic close.
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {2, {{items[0]}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t        decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 2);
+        ead(item, yp_next(iter), assert_obj(item, is, items[0]));
+
+        assert_not_raises_exc(yp_close(iter, &exc));
+        assert_script_completed(iter);
+        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_raises(yp_next(iter), yp_StopIteration);
+
+        yp_decrefN(N(iter));
+    }
+
+    // yp_GeneratorExit or yp_StopIteration raised on close.
+    for (exception = iter_close_exceptions; *exception != NULL; exception++) {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {1, {{*exception, yp_GeneratorExit}}};
+        yp_generator_decl_t        decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_not_raises_exc(yp_close(iter, &exc));
+        assert_script_completed(iter);
+        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_raises(yp_next(iter), yp_StopIteration);
+
+        yp_decrefN(N(iter));
+    }
+
+    // Unexpectedly-yielded value on close.
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {1, {{items[0], yp_GeneratorExit}}};
+        yp_generator_decl_t        decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_raises_exc(yp_close(iter, &exc), yp_RuntimeError);
+        assert_script_completed(iter);
+        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_raises(yp_next(iter), yp_StopIteration);
+
+        yp_decrefN(N(iter));
+    }
+
+    // Unexpected exception on close.
+    {
+        ypObject                  *iter;
+        scripted_generator_state_t state = {1, {{yp_SyntaxError, yp_GeneratorExit}}};
+        yp_generator_decl_t        decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_raises_exc(yp_close(iter, &exc), yp_SyntaxError);
+        assert_script_completed(iter);
+        assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
+        assert_raises(yp_next(iter), yp_StopIteration);
+
+        yp_decrefN(N(iter));
+    }
+
+    // Exception passthrough.
+    assert_raises_exc(yp_close(yp_SyntaxError, &exc), yp_SyntaxError);
 
     obj_array_decref(items);
     uniqueness_dealloc(uq);
@@ -453,8 +900,7 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
 static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 {
     uniqueness_t *uq = uniqueness_new();
-    ypObject     *items[2];
-    obj_array_fill(items, uq, fixture_type_iter->rand_items);
+    ypObject     *items[] = obj_array_init(2, rand_obj_any(uq));
 
     // yp_generatorC
     {
@@ -499,8 +945,9 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 
 
 MunitTest test_iter_tests[] = {TEST(test_generatorC, NULL), TEST(test_new2, NULL),
-        TEST(test_call_type, NULL), TEST(test_bool, NULL), TEST(test_close, NULL),
-        TEST(test_oom, NULL), {NULL}};
+        TEST(test_call_type, NULL), TEST(test_bool, NULL), TEST(test_send, NULL),
+        TEST(test_next, NULL), TEST(test_next2, NULL), TEST(test_throw, NULL),
+        TEST(test_close, NULL), TEST(test_oom, NULL), {NULL}};
 
 
 extern void test_iter_initialize(void) {}

@@ -5,6 +5,19 @@
 // TODO Ensure yp_max_key/etc properly handles exception passthrough, even in cases where
 // one of the arguments would be ignored.
 
+// Used as the code for a function. Unconditionally returns zero.
+static ypObject *zero_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
+{
+    return yp_i_zero;
+}
+
+// Used as the code for a function. Unconditionally returns the first argument.
+static ypObject *first_arg_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
+{
+    assert_ssizeC(n, >, 0);
+    return yp_incref(argarray[0]);
+}
+
 
 static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
 {
@@ -87,6 +100,8 @@ static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
 
     // Exception passthrough.
     assert_raises(any_iter(yp_SyntaxError), yp_SyntaxError);
+    assert_raises(any_iter(yp_StopIteration), yp_StopIteration);
+    assert_raises(any_iter(yp_GeneratorExit), yp_GeneratorExit);
 
     obj_array_decref(items);
     yp_decrefN(N(not_iterable));
@@ -108,6 +123,8 @@ static MunitResult test_iter(const MunitParameter params[], fixture_t *fixture)
 
 static void _test_unpackN(fixture_type_t *type, void (*any_unpackN)(ypObject *, int, ...))
 {
+    ypObject     *syntax_genExit[] = {yp_SyntaxError, yp_GeneratorExit, NULL};
+    ypObject    **exception;
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[3];
@@ -182,41 +199,44 @@ static void _test_unpackN(fixture_type_t *type, void (*any_unpackN)(ypObject *, 
     }
 
     // Iterator exception on the first item. (No yielded values, nothing to discard.)
-    {
+    // XXX Includes yp_GeneratorExit, to ensure it's not confused with yp_StopIteration.
+    for (exception = syntax_genExit; *exception != NULL; exception++) {
         ypObject *second;
         ypObject *x_supplier = type->newN(N(items[0], items[1]));
-        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises_exc(any_unpackN(x, N(&exc, &second)), yp_SyntaxError);
-        assert_isexception(second, yp_SyntaxError);
+        ypObject *x = new_faulty_iter(x_supplier, 0, *exception, 2);
+        assert_raises_exc(any_unpackN(x, N(&exc, &second)), *exception);
+        assert_isexception(second, *exception);
         yp_decrefN(N(x, x_supplier));
     }
 
     // Iterator exception on the second item. (One yielded value discarded.)
-    {
+    // XXX Includes yp_GeneratorExit, to ensure it's not confused with yp_StopIteration.
+    for (exception = syntax_genExit; *exception != NULL; exception++) {
         ypObject *second;
         ypObject *x_supplier = type->newN(N(items[0], items[1]));
-        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises_exc(any_unpackN(x, N(&exc, &second)), yp_SyntaxError);
-        assert_isexception(second, yp_SyntaxError);
+        ypObject *x = new_faulty_iter(x_supplier, 1, *exception, 2);
+        assert_raises_exc(any_unpackN(x, N(&exc, &second)), *exception);
+        assert_isexception(second, *exception);
         yp_decrefN(N(x, x_supplier));
     }
 
     // Iterator exception on the n+1 item. (All yielded values discarded.)
-    {
+    // XXX Includes yp_GeneratorExit, to ensure it's not confused with yp_StopIteration.
+    for (exception = syntax_genExit; *exception != NULL; exception++) {
         ypObject *second;
         ypObject *x_supplier = type->newN(N(items[0], items[1]));
-        ypObject *x = new_faulty_iter(x_supplier, 2, yp_SyntaxError, 2);
-        assert_raises_exc(any_unpackN(x, N(&exc, &second)), yp_SyntaxError);
-        assert_isexception(second, yp_SyntaxError);
+        ypObject *x = new_faulty_iter(x_supplier, 2, *exception, 2);
+        assert_raises_exc(any_unpackN(x, N(&exc, &second)), *exception);
+        assert_isexception(second, *exception);
         yp_decrefN(N(x, x_supplier));
     }
 
     // Iterator exception after the n+1 item. The "too few arguments" yp_ValueError takes priority
     // over the iterator exception, because we don't exhaust the iterator.
-    {
+    for (exception = syntax_genExit; *exception != NULL; exception++) {
         ypObject *second;
         ypObject *x_supplier = type->newN(N(items[0], items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 3);
+        ypObject *x = new_faulty_iter(x_supplier, 3, *exception, 3);
         assert_raises_exc(any_unpackN(x, N(&exc, &second)), yp_ValueError);
         assert_isexception(second, yp_ValueError);
         yp_decrefN(N(x, x_supplier));
@@ -230,6 +250,7 @@ static void _test_unpackN(fixture_type_t *type, void (*any_unpackN)(ypObject *, 
 
     // Bug: yp_StopIteration was mistaken for an exhausted iterator.
     assert_raises_exc(any_unpackN(yp_StopIteration, N(&exc)), yp_StopIteration);
+    assert_raises_exc(any_unpackN(yp_GeneratorExit, N(&exc)), yp_GeneratorExit);
 
     obj_array_decref(items);
     yp_decrefN(N(not_iterable));
@@ -404,6 +425,8 @@ static void _test_reversed(fixture_type_t *type, ypObject *(*any_reversed)(ypObj
 
     // Exception passthrough.
     assert_raises(any_reversed(yp_SyntaxError), yp_SyntaxError);
+    assert_raises(any_reversed(yp_StopIteration), yp_StopIteration);
+    assert_raises(any_reversed(yp_GeneratorExit), yp_GeneratorExit);
 
 tear_down:
     obj_array_decref(items);
@@ -497,9 +520,108 @@ static void _test_sorted(fixture_type_t *type, ypObject *(*any_sorted)(ypObject 
 
     // Exception passthrough.
     assert_raises(any_sorted(yp_SyntaxError), yp_SyntaxError);
+    assert_raises(any_sorted(yp_StopIteration), yp_StopIteration);
+    assert_raises(any_sorted(yp_GeneratorExit), yp_GeneratorExit);
 
     obj_array_decref(items);
     yp_decrefN(N(not_iterable));
+    uniqueness_dealloc(uq);
+}
+
+// yp_sorted3/etc is tested more thoroughly in test_tuple.
+static void _test_sorted3(
+        fixture_type_t *type, ypObject *(*any_sorted3)(ypObject *, ypObject *, ypObject *))
+{
+    ypObject *s_x = yp_str_frombytesC2(-1, "x");
+    define_function(key_first_arg, first_arg_code, ({s_x}));
+    define_function(key_zero, zero_code, ({s_x}));
+    ypObject     *keys_noop[] = {yp_None, key_first_arg, NULL};           // borrowed
+    ypObject     *keys_all[] = {yp_None, key_first_arg, key_zero, NULL};  // borrowed
+    ypObject    **key;                                                    // borrowed
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject     *items[2];
+    obj_array_fill(items, uq, type->rand_ordered_items);
+
+    // Basic sorted3.
+    for (key = keys_noop; *key != NULL; key++) {
+        ypObject *x = type->newN(N(items[1], items[0]));
+        ypObject *sorted = any_sorted3(x, *key, yp_False);
+        assert_type_is(sorted, yp_t_list);
+        assert_sequence(sorted, items[0], items[1]);
+        yp_decrefN(N(sorted, x));
+    }
+
+    // Reversed.
+    for (key = keys_noop; *key != NULL; key++) {
+        ypObject *x = type->newN(N(items[0], items[1]));
+        ypObject *sorted = any_sorted3(x, *key, yp_True);
+        assert_type_is(sorted, yp_t_list);
+        assert_sequence(sorted, items[1], items[0]);
+        yp_decrefN(N(sorted, x));
+    }
+
+    // key_zero: items do not move as their keys are all equal.
+    {
+        ypObject *first;
+        ypObject *second;
+        ypObject *x = type->newN(N(items[1], items[0]));
+        ypObject *sorted = any_sorted3(x, key_zero, yp_False);
+        assert_type_is(sorted, yp_t_list);
+        yp_unpackN(sorted, N(&first, &second));
+
+        if (yp_eq(first, items[1]) == yp_True) {
+            assert_obj(second, eq, items[0]);
+        } else {
+            // Only set-likes and mappings are allowed to iterate out of order.
+            assert_true(type->is_setlike || type->is_mapping);
+            assert_obj(first, eq, items[0]);
+            assert_obj(second, eq, items[1]);
+        }
+
+        yp_decrefN(N(sorted, x, second, first));
+    }
+
+    // Items already sorted.
+    for (key = keys_noop; *key != NULL; key++) {
+        ypObject *x = type->newN(N(items[0], items[1]));
+        ypObject *sorted = any_sorted3(x, *key, yp_False);
+        assert_type_is(sorted, yp_t_list);
+        assert_sequence(sorted, items[0], items[1]);
+        yp_decrefN(N(sorted, x));
+    }
+
+    // Items already reversed.
+    for (key = keys_noop; *key != NULL; key++) {
+        ypObject *x = type->newN(N(items[1], items[0]));
+        ypObject *sorted = any_sorted3(x, *key, yp_True);
+        assert_type_is(sorted, yp_t_list);
+        assert_sequence(sorted, items[1], items[0]);
+        yp_decrefN(N(sorted, x));
+    }
+
+    // x is empty.
+    for (key = keys_all; *key != NULL; key++) {
+        ypObject *x = type->newN(0);
+        ypObject *sorted = any_sorted3(x, *key, yp_False);
+        assert_type_is(sorted, yp_t_list);
+        assert_len(sorted, 0);
+        yp_decrefN(N(sorted, x));
+    }
+
+    // x is not an iterable.
+    assert_raises(any_sorted3(not_iterable, yp_None, yp_False), yp_TypeError);
+    assert_raises(any_sorted3(not_iterable, key_zero, yp_True), yp_TypeError);
+
+    // Exception passthrough.
+    assert_raises(any_sorted3(yp_SyntaxError, yp_None, yp_False), yp_SyntaxError);
+    assert_raises(any_sorted3(yp_StopIteration, yp_None, yp_False), yp_StopIteration);
+    assert_raises(any_sorted3(yp_GeneratorExit, yp_None, yp_False), yp_GeneratorExit);
+    assert_raises(any_sorted3(yp_tuple_empty, yp_SyntaxError, yp_False), yp_SyntaxError);
+    assert_raises(any_sorted3(yp_tuple_empty, yp_None, yp_SyntaxError), yp_SyntaxError);
+
+    obj_array_decref(items);
+    yp_decrefN(N(not_iterable, key_zero, key_first_arg, s_x));
     uniqueness_dealloc(uq);
 }
 
@@ -521,18 +643,12 @@ static MunitResult test_sorted(const MunitParameter params[], fixture_t *fixture
     _test_sorted(type, yp_sorted, /*reversed=*/FALSE);
     _test_sorted(type, sorted_to_sorted3, /*reversed=*/FALSE);
     _test_sorted(type, sorted_to_sorted3_reverse, /*reversed=*/TRUE);
-
-    // FIXME Put a small keyfunc test here to ensure it's working.
-
-    // Exception passthrough.
-    assert_raises(yp_sorted(yp_SyntaxError), yp_SyntaxError);
-    assert_raises(yp_sorted3(yp_SyntaxError, yp_None, yp_False), yp_SyntaxError);
-    assert_raises(yp_sorted3(yp_tuple_empty, yp_SyntaxError, yp_False), yp_SyntaxError);
-    assert_raises(yp_sorted3(yp_tuple_empty, yp_None, yp_SyntaxError), yp_SyntaxError);
+    _test_sorted3(type, yp_sorted3);
 
     return MUNIT_OK;
 }
 
+// Tests the default arguments for yp_func_sorted.
 static ypObject *sorted_to_call_func_sorted(ypObject *obj)
 {
     return yp_callN(yp_func_sorted, N(obj));
@@ -569,6 +685,7 @@ static MunitResult test_func_sorted(const MunitParameter params[], fixture_t *fi
     _test_sorted(type, sorted_to_call_func_sorted, /*reversed=*/FALSE);
     _test_sorted(type, sorted_to_call_func_sorted3, /*reversed=*/FALSE);
     _test_sorted(type, sorted_to_call_func_sorted3_reverse, /*reversed=*/TRUE);
+    _test_sorted3(type, sorted3_to_call_func_sorted3);
 
     // Invalid arguments.
     {
@@ -676,6 +793,9 @@ static void _test_send(fixture_type_t *type, ypObject *x_two, ypObject *(*any_it
     }
 
     // Exception passthrough.
+    assert_raises(yp_send(yp_SyntaxError, yp_None), yp_SyntaxError);
+    assert_raises(yp_send(yp_StopIteration, yp_None), yp_StopIteration);
+    assert_raises(yp_send(yp_GeneratorExit, yp_None), yp_GeneratorExit);
     ead(iter, any_iter(x_two), assert_raises(yp_send(iter, yp_SyntaxError), yp_SyntaxError));
 }
 
@@ -720,6 +840,8 @@ static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
 
     // Exception passthrough.
     assert_raises(yp_send(yp_SyntaxError, send_value), yp_SyntaxError);
+    assert_raises(yp_send(yp_StopIteration, send_value), yp_StopIteration);
+    assert_raises(yp_send(yp_GeneratorExit, send_value), yp_GeneratorExit);
 
     obj_array_decref(items);
     yp_decrefN(N(send_value, not_iterable));
@@ -787,6 +909,9 @@ static void _test_next2(fixture_type_t *type, ypObject *x_two, ypObject *(*any_i
     }
 
     // Exception passthrough.
+    assert_raises(yp_next2(yp_SyntaxError, yp_None), yp_SyntaxError);
+    assert_raises(yp_next2(yp_StopIteration, yp_None), yp_StopIteration);
+    assert_raises(yp_next2(yp_GeneratorExit, yp_None), yp_GeneratorExit);
     ead(iter, any_iter(x_two), assert_raises(yp_next2(iter, yp_SyntaxError), yp_SyntaxError));
 }
 
@@ -830,6 +955,8 @@ static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
 
     // Exception passthrough.
     assert_raises(yp_next2(yp_SyntaxError, default_), yp_SyntaxError);
+    assert_raises(yp_next2(yp_StopIteration, default_), yp_StopIteration);
+    assert_raises(yp_next2(yp_GeneratorExit, default_), yp_GeneratorExit);
 
     obj_array_decref(items);
     yp_decrefN(N(default_, not_iterable));
@@ -839,6 +966,9 @@ static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
 
 static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
 {
+    ypObject *syntax_stopIter_genExit[] = {
+            yp_SyntaxError, yp_StopIteration, yp_GeneratorExit, NULL};
+    ypObject      **exception;
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
@@ -846,11 +976,16 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
     ypObject       *items[2];
     obj_array_fill(items, uq, type->rand_items);
 
-    // yp_throw with yp_iter.
+    // yp_throw with yp_iter. x is reused so can't be an iter.
     if (type != fixture_type_iter) {
         ypObject *x = type->newN(N(items[0], items[1]));
-        ead(iter, yp_iter(x), assert_raises(yp_throw(iter, yp_SyntaxError), yp_SyntaxError));
+
+        for (exception = syntax_stopIter_genExit; *exception != NULL; exception++) {
+            ead(iter, yp_iter(x), assert_raises(yp_throw(iter, *exception), *exception));
+        }
+
         ead(iter, yp_iter(x), assert_raises(yp_throw(iter, not_exception), yp_TypeError));
+
         yp_decrefN(N(x));
     }
 
@@ -861,11 +996,14 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
         obj_array_fill(values, uq, type->rand_values);
         x = type->newK(K(items[0], values[0], items[1], values[1]));
 
-        ead(iter, yp_iter_keys(x), assert_raises(yp_throw(iter, yp_SyntaxError), yp_SyntaxError));
+        for (exception = syntax_stopIter_genExit; *exception != NULL; exception++) {
+            ead(iter, yp_iter_keys(x), assert_raises(yp_throw(iter, *exception), *exception));
+            ead(iter, yp_iter_values(x), assert_raises(yp_throw(iter, *exception), *exception));
+            ead(iter, yp_iter_items(x), assert_raises(yp_throw(iter, *exception), *exception));
+        }
+
         ead(iter, yp_iter_keys(x), assert_raises(yp_throw(iter, not_exception), yp_TypeError));
-        ead(iter, yp_iter_values(x), assert_raises(yp_throw(iter, yp_SyntaxError), yp_SyntaxError));
         ead(iter, yp_iter_values(x), assert_raises(yp_throw(iter, not_exception), yp_TypeError));
-        ead(iter, yp_iter_items(x), assert_raises(yp_throw(iter, yp_SyntaxError), yp_SyntaxError));
         ead(iter, yp_iter_items(x), assert_raises(yp_throw(iter, not_exception), yp_TypeError));
 
         yp_decrefN(N(x));
@@ -877,6 +1015,8 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
 
     // Exception passthrough.
     assert_raises(yp_throw(yp_SyntaxError, yp_Exception), yp_SyntaxError);
+    assert_raises(yp_throw(yp_StopIteration, yp_Exception), yp_StopIteration);
+    assert_raises(yp_throw(yp_GeneratorExit, yp_Exception), yp_GeneratorExit);
 
     obj_array_decref(items);
     yp_decrefN(N(not_exception, not_iterable));
@@ -957,6 +1097,8 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
 
     // Exception passthrough.
     assert_raises_exc(yp_close(yp_SyntaxError, &exc), yp_SyntaxError);
+    assert_raises_exc(yp_close(yp_StopIteration, &exc), yp_StopIteration);
+    assert_raises_exc(yp_close(yp_GeneratorExit, &exc), yp_GeneratorExit);
 
     obj_array_decref(items);
     yp_decrefN(N(not_iterable));
@@ -1059,6 +1201,8 @@ static void _test_iter_values(fixture_type_t *type)
 
     // Exception passthrough.
     assert_raises(yp_iter_values(yp_SyntaxError), yp_SyntaxError);
+    assert_raises(yp_iter_values(yp_StopIteration), yp_StopIteration);
+    assert_raises(yp_iter_values(yp_GeneratorExit), yp_GeneratorExit);
 
     obj_array_decref(values);
     obj_array_decref(keys);
@@ -1165,6 +1309,8 @@ static void _test_iter_items(fixture_type_t *type)
 
     // Exception passthrough.
     assert_raises(yp_iter_items(yp_SyntaxError), yp_SyntaxError);
+    assert_raises(yp_iter_items(yp_StopIteration), yp_StopIteration);
+    assert_raises(yp_iter_items(yp_GeneratorExit), yp_GeneratorExit);
 
     obj_array_decref(pairs);
     obj_array_decref(values);
@@ -1295,6 +1441,8 @@ static void _test_miniiter(
     {
         yp_uint64_t mi_state;
         assert_raises(any_miniiter(yp_SyntaxError, &mi_state), yp_SyntaxError);
+        assert_raises(any_miniiter(yp_StopIteration, &mi_state), yp_StopIteration);
+        assert_raises(any_miniiter(yp_GeneratorExit, &mi_state), yp_GeneratorExit);
     }
 
     obj_array_decref(items);
@@ -1422,6 +1570,8 @@ static void _test_miniiter_values(fixture_type_t *type)
     {
         yp_uint64_t mi_state;
         assert_raises(yp_miniiter_values(yp_SyntaxError, &mi_state), yp_SyntaxError);
+        assert_raises(yp_miniiter_values(yp_StopIteration, &mi_state), yp_StopIteration);
+        assert_raises(yp_miniiter_values(yp_GeneratorExit, &mi_state), yp_GeneratorExit);
     }
 
     obj_array_decref(keys);
@@ -1549,6 +1699,8 @@ static void _test_miniiter_items(fixture_type_t *type)
     {
         yp_uint64_t mi_state;
         assert_raises(yp_miniiter_items(yp_SyntaxError, &mi_state), yp_SyntaxError);
+        assert_raises(yp_miniiter_items(yp_StopIteration, &mi_state), yp_StopIteration);
+        assert_raises(yp_miniiter_items(yp_GeneratorExit, &mi_state), yp_GeneratorExit);
     }
 
     obj_array_decref(pairs);
