@@ -2975,6 +2975,9 @@ static ypObject *iter_close(ypObject *i)
 
     // Handle the returned value from the generator. yp_StopIteration and yp_GeneratorExit are not
     // errors. Any other exception or yielded value _is_ an error, as per Python.
+    // TODO Changed in CPython version 3.13: If a generator returns a value upon being closed, the
+    // value is returned by close(). But "If the generator yields a value, a RuntimeError is raised"
+    // still applies. So there's a difference between yielding and returning.
     if (yp_isexceptionCN(result, 2, yp_StopIteration, yp_GeneratorExit)) return yp_None;
     if (yp_isexceptionC(result)) return result;
     yp_decref(result);  // discard unexpectedly-yielded value
@@ -3006,12 +3009,13 @@ static ypObject *iter_send(ypObject *i, ypObject *value)
 {
     ypObject *result = _iter_send(i, value);
 
-    // As per Python, when a generator raises an exception, it can't continue to yield values, so
-    // close it. If iter_close fails just ignore it: result is already set to an exception.
-    // TODO Don't hide errors from iter_close; instead, use Python's "while handling this
-    // exception, another occurred" style of reporting
+    // When a generator raises an exception, it can't continue to yield values, so close it.
+    // TODO Don't hide errors from _iter_send; instead, use Python's "while handling this
+    // exception, another occurred" style of reporting.
     if (yp_isexceptionC(result)) {
-        (void)iter_close(i);
+        ypObject *close_result = iter_close(i);
+        yp_ASSERT1(!yp_isexceptionCN(close_result, 2, yp_StopIteration, yp_GeneratorExit));
+        if (yp_isexceptionC(close_result)) return close_result;
         return result;
     }
 
@@ -3722,6 +3726,7 @@ ypObject *yp_any(ypObject *iterable)
     mi = yp_miniiter(iterable, &mi_state);  // new ref
     while (1) {
         x = yp_miniiter_next(mi, &mi_state);  // new ref
+        // TODO Write tests to ensure yp_GeneratorExit isn't valid here.
         if (yp_isexceptionC2(x, yp_StopIteration)) break;
         result = yp_bool(x);
         yp_decref(x);
@@ -3775,6 +3780,7 @@ ypObject *yp_all(ypObject *iterable)
     mi = yp_miniiter(iterable, &mi_state);  // new ref
     while (1) {
         x = yp_miniiter_next(mi, &mi_state);  // new ref
+        // TODO Write tests to ensure yp_GeneratorExit isn't valid here.
         if (yp_isexceptionC2(x, yp_StopIteration)) break;
         result = yp_bool(x);
         yp_decref(x);
@@ -19369,6 +19375,7 @@ static ypObject *_ypFunction_call_copy_var_kwargs(ypObject *kwargs, int kwargs_i
         ypObject *key = frozendict_miniiter_next(mi, &mi_state);
         // TODO Allow subclasses of str.
         if (ypObject_TYPE_CODE(key) != ypStr_CODE) {
+            // TODO Write tests to ensure yp_GeneratorExit isn't valid here.
             if (yp_isexceptionC2(key, yp_StopIteration)) break;
 
             // An exception happened or the key is not a str: replace the result with an exception.

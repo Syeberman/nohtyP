@@ -430,6 +430,8 @@ ypAPI ypObject *yp_ne(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_ge(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_gt(ypObject *x, ypObject *y);
 
+// FIXME Move max/min/etc here, closer to yp_lt?
+
 // You may also be interested in yp_IF and yp_WHILE for working with boolean operations; see below.
 
 
@@ -509,6 +511,7 @@ ypAPI ypObject *yp_reversed(ypObject *iterable);
 // function used to extract a comparison key from each element in iterable; to compare the elements
 // directly, use yp_None. If reverse is true, the list elements are sorted as if each comparison
 // were reversed.
+// FIXME Here, keyword-only args are treated as positional (3). In yp_max, we use _key instead.
 ypAPI ypObject *yp_sorted3(ypObject *iterable, ypObject *key, ypObject *reverse);
 
 // Equivalent to yp_sorted3(iterable, yp_None, yp_False).
