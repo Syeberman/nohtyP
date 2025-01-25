@@ -20261,7 +20261,9 @@ ypObject *yp_next2(ypObject *iterator, ypObject *default_)
     if (yp_isexceptionC(default_)) return default_;
     result = _yp_send(iterator, yp_None);
     if (yp_isexceptionC2(result, yp_StopIteration)) {
-        result = yp_incref(default_);
+        // If iterator is yp_StopIteration, _yp_send will return yp_StopIteration, which we do not
+        // want to treat as an exhausted iterator.
+        if (!yp_isexceptionC(iterator)) result = yp_incref(default_);
     }
     return result;
 }
