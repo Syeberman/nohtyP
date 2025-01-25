@@ -737,16 +737,17 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
     } while (0)
 
 
-#define _faulty_iter_test_raises(setup, iter_name, iter_expression, statement, tear_down,         \
-        test_name, exc_suffix, expected, statement_str)                                           \
-    do {                                                                                          \
-        ypObject *iter_name;                                                                      \
-        UNPACK    setup;                                                                          \
-        iter_name = iter_expression;                                                              \
-        _assert_raises##exc_suffix(                                                               \
-                statement, 1, expected, "%s /*" test_name "*/", "yp_SyntaxError", statement_str); \
-        yp_decref(iter_name);                                                                     \
-        UNPACK tear_down;                                                                         \
+#define _faulty_iter_test_raises(setup, iter_name, iter_expression, statement, tear_down,        \
+        test_name, exc_suffix, expected, statement_str)                                          \
+    do {                                                                                         \
+        ypObject *_ypmt_FLT_ITR_expected[] = {expected};                                         \
+        ypObject *iter_name;                                                                     \
+        UNPACK    setup;                                                                         \
+        iter_name = iter_expression;                                                             \
+        _assert_raises##exc_suffix(statement, 1, _ypmt_FLT_ITR_expected, "%s /*" test_name "*/", \
+                "%s", statement_str, #expected);                                                 \
+        yp_decref(iter_name);                                                                    \
+        UNPACK tear_down;                                                                        \
     } while (0)
 
 // XXX Unfortunately, we don't have a way to inject test_name into the assertion statement.
@@ -763,36 +764,48 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
     } while (0)
 
 // XXX yp_SyntaxError is chosen as nohtyP.c neither raises nor catches it.
-#define _faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down,      \
-        exc_suffix, statement_str)                                                                \
-    do {                                                                                          \
-        yp_ssize_t _ypmt_FLT_ITR_len = yp_lenC_not_raises(iter_supplier);                         \
-        ypObject  *_ypmt_FLT_ITR_expected[] = {yp_SyntaxError};                                   \
-        if (_ypmt_FLT_ITR_len < 2) {                                                              \
-            munit_error("iter_supplier must contain at least two entries");                       \
-        }                                                                                         \
-        /* x is an iterator that fails at the start. */                                           \
-        _faulty_iter_test_raises(setup, iter_name,                                                \
-                new_faulty_iter(iter_supplier, 0, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,  \
-                tear_down, "fail_start", exc_suffix, _ypmt_FLT_ITR_expected, statement_str);      \
-        /* x is an iterator that fails mid-way. */                                                \
-        _faulty_iter_test_raises(setup, iter_name,                                                \
-                new_faulty_iter(iter_supplier, 1, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,  \
-                tear_down, "fail_mid", exc_suffix, _ypmt_FLT_ITR_expected, statement_str);        \
-        /* x is an iterator with a too-small length_hint. */                                      \
-        _faulty_iter_test_succeeds(setup, iter_name,                                              \
-                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, 1),         \
-                statement, assertion, tear_down, "hint_small", exc_suffix, statement_str);        \
-        /* x is an iterator with a too-large length_hint. */                                      \
-        _faulty_iter_test_succeeds(setup, iter_name,                                              \
-                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,             \
-                        _ypmt_FLT_ITR_len + 100),                                                 \
-                statement, assertion, tear_down, "hint_large", exc_suffix, statement_str);        \
-        /* x is an iterator with the maximum length_hint. FIXME enable. */                        \
-        /*_faulty_iter_test_succeeds(setup, iter_name,                                            \
-                new_faulty_iter(                                                                  \
-                        iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, yp_SSIZE_T_MAX),    \
-                statement, assertion, tear_down, "hint_max", exc_suffix, statement_str);       */ \
+// XXX The tests with yp_GeneratorExit are to ensure it's not treated like yp_StopIteration.
+#define _faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down,       \
+        exc_suffix, statement_str)                                                                 \
+    do {                                                                                           \
+        yp_ssize_t _ypmt_FLT_ITR_len = yp_lenC_not_raises(iter_supplier);                          \
+        if (_ypmt_FLT_ITR_len < 2) {                                                               \
+            munit_error("iter_supplier must contain at least two entries");                        \
+        }                                                                                          \
+        /* x is yp_StopIteration; it should not be confused with "exhausted". */                   \
+        _faulty_iter_test_raises(setup, iter_name, yp_StopIteration, statement, tear_down,         \
+                "exc_passthrough", exc_suffix, yp_StopIteration, statement_str);                   \
+        /* x is an iterator that fails at the start. */                                            \
+        _faulty_iter_test_raises(setup, iter_name,                                                 \
+                new_faulty_iter(iter_supplier, 0, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,   \
+                tear_down, "fail_start", exc_suffix, yp_SyntaxError, statement_str);               \
+        /* x is an iterator that fails mid-way. */                                                 \
+        _faulty_iter_test_raises(setup, iter_name,                                                 \
+                new_faulty_iter(iter_supplier, 1, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,   \
+                tear_down, "fail_mid", exc_suffix, yp_SyntaxError, statement_str);                 \
+        /* x is an iterator that raises yp_GeneratorExit at the start. */                          \
+        _faulty_iter_test_raises(setup, iter_name,                                                 \
+                new_faulty_iter(iter_supplier, 0, yp_GeneratorExit, _ypmt_FLT_ITR_len), statement, \
+                tear_down, "fail_start", exc_suffix, yp_GeneratorExit, statement_str);             \
+        /* x is an iterator that raises yp_GeneratorExit when exhausted. */                        \
+        _faulty_iter_test_raises(setup, iter_name,                                                 \
+                new_faulty_iter(                                                                   \
+                        iter_supplier, _ypmt_FLT_ITR_len, yp_GeneratorExit, _ypmt_FLT_ITR_len),    \
+                statement, tear_down, "fail_end", exc_suffix, yp_GeneratorExit, statement_str);    \
+        /* x is an iterator with a too-small length_hint. */                                       \
+        _faulty_iter_test_succeeds(setup, iter_name,                                               \
+                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, 1),          \
+                statement, assertion, tear_down, "hint_small", exc_suffix, statement_str);         \
+        /* x is an iterator with a too-large length_hint. */                                       \
+        _faulty_iter_test_succeeds(setup, iter_name,                                               \
+                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,              \
+                        _ypmt_FLT_ITR_len + 100),                                                  \
+                statement, assertion, tear_down, "hint_large", exc_suffix, statement_str);         \
+        /* x is an iterator with the maximum length_hint. FIXME enable. */                         \
+        /*_faulty_iter_test_succeeds(setup, iter_name,                                             \
+                new_faulty_iter(                                                                   \
+                        iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, yp_SSIZE_T_MAX),     \
+                statement, assertion, tear_down, "hint_max", exc_suffix, statement_str);       */  \
     } while (0)
 
 // Executes a series of tests using a "faulty iterator" that either raises an exception during
