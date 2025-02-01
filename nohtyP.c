@@ -19736,10 +19736,10 @@ static ypObject *ypFunction_callNV_withself(ypObject *f, ypObject *self, int n_a
     }
     param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
 
-    n_actual = n_args + 1;
-    if (n_actual < 0) {
+    if (n_args > INT_MAX - 1) {
         return yp_MemorySizeOverflowError;
     }
+    n_actual = n_args + 1;
 
     // XXX Resist temptation: only add special cases when it's easy AND common.
     if (ypFunction_NO_PARAMETERS(param_flags)) {
