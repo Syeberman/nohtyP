@@ -44,12 +44,12 @@ static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
 
         if (yp_eq(first, items[0]) == yp_True) {
             assert_obj(second, eq, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, eq, items[1]);
             assert_obj(second, eq, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter, x));
     }
@@ -85,12 +85,12 @@ static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
 
         if (first == items[0]) {
             assert_obj(second, is, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, is, items[1]);
             assert_obj(second, is, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter, x));
     }
@@ -142,12 +142,12 @@ static void _test_unpackN(fixture_type_t *type, void (*any_unpackN)(ypObject *, 
 
         if (yp_eq(first, items[0]) == yp_True) {
             assert_obj(second, eq, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, eq, items[1]);
             assert_obj(second, eq, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, x));
     }
@@ -172,12 +172,12 @@ static void _test_unpackN(fixture_type_t *type, void (*any_unpackN)(ypObject *, 
 
         if (first == items[0]) {
             assert_obj(second, is, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, is, items[1]);
             assert_obj(second, is, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, x));
     }
@@ -572,12 +572,12 @@ static void _test_sorted3(
 
         if (yp_eq(first, items[1]) == yp_True) {
             assert_obj(second, eq, items[0]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, eq, items[0]);
             assert_obj(second, eq, items[1]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(sorted, x, second, first));
     }
@@ -752,12 +752,12 @@ static void _test_send(fixture_type_t *type, ypObject *x_two, ypObject *(*any_it
 
         if (yp_eq(first, items[0]) == yp_True) {
             assert_obj(second, eq, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, eq, items[1]);
             assert_obj(second, eq, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter));
     }
@@ -782,12 +782,12 @@ static void _test_send(fixture_type_t *type, ypObject *x_two, ypObject *(*any_it
 
         if (first == items[0]) {
             assert_obj(second, is, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, is, items[1]);
             assert_obj(second, is, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter));
     }
@@ -868,12 +868,12 @@ static void _test_next2(fixture_type_t *type, ypObject *x_two, ypObject *(*any_i
 
         if (yp_eq(first, items[0]) == yp_True) {
             assert_obj(second, eq, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, eq, items[1]);
             assert_obj(second, eq, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter));
     }
@@ -898,12 +898,12 @@ static void _test_next2(fixture_type_t *type, ypObject *x_two, ypObject *(*any_i
 
         if (first == items[0]) {
             assert_obj(second, is, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, is, items[1]);
             assert_obj(second, is, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter));
     }
@@ -1155,12 +1155,12 @@ static void _test_iter_values(fixture_type_t *type)
         assert_raises(yp_next(iter), yp_StopIteration);
         assert_ssizeC_exc(yp_length_hintC(iter, &exc), ==, 0);
 
-        if (yp_eq(first, values[0]) == yp_True) {
+        if (yp_eq(first, values[0]) == yp_True) {  // GCOVR_EXCL_START
             assert_obj(second, eq, values[1]);
         } else {
             assert_obj(first, eq, values[1]);
             assert_obj(second, eq, values[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter, x));
     }
@@ -1186,12 +1186,12 @@ static void _test_iter_values(fixture_type_t *type)
         assert_not_raises(second = yp_next(iter));
         assert_raises(yp_next(iter), yp_StopIteration);
 
-        if (first == values[0]) {
+        if (first == values[0]) {  // GCOVR_EXCL_START
             assert_obj(second, is, values[1]);
         } else {
             assert_obj(first, is, values[1]);
             assert_obj(second, is, values[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter, x));
     }
@@ -1258,12 +1258,12 @@ static void _test_iter_items(fixture_type_t *type)
 
         assert_type_is(first, yp_t_tuple);
         assert_type_is(second, yp_t_tuple);
-        if (yp_eq(first, pairs[0]) == yp_True) {
+        if (yp_eq(first, pairs[0]) == yp_True) {  // GCOVR_EXCL_START
             assert_obj(second, eq, pairs[1]);
         } else {
             assert_obj(first, eq, pairs[1]);
             assert_obj(second, eq, pairs[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter, x));
     }
@@ -1289,7 +1289,7 @@ static void _test_iter_items(fixture_type_t *type)
         assert_not_raises(second = yp_next(iter));
         assert_raises(yp_next(iter), yp_StopIteration);
 
-        if (yp_eq(first, pairs[0]) == yp_True) {
+        if (yp_eq(first, pairs[0]) == yp_True) {  // GCOVR_EXCL_START
             ead(item, yp_getindexC(first, 0), assert_obj(item, is, keys[0]));
             ead(item, yp_getindexC(first, 1), assert_obj(item, is, values[0]));
             ead(item, yp_getindexC(second, 0), assert_obj(item, is, keys[1]));
@@ -1299,7 +1299,7 @@ static void _test_iter_items(fixture_type_t *type)
             ead(item, yp_getindexC(first, 1), assert_obj(item, is, values[1]));
             ead(item, yp_getindexC(second, 0), assert_obj(item, is, keys[0]));
             ead(item, yp_getindexC(second, 1), assert_obj(item, is, values[0]));
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, iter, x));
     }
@@ -1378,12 +1378,12 @@ static void _test_miniiter(
 
         if (yp_eq(first, items[0]) == yp_True) {
             assert_obj(second, eq, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, eq, items[1]);
             assert_obj(second, eq, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, mi, x));
     }
@@ -1421,12 +1421,12 @@ static void _test_miniiter(
 
         if (first == items[0]) {
             assert_obj(second, is, items[1]);
-        } else {
+        } else {  // GCOVR_EXCL_START
             // Only set-likes and mappings are allowed to iterate out of order.
             assert_true(type->is_setlike || type->is_mapping);
             assert_obj(first, is, items[1]);
             assert_obj(second, is, items[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, mi, x));
     }
@@ -1518,12 +1518,12 @@ static void _test_miniiter_values(fixture_type_t *type)
         assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
         assert_ssizeC_exc(yp_miniiter_length_hintC(mi, &mi_state, &exc), ==, 0);
 
-        if (yp_eq(first, values[0]) == yp_True) {
+        if (yp_eq(first, values[0]) == yp_True) {  // GCOVR_EXCL_START
             assert_obj(second, eq, values[1]);
         } else {
             assert_obj(first, eq, values[1]);
             assert_obj(second, eq, values[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, mi, x));
     }
@@ -1550,12 +1550,12 @@ static void _test_miniiter_values(fixture_type_t *type)
         assert_not_raises(second = yp_miniiter_next(mi, &mi_state));
         assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
 
-        if (first == values[0]) {
+        if (first == values[0]) {  // GCOVR_EXCL_START
             assert_obj(second, is, values[1]);
         } else {
             assert_obj(first, is, values[1]);
             assert_obj(second, is, values[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first, mi, x));
     }
@@ -1634,14 +1634,14 @@ static void _test_miniiter_items(fixture_type_t *type)
         assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
         assert_ssizeC_exc(yp_miniiter_length_hintC(mi, &mi_state, &exc), ==, 0);
 
-        if (yp_eq(first_key, keys[0]) == yp_True) {
+        if (yp_eq(first_key, keys[0]) == yp_True) {  // GCOVR_EXCL_START
             assert_obj(first_value, eq, values[0]);
             assert_obj(second, eq, pairs[1]);
         } else {
             assert_obj(first_key, eq, keys[1]);
             assert_obj(first_value, eq, values[1]);
             assert_obj(second, eq, pairs[0]);
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first_value, first_key, mi, x));
     }
@@ -1675,7 +1675,7 @@ static void _test_miniiter_items(fixture_type_t *type)
         assert_not_raises(second = yp_miniiter_next(mi, &mi_state));
         assert_raises_exc(yp_miniiter_items_next(mi, &mi_state, &exc, &exc), yp_StopIteration);
 
-        if (first_key == keys[0]) {
+        if (first_key == keys[0]) {  // GCOVR_EXCL_START
             assert_obj(first_value, is, values[0]);
             ead(item, yp_getindexC(second, 0), assert_obj(item, is, keys[1]));
             ead(item, yp_getindexC(second, 1), assert_obj(item, is, values[1]));
@@ -1684,7 +1684,7 @@ static void _test_miniiter_items(fixture_type_t *type)
             assert_obj(first_value, is, values[1]);
             ead(item, yp_getindexC(second, 0), assert_obj(item, is, keys[0]));
             ead(item, yp_getindexC(second, 1), assert_obj(item, is, values[0]));
-        }
+        }  // GCOVR_EXCL_STOP
 
         yp_decrefN(N(second, first_value, first_key, mi, x));
     }

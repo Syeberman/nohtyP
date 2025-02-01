@@ -309,11 +309,12 @@ static void _test_new2(ypObject *(*any_new2)(ypObject *, ypObject *))
 
     // Iterator is empty.
     {
-        ypObject *iter = any_new2(yp_t_tuple, yp_tuple_empty);
+        define_function2(func_None, None_code);
+        ypObject *iter = any_new2(func_None, yp_None);
         assert_type_is(iter, yp_t_iter);
         assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
         assert_raises(yp_next(iter), yp_StopIteration);
-        yp_decrefN(N(iter));
+        yp_decrefN(N(iter, func_None));
     }
 
     // Callable requires arguments.

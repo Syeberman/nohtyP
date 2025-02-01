@@ -481,6 +481,21 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
         }
     }
 
+    // new_itemsK is used by collection types that are peers with frozendict/etc.
+    if (type->is_collection && !type->is_string && type != fixture_type_range) {
+        ypObject *keys[1];
+        ypObject *values[1];
+        ypObject *self;
+        obj_array_fill(keys, NULL, type->rand_items);
+        obj_array_fill(values, NULL, type->rand_values);
+        self = new_itemsK(type, fixture_type_tuple, 1, keys[0], values[0]);
+        assert_type_is(self, type->yp_type);
+        assert_len(self, 1);
+        obj_array_decref(values);
+        obj_array_decref(keys);
+        yp_decrefN(N(self));
+    }
+
     return MUNIT_OK;
 }
 
