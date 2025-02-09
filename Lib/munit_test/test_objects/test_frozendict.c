@@ -210,24 +210,24 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
     uniqueness_dealloc(uq);
 }
 
-static ypObject *newK_to_frozendictKV(int n, ...)
+static ypObject *newK_to_frozendictKV(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = yp_frozendictKV(n, args);
+    va_start(args, k);
+    result = yp_frozendictKV(k, args);
     va_end(args);
     return result;
 }
 
-static ypObject *newK_to_dictKV(int n, ...)
+static ypObject *newK_to_dictKV(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = yp_dictKV(n, args);
+    va_start(args, k);
+    result = yp_dictKV(k, args);
     va_end(args);
     return result;
 }
@@ -254,14 +254,14 @@ static MunitResult test_newK(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-static ypObject *newK_to_frozendict(int n, ...)
+static ypObject *newK_to_frozendict(int k, ...)
 {
     va_list   args;
     ypObject *iterable;
     ypObject *result;
 
-    va_start(args, n);
-    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     result = yp_frozendict(iterable);
@@ -269,14 +269,14 @@ static ypObject *newK_to_frozendict(int n, ...)
     return result;
 }
 
-static ypObject *newK_to_dict(int n, ...)
+static ypObject *newK_to_dict(int k, ...)
 {
     va_list   args;
     ypObject *iterable;
     ypObject *result;
 
-    va_start(args, n);
-    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     result = yp_dict(iterable);
@@ -310,14 +310,14 @@ static MunitResult test_new(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-static ypObject *newK_to_call_args_t_frozendict(int n, ...)
+static ypObject *newK_to_call_args_t_frozendict(int k, ...)
 {
     va_list   args;
     ypObject *iterable;
     ypObject *result;
 
-    va_start(args, n);
-    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     result = yp_callN(yp_t_frozendict, 1, iterable);
@@ -330,14 +330,14 @@ static ypObject *new_to_call_args_t_frozendict(ypObject *iterable)
     return yp_callN(yp_t_frozendict, 1, iterable);
 }
 
-static ypObject *newK_to_call_args_t_dict(int n, ...)
+static ypObject *newK_to_call_args_t_dict(int k, ...)
 {
     va_list   args;
     ypObject *iterable;
     ypObject *result;
 
-    va_start(args, n);
-    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     result = yp_callN(yp_t_dict, 1, iterable);

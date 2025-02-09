@@ -1188,11 +1188,11 @@ tear_down:
     yp_decrefN(N(pair.hashable, pair.unhashable));
 }
 
-static void updateK_to_updateKV(ypObject *mapping, ypObject **exc, int n, ...)
+static void updateK_to_updateKV(ypObject *mapping, ypObject **exc, int k, ...)
 {
     va_list args;
-    va_start(args, n);
-    yp_updateKV(mapping, exc, n, args);
+    va_start(args, k);
+    yp_updateKV(mapping, exc, k, args);
     va_end(args);
 }
 
@@ -1438,34 +1438,34 @@ tear_down:
     yp_decrefN(N(not_iterable, pair.hashable, pair.unhashable));
 }
 
-static void updateK_to_update_fromiter(ypObject *mapping, ypObject **exc, int n, ...)
+static void updateK_to_update_fromiter(ypObject *mapping, ypObject **exc, int k, ...)
 {
     va_list   args;
     ypObject *x;
-    va_start(args, n);
-    x = new_itemsKV(fixture_type_iter, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    x = new_itemsKV(fixture_type_iter, fixture_type_tuple, k, args);  // new ref
     va_end(args);
     yp_update(mapping, x, exc);
     yp_decref(x);
 }
 
-static void updateK_to_update_fromfrozendict(ypObject *mapping, ypObject **exc, int n, ...)
+static void updateK_to_update_fromfrozendict(ypObject *mapping, ypObject **exc, int k, ...)
 {
     va_list   args;
     ypObject *x;
-    va_start(args, n);
-    assert_not_raises(x = yp_frozendictKV(n, args));  // new ref
+    va_start(args, k);
+    assert_not_raises(x = yp_frozendictKV(k, args));  // new ref
     va_end(args);
     yp_update(mapping, x, exc);
     yp_decref(x);
 }
 
-static void updateK_to_update_fromdict(ypObject *mapping, ypObject **exc, int n, ...)
+static void updateK_to_update_fromdict(ypObject *mapping, ypObject **exc, int k, ...)
 {
     va_list   args;
     ypObject *x;
-    va_start(args, n);
-    assert_not_raises(x = yp_dictKV(n, args));  // new ref
+    va_start(args, k);
+    assert_not_raises(x = yp_dictKV(k, args));  // new ref
     va_end(args);
     yp_update(mapping, x, exc);
     yp_decref(x);

@@ -326,16 +326,15 @@ ypAPI ypObject *yp_setNV(int n, va_list args);
 ypAPI ypObject *yp_frozenset(ypObject *iterable);
 ypAPI ypObject *yp_set(ypObject *iterable);
 
-// Returns a new reference to a frozendict/dict containing the given n (key, value) pairs (for a
-// total of 2*n objects); the length will be n, unless there are duplicate keys, in which case the
+// Returns a new reference to a frozendict/dict containing the given k (key, value) pairs (for a
+// total of 2*k objects); the length will be k, unless there are duplicate keys, in which case the
 // last value will be retained.
 //
 // Ex: yp_dictK(3, key0, value0, key1, value1, key2, value2)
-// FIXME Rename `n` to `k` to reflect `K`?
-ypAPI ypObject *yp_frozendictK(int n, ...);
-ypAPI ypObject *yp_frozendictKV(int n, va_list args);
-ypAPI ypObject *yp_dictK(int n, ...);
-ypAPI ypObject *yp_dictKV(int n, va_list args);
+ypAPI ypObject *yp_frozendictK(int k, ...);
+ypAPI ypObject *yp_frozendictKV(int k, va_list args);
+ypAPI ypObject *yp_dictK(int k, ...);
+ypAPI ypObject *yp_dictKV(int k, va_list args);
 
 // Returns a new reference to a frozendict/dict containing the given n keys all set to value; the
 // length will be n, unless there are duplicate keys. The Python-equivalent default of value is
@@ -917,11 +916,11 @@ ypAPI void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value);
 // not in the map. The Python-equivalent "default" for default_ is yp_None.
 ypAPI ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *default_);
 
-// Add the given n (key, value) pairs (for a total of 2*n objects) to mapping, overwriting existing
+// Add the given k (key, value) pairs (for a total of 2*k objects) to mapping, overwriting existing
 // keys. If a given key is seen more than once, the last value is retained. Sets *exc on error. Note
-// that exc is before n as you cannot have arguments after ellipsis.
-ypAPI void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...);
-ypAPI void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args);
+// that exc is before k as you cannot have arguments after ellipsis.
+ypAPI void yp_updateK(ypObject *mapping, ypObject **exc, int k, ...);
+ypAPI void yp_updateKV(ypObject *mapping, ypObject **exc, int k, va_list args);
 
 // Add the elements from x to mapping. x is handled as per yp_dict. Sets *exc on error.
 ypAPI void yp_update(ypObject *mapping, ypObject *x, ypObject **exc);
@@ -1169,11 +1168,11 @@ ypAPI ypObject *const yp_str_empty;
 ypAPI ypObject *yp_formatN(ypObject *s, int n, ...);
 ypAPI ypObject *yp_formatNV(ypObject *s, int n, va_list args);
 
-// Similar to yp_formatN, except each replacement field contains the name of one of the n (key,
-// value) pairs (for a total of 2*n objects). (Implementation note: this function is optimized for
+// Similar to yp_formatN, except each replacement field contains the name of one of the k (key,
+// value) pairs (for a total of 2*k objects). (Implementation note: this function is optimized for
 // in-order replacement field names.)
-ypAPI ypObject *yp_formatK(ypObject *s, int n, ...);
-ypAPI ypObject *yp_formatKV(ypObject *s, int n, va_list args);
+ypAPI ypObject *yp_formatK(ypObject *s, int k, ...);
+ypAPI ypObject *yp_formatKV(ypObject *s, int k, va_list args);
 
 // Similar to yp_formatN, except each replacement field can contain either the numeric index of an
 // item in sequence, or the name of a key from mapping. The Python-equivalent default for sequence

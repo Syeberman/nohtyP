@@ -196,7 +196,7 @@ class c_ypObject_pp(c_ypObject_p*1):
 # Special-case arguments
 c_ypObject_pp_exc = (c_ypObject_pp, "exc", None)
 c_multiN_ypObject_p = (c_int, "n", 0)
-c_multiK_ypObject_p = (c_int, "n", 0)
+c_multiK_ypObject_p = (c_int, "k", 0)
 assert c_multiN_ypObject_p is not c_multiK_ypObject_p
 
 # ypObject *yp_incref(ypObject *x);
@@ -348,7 +348,7 @@ yp_func(c_ypObject_p, "yp_frozenset", ((c_ypObject_p, "iterable"), ))
 # ypObject *yp_set(ypObject *iterable);
 yp_func(c_ypObject_p, "yp_set", ((c_ypObject_p, "iterable"), ))
 
-# ypObject *yp_dictK(int n, ...);
+# ypObject *yp_dictK(int k, ...);
 yp_func(c_ypObject_p, "yp_dictK", (c_multiK_ypObject_p, ))
 
 # ypObject *yp_frozendict_fromkeysN(ypObject *value, int n, ...);
@@ -563,7 +563,7 @@ yp_func(c_void, "yp_popitem", ((c_ypObject_p, "mapping"), (c_ypObject_pp, "key")
 yp_func(c_ypObject_p, "yp_setdefault",
         ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "default_")))
 
-# void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...);
+# void yp_updateK(ypObject *mapping, ypObject **exc, int k, ...);
 yp_func(c_void, "yp_updateK", ((c_ypObject_p, "mapping"), c_ypObject_pp_exc, c_multiK_ypObject_p))
 
 # ypObject *yp_iter_values(ypObject *mapping);

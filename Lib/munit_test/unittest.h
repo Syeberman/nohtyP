@@ -384,8 +384,8 @@ for i in range(1, 35):
     do {                                                                                     \
         T _ypmt_TYPEC_a;                                                                     \
         T _ypmt_TYPEC_b;                                                                     \
-        _assert_not_raises_exc(_ypmt_TYPEC_a = (a_statement); _ypmt_TYPEC_b = (b_statement), \
-                               a_fmt " " #op " " b_fmt, __VA_ARGS__);                        \
+        _assert_not_raises_exc(_ypmt_TYPEC_a = (a_statement);                                \
+                _ypmt_TYPEC_b = (b_statement), a_fmt " " #op " " b_fmt, __VA_ARGS__);        \
         _assert_typeC(_ypmt_TYPEC_a, op, _ypmt_TYPEC_b, val_pri, a_fmt, b_fmt, __VA_ARGS__); \
     } while (0)
 
@@ -635,7 +635,7 @@ extern int _assert_setlike_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
         _assert_setlike(_ypmt_SET_obj, _ypmt_SET_items, "%s", _ypmt_SET_item_strs, #obj); \
     } while (0)
 
-extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t n,
+extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t k,
         ypObject **items, ypObject **actual_key, ypObject **actual_value, yp_ssize_t *items_i);
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
@@ -1108,11 +1108,11 @@ extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type);
 extern ypObject *new_iterN(int n, ...);
 extern ypObject *new_iterNV(int n, va_list args);
 
-// Returns an object of the given outer type containing the n (key, value) pairs of the given inner
+// Returns an object of the given outer type containing the k (key, value) pairs of the given inner
 // type. The pairs are constructed by calling inner->newN, while the object is constructed by
 // calling outer->new_ with a list of the pairs.
-extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int n, ...);
-extern ypObject *new_itemsKV(fixture_type_t *outer, fixture_type_t *inner, int n, va_list args);
+extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int k, ...);
+extern ypObject *new_itemsKV(fixture_type_t *outer, fixture_type_t *inner, int k, va_list args);
 
 // Returns an iterator that yields values from supplier (an iterable) until n values have been
 // yielded, after which the given exception is raised. The iterator is initialized with the given

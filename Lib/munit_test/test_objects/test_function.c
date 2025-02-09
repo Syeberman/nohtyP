@@ -2648,8 +2648,8 @@ static ypObject *callN_to_call_stars_iter(ypObject *c, int n, ...)
 }
 
 // Accepts the "yp_callK" signature (not actually implemented, yet) and instead calls yp_call_stars
-// with a frozendict. For use in _test_callK. n must be >= 0.
-static ypObject *callK_to_call_stars_frozendict(ypObject *c, int n, ...)
+// with a frozendict. For use in _test_callK. k must be >= 0.
+static ypObject *callK_to_call_stars_frozendict(ypObject *c, int k, ...)
 {
     va_list   args;
     ypObject *as_frozendict;
@@ -2658,8 +2658,8 @@ static ypObject *callK_to_call_stars_frozendict(ypObject *c, int n, ...)
 
     // If args contains an exception, as_frozendict will be that exception. We could
     // assert_not_raises here, but this tests that yp_call_stars fails if kwargs is an exception.
-    va_start(args, n);
-    as_frozendict = yp_frozendictKV(n, args);  // new ref
+    va_start(args, k);
+    as_frozendict = yp_frozendictKV(k, args);  // new ref
     va_end(args);
 
     result = yp_call_stars(c, list_empty, as_frozendict);

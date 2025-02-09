@@ -543,9 +543,9 @@ namespace nohtyP
         internal static extern ypObject_p yp_set( ypObject_p iterable );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_frozendictK( int n, params ypObject_p[] args );
+        internal static extern ypObject_p yp_frozendictK( int k, params ypObject_p[] args );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_dictK( int n, params ypObject_p[] args );
+        internal static extern ypObject_p yp_dictK( int k, params ypObject_p[] args );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_frozendict_fromkeysN( ypObject_p value, int n, params ypObject_p[] args );
@@ -851,7 +851,7 @@ namespace nohtyP
         internal static extern ypObject_p yp_setdefault( ref ypObject_p mapping, ypObject_p key, ypObject_p default_ );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_updateK( ref ypObject_p mapping, int n, params ypObject_p[] args );
+        internal static extern void yp_updateK( ref ypObject_p mapping, int k, params ypObject_p[] args );
 
         internal static ypObject_p yp_s_ascii = DllImportData( "yp_s_ascii" );
         internal static ypObject_p yp_s_latin_1 = DllImportData( "yp_s_latin_1" );

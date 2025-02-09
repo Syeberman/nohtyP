@@ -12194,8 +12194,8 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
 ypObject *yp_formatN(ypObject *s, int n, ...) { return yp_NotImplementedError; }
 ypObject *yp_formatNV(ypObject *s, int n, va_list args) { return yp_NotImplementedError; }
 
-ypObject *yp_formatK(ypObject *s, int n, ...) { return yp_NotImplementedError; }
-ypObject *yp_formatKV(ypObject *s, int n, va_list args) { return yp_NotImplementedError; }
+ypObject *yp_formatK(ypObject *s, int k, ...) { return yp_NotImplementedError; }
+ypObject *yp_formatKV(ypObject *s, int k, va_list args) { return yp_NotImplementedError; }
 
 ypObject *yp_format(ypObject *s, ypObject *sequence, ypObject *mapping)
 {
@@ -17863,21 +17863,21 @@ static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *default_
     }
 }
 
-static ypObject *dict_updateK(ypObject *mp, int n, va_list args)
+static ypObject *dict_updateK(ypObject *mp, int k, va_list args)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
     ypObject  *result;
     ypObject  *key;
     ypObject  *value;
 
-    while (n > 0) {
+    while (k > 0) {
         // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
         key = va_arg(args, ypObject *);  // borrowed
         if (yp_isexceptionC(key)) return key;
         value = va_arg(args, ypObject *);  // borrowed
         if (yp_isexceptionC(value)) return value;
-        n -= 1;
-        result = _ypDict_push_byhash(mp, key, value, &spaceleft, n);
+        k -= 1;
+        result = _ypDict_push_byhash(mp, key, value, &spaceleft, k);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -18294,19 +18294,19 @@ static ypTypeObject ypDict_Type = {
 // Constructors
 
 // XXX Handle the "no items" case first.
-static ypObject *_ypDictKV(int type, int n, va_list args)
+static ypObject *_ypDictKV(int type, int k, va_list args)
 {
     ypObject *newMp;
     ypObject *result;
 
-    yp_ASSERT1(n > 0);
+    yp_ASSERT1(k > 0);
 
     // We set alloclen_fixed to TRUE here because we know for certain that we will not be adding
-    // more than n entries.
-    newMp = _ypDict_new_fromhint(type, n, /*alloclen_fixed=*/TRUE);
+    // more than k entries.
+    newMp = _ypDict_new_fromhint(type, k, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newMp)) return newMp;
 
-    result = dict_updateK(newMp, n, args);
+    result = dict_updateK(newMp, k, args);
     if (yp_isexceptionC(result)) {
         yp_decref(newMp);
         return result;
@@ -18314,26 +18314,26 @@ static ypObject *_ypDictKV(int type, int n, va_list args)
     return newMp;
 }
 
-ypObject *yp_frozendictK(int n, ...)
+ypObject *yp_frozendictK(int k, ...)
 {
-    if (n < 1) return yp_frozendict_empty;
-    return_yp_NV_FUNC(ypObject *, _ypDictKV, (ypFrozenDict_CODE, n, args), n);
+    if (k < 1) return yp_frozendict_empty;
+    return_yp_NV_FUNC(ypObject *, _ypDictKV, (ypFrozenDict_CODE, k, args), k);
 }
-ypObject *yp_frozendictKV(int n, va_list args)
+ypObject *yp_frozendictKV(int k, va_list args)
 {
-    if (n < 1) return yp_frozendict_empty;
-    return _ypDictKV(ypFrozenDict_CODE, n, args);
+    if (k < 1) return yp_frozendict_empty;
+    return _ypDictKV(ypFrozenDict_CODE, k, args);
 }
 
-ypObject *yp_dictK(int n, ...)
+ypObject *yp_dictK(int k, ...)
 {
-    if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return_yp_NV_FUNC(ypObject *, _ypDictKV, (ypDict_CODE, n, args), n);
+    if (k < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
+    return_yp_NV_FUNC(ypObject *, _ypDictKV, (ypDict_CODE, k, args), k);
 }
-ypObject *yp_dictKV(int n, va_list args)
+ypObject *yp_dictKV(int k, va_list args)
 {
-    if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return _ypDictKV(ypDict_CODE, n, args);
+    if (k < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
+    return _ypDictKV(ypDict_CODE, k, args);
 }
 
 // XXX Handle the "fellow frozendict" case _before_ calling this function.
@@ -20600,13 +20600,13 @@ ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *default_)
     return result;
 }
 
-void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...)
+void yp_updateK(ypObject *mapping, ypObject **exc, int k, ...)
 {
-    return_yp_KV_FUNC_void(yp_updateKV, (mapping, exc, n, args), n);
+    return_yp_KV_FUNC_void(yp_updateKV, (mapping, exc, k, args), k);
 }
-void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args)
+void yp_updateKV(ypObject *mapping, ypObject **exc, int k, va_list args)
 {
-    _yp_REDIRECT_EXC2(mapping, tp_as_mapping, tp_updateK, (mapping, n, args), exc);
+    _yp_REDIRECT_EXC2(mapping, tp_as_mapping, tp_updateK, (mapping, k, args), exc);
 }
 
 int yp_iscallableC(ypObject *x) { return ypObject_IS_CALLABLE(x); }
@@ -21155,7 +21155,6 @@ static void _ypMem_initialize(const yp_initialize_parameters_t *args)
 
 // Called *exactly* *once* by yp_initialize to set up the codecs module. Errors are largely
 // ignored: calling code will fail gracefully later on.
-// FIXME Since this is initialization, we should abort on any error. (yp_ASSERT is only debug.)
 static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
 {
     ypObject *exc = yp_None;
@@ -21171,11 +21170,13 @@ static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
         yp_s_ucs_2,     yp_s_ucs_4
     );
     // clang-format on
+    yp_ASSERT1(!yp_isexceptionC(_yp_codecs_standard));
 
     // Codec aliases
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a length_hint
     // (yp_dict_fromlength_hint?)
     _yp_codecs_alias2encoding = yp_dictK(0);
+    yp_ASSERT1(!yp_isexceptionC(_yp_codecs_alias2encoding));
 #define yp_codecs_init_ADD_ALIAS(alias, name)                            \
     do {                                                                 \
         yp_IMMORTAL_STR_LATIN_1(_alias_obj, alias);                      \
@@ -21210,6 +21211,7 @@ static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a length_hint
     // (yp_dict_fromlength_hint?)
     _yp_codecs_errors2handler = yp_dictK(0);
+    yp_ASSERT1(!yp_isexceptionC(_yp_codecs_errors2handler));
 #define yp_codecs_init_ADD_ERROR(name, func)                                          \
     do {                                                                              \
         yp_o2i_setitemC(_yp_codecs_errors2handler, (name), (yp_ssize_t)(func), &exc); \

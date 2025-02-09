@@ -486,11 +486,11 @@ static void rand_objs_any_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **arr
 }
 
 
-static ypObject *_new_items_listKV(fixture_type_t *inner, int n, va_list args)
+static ypObject *_new_items_listKV(fixture_type_t *inner, int k, va_list args)
 {
     ypObject *result;
     assert_not_raises(result = yp_listN(0));  // new ref
-    for (/*n already initialized*/; n > 0; n--) {
+    for (/*k already initialized*/; k > 0; k--) {
         ypObject *item;
         // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
         ypObject *key = va_arg(args, ypObject *);              // borrowed
@@ -502,10 +502,10 @@ static ypObject *_new_items_listKV(fixture_type_t *inner, int n, va_list args)
     return result;
 }
 
-extern ypObject *new_itemsKV(fixture_type_t *outer, fixture_type_t *inner, int n, va_list args)
+extern ypObject *new_itemsKV(fixture_type_t *outer, fixture_type_t *inner, int k, va_list args)
 {
     ypObject *result;
-    ypObject *list = _new_items_listKV(inner, n, args);  // new ref
+    ypObject *list = _new_items_listKV(inner, k, args);  // new ref
 
     if (outer == fixture_type_list) {
         return list;
@@ -519,12 +519,12 @@ extern ypObject *new_itemsKV(fixture_type_t *outer, fixture_type_t *inner, int n
     }
 }
 
-extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int n, ...)
+extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int k, ...)
 {
     ypObject *result;
     va_list   args;
-    va_start(args, n);
-    result = new_itemsKV(outer, inner, n, args);  // new ref
+    va_start(args, k);
+    result = new_itemsKV(outer, inner, k, args);  // new ref
     va_end(args);
     return result;
 }
@@ -966,13 +966,13 @@ extern ypObject *new_iterN(int n, ...)
     return result;
 }
 
-static ypObject *newK_iter(int n, ...)
+static ypObject *newK_iter(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = new_itemsKV(fixture_type_iter, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_iter, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     return result;
@@ -1503,13 +1503,13 @@ static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-static ypObject *newK_tuple(int n, ...)
+static ypObject *newK_tuple(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = new_itemsKV(fixture_type_tuple, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_tuple, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     return result;
@@ -1564,13 +1564,13 @@ static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-static ypObject *newK_list(int n, ...)
+static ypObject *newK_list(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = _new_items_listKV(fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    result = _new_items_listKV(fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     return result;
@@ -1634,13 +1634,13 @@ static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-static ypObject *newK_frozenset(int n, ...)
+static ypObject *newK_frozenset(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = new_itemsKV(fixture_type_frozenset, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_frozenset, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     return result;
@@ -1698,13 +1698,13 @@ static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-static ypObject *newK_set(int n, ...)
+static ypObject *newK_set(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = new_itemsKV(fixture_type_set, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_set, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     return result;
@@ -1800,13 +1800,13 @@ static ypObject *new_frozenset_dirtyN(int n, ...)
     return result;
 }
 
-static ypObject *newK_frozenset_dirty(int n, ...)
+static ypObject *newK_frozenset_dirty(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = new_itemsKV(fixture_type_frozenset_dirty, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_frozenset_dirty, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     return result;
@@ -1876,13 +1876,13 @@ static ypObject *new_set_dirtyN(int n, ...)
     return result;
 }
 
-static ypObject *newK_set_dirty(int n, ...)
+static ypObject *newK_set_dirty(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = new_itemsKV(fixture_type_set_dirty, fixture_type_tuple, n, args);  // new ref
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_set_dirty, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     return result;
@@ -2183,13 +2183,13 @@ static ypObject *new_frozendict_dirtyN(int n, ...)
     return result;
 }
 
-static ypObject *new_frozendict_dirtyK(int n, ...)
+static ypObject *new_frozendict_dirtyK(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    assert_not_raises(result = yp_dictKV(n, args));  // new ref
+    va_start(args, k);
+    assert_not_raises(result = yp_dictKV(k, args));  // new ref
     va_end(args);
 
     make_dict_dirty(result);
@@ -2262,13 +2262,13 @@ static ypObject *new_dict_dirtyN(int n, ...)
     return result;
 }
 
-static ypObject *new_dict_dirtyK(int n, ...)
+static ypObject *new_dict_dirtyK(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    assert_not_raises(result = yp_dictKV(n, args));  // new ref
+    va_start(args, k);
+    assert_not_raises(result = yp_dictKV(k, args));  // new ref
     va_end(args);
 
     make_dict_dirty(result);
