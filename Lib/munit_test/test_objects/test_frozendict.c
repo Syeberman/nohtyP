@@ -101,9 +101,9 @@ static void _test_newK(
         assert_isexception(any_newK(K(yp_SyntaxError, yp_None)), yp_SyntaxError);
         assert_isexception(any_newK(K(yp_None, yp_SyntaxError)), yp_SyntaxError);
         assert_isexception(
-                any_newK(K(yp_i_one, yp_i_one, yp_SyntaxError, yp_None)), yp_SyntaxError);
+                any_newK(K(keys[0], values[0], yp_SyntaxError, yp_None)), yp_SyntaxError);
         assert_isexception(
-                any_newK(K(yp_i_one, yp_i_one, yp_None, yp_SyntaxError)), yp_SyntaxError);
+                any_newK(K(keys[0], values[0], yp_None, yp_SyntaxError)), yp_SyntaxError);
     }
 
     obj_array_decref(values);
@@ -462,11 +462,11 @@ static void _test_call_type(fixture_type_t *type, peer_type_t *peer)
 
     // Invalid arguments.
     {
-        ypObject *args_two = yp_tupleN(N(yp_frozendict_empty, yp_frozendict_empty));
-        assert_raises(
-                yp_callN(type->yp_type, N(yp_frozendict_empty, yp_frozendict_empty)), yp_TypeError);
+        ypObject *dict_empty = yp_dictK(0);
+        ypObject *args_two = yp_tupleN(N(dict_empty, dict_empty));
+        assert_raises(yp_callN(type->yp_type, N(dict_empty, dict_empty)), yp_TypeError);
         assert_raises(yp_call_stars(type->yp_type, args_two, yp_frozendict_empty), yp_TypeError);
-        yp_decrefN(N(args_two));
+        yp_decrefN(N(args_two, dict_empty));
     }
 
     // Iterator exceptions and bad length hints when merged with keyword arguments.
@@ -667,8 +667,10 @@ static void _test_fromkeys(fixture_type_t *type, peer_type_t  *peer,
 
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_fromkeys(yp_SyntaxError, yp_None), yp_SyntaxError);
-        assert_isexception(any_fromkeys(yp_tuple_empty, yp_SyntaxError), yp_SyntaxError);
+        ypObject *list_empty = yp_listN(0);
+        assert_isexception(any_fromkeys(yp_SyntaxError, list_empty), yp_SyntaxError);
+        assert_isexception(any_fromkeys(list_empty, yp_SyntaxError), yp_SyntaxError);
+        yp_decrefN(N(list_empty));
     }
 
     obj_array_decref(values);

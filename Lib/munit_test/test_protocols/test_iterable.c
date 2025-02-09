@@ -5,10 +5,10 @@
 // TODO Ensure yp_max_key/etc properly handles exception passthrough, even in cases where
 // one of the arguments would be ignored.
 
-// Used as the code for a function. Unconditionally returns zero.
+// Used as the code for a function. Unconditionally returns intstore zero.
 static ypObject *zero_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
-    return yp_i_zero;
+    return yp_intstoreC(0);
 }
 
 // Used as the code for a function. Unconditionally returns the first argument.
@@ -456,16 +456,17 @@ static MunitResult test_func_reversed(const MunitParameter params[], fixture_t *
     // Invalid arguments.
     {
         ypObject *x = rand_obj(NULL, type);
+        ypObject *list_empty = yp_listN(0);
         ypObject *kwargs_sequence = yp_frozendictK(K(str_sequence, x));
         ypObject *kwargs_rand = yp_frozendictK(K(str_rand, x));
 
         assert_raises(yp_callN(yp_func_reversed, 0), yp_TypeError);
-        assert_raises(yp_callN(yp_func_reversed, N(x, yp_tuple_empty)), yp_TypeError);
+        assert_raises(yp_callN(yp_func_reversed, N(x, list_empty)), yp_TypeError);
         assert_raises(
                 yp_call_stars(yp_func_reversed, yp_tuple_empty, kwargs_sequence), yp_TypeError);
         assert_raises(yp_call_stars(yp_func_reversed, yp_tuple_empty, kwargs_rand), yp_TypeError);
 
-        yp_decrefN(N(kwargs_rand, kwargs_sequence, x));
+        yp_decrefN(N(kwargs_rand, kwargs_sequence, list_empty, x));
     }
 
     yp_decrefN(N(str_rand, str_sequence));
@@ -614,11 +615,17 @@ static void _test_sorted3(
     assert_raises(any_sorted3(not_iterable, key_zero, yp_True), yp_TypeError);
 
     // Exception passthrough.
-    assert_raises(any_sorted3(yp_SyntaxError, yp_None, yp_False), yp_SyntaxError);
-    assert_raises(any_sorted3(yp_StopIteration, yp_None, yp_False), yp_StopIteration);
-    assert_raises(any_sorted3(yp_GeneratorExit, yp_None, yp_False), yp_GeneratorExit);
-    assert_raises(any_sorted3(yp_tuple_empty, yp_SyntaxError, yp_False), yp_SyntaxError);
-    assert_raises(any_sorted3(yp_tuple_empty, yp_None, yp_SyntaxError), yp_SyntaxError);
+    {
+        ypObject *list_empty = yp_listN(0);
+
+        assert_raises(any_sorted3(yp_SyntaxError, yp_None, yp_False), yp_SyntaxError);
+        assert_raises(any_sorted3(yp_StopIteration, yp_None, yp_False), yp_StopIteration);
+        assert_raises(any_sorted3(yp_GeneratorExit, yp_None, yp_False), yp_GeneratorExit);
+        assert_raises(any_sorted3(list_empty, yp_SyntaxError, yp_False), yp_SyntaxError);
+        assert_raises(any_sorted3(list_empty, yp_None, yp_SyntaxError), yp_SyntaxError);
+
+        yp_decrefN(N(list_empty));
+    }
 
     obj_array_decref(items);
     yp_decrefN(N(not_iterable, key_zero, key_first_arg, s_x));
@@ -690,16 +697,17 @@ static MunitResult test_func_sorted(const MunitParameter params[], fixture_t *fi
     // Invalid arguments.
     {
         ypObject *x = rand_obj(NULL, type);
+        ypObject *list_empty = yp_listN(0);
         ypObject *kwargs_iterable = yp_frozendictK(K(str_iterable, x));
         ypObject *kwargs_rand = yp_frozendictK(K(str_rand, x));
 
         assert_raises(yp_callN(yp_func_sorted, 0), yp_TypeError);
         assert_raises(yp_callN(yp_func_sorted, N(x, yp_None)), yp_TypeError);
         assert_raises(yp_callN(yp_func_sorted, N(x, yp_None, yp_False)), yp_TypeError);
-        assert_raises(yp_call_stars(yp_func_sorted, yp_tuple_empty, kwargs_iterable), yp_TypeError);
-        assert_raises(yp_call_stars(yp_func_sorted, yp_tuple_empty, kwargs_rand), yp_TypeError);
+        assert_raises(yp_call_stars(yp_func_sorted, list_empty, kwargs_iterable), yp_TypeError);
+        assert_raises(yp_call_stars(yp_func_sorted, list_empty, kwargs_rand), yp_TypeError);
 
-        yp_decrefN(N(kwargs_rand, kwargs_iterable, x));
+        yp_decrefN(N(kwargs_rand, kwargs_iterable, list_empty, x));
     }
 
     yp_decrefN(N(str_rand, str_iterable));

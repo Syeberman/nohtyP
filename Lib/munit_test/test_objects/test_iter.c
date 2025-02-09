@@ -301,7 +301,8 @@ static void _test_new2(ypObject *(*any_new2)(ypObject *, ypObject *))
         assert_intC_exc(yp_length_hintC(iter, &exc), ==, 0);
         ead(item, yp_next(iter), assert_obj(item, is, yp_tuple_empty));
         ead(item, yp_next(iter), assert_obj(item, is, yp_tuple_empty));
-        // FIXME Our test callable will never yield yp_None. We need a stateful callable.
+        // TODO Our test callable will never yield yp_None. We need a stateful callable. Until then,
+        // manually close the iter.
         assert_not_raises_exc(yp_close(iter, &exc));
         assert_raises(yp_next(iter), yp_StopIteration);
         yp_decrefN(N(iter));
@@ -376,16 +377,16 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 
     // Invalid arguments.
     {
-        ypObject *args_three = yp_tupleN(N(yp_t_tuple, yp_tuple_empty, yp_tuple_empty));
+        ypObject *list_empty = yp_listN(0);
+        ypObject *args_three = yp_tupleN(N(yp_t_tuple, list_empty, list_empty));
         ypObject *kwargs_object = yp_frozendictK(K(str_object, yp_t_tuple));
         ypObject *kwargs_sentinel =
-                yp_frozendictK(K(str_object, yp_t_tuple, str_sentinel, yp_tuple_empty));
+                yp_frozendictK(K(str_object, yp_t_tuple, str_sentinel, list_empty));
         ypObject *kwargs_cls = yp_frozendictK(K(str_cls, yp_t_iter, str_object, yp_t_tuple));
         ypObject *kwargs_rand = yp_frozendictK(K(str_rand, yp_t_tuple));
 
         assert_raises(yp_callN(yp_t_iter, 0), yp_TypeError);
-        assert_raises(
-                yp_callN(yp_t_iter, N(yp_t_tuple, yp_tuple_empty, yp_tuple_empty)), yp_TypeError);
+        assert_raises(yp_callN(yp_t_iter, N(yp_t_tuple, list_empty, list_empty)), yp_TypeError);
         assert_raises(yp_call_stars(yp_t_iter, yp_tuple_empty, yp_frozendict_empty), yp_TypeError);
         assert_raises(yp_call_stars(yp_t_iter, args_three, yp_frozendict_empty), yp_TypeError);
         assert_raises(yp_call_stars(yp_t_iter, yp_tuple_empty, kwargs_object), yp_TypeError);
@@ -393,7 +394,8 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         assert_raises(yp_call_stars(yp_t_iter, yp_tuple_empty, kwargs_cls), yp_TypeError);
         assert_raises(yp_call_stars(yp_t_iter, yp_tuple_empty, kwargs_rand), yp_TypeError);
 
-        yp_decrefN(N(kwargs_rand, kwargs_cls, kwargs_sentinel, kwargs_object, args_three));
+        yp_decrefN(
+                N(kwargs_rand, kwargs_cls, kwargs_sentinel, kwargs_object, args_three, list_empty));
     }
 
     // x is not an iterable.
@@ -897,7 +899,6 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-// FIXME Review use of immortals (yp_tuple_empty, yp_tupleN(0)): they hide ref leaks
 static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 {
     uniqueness_t *uq = uniqueness_new();

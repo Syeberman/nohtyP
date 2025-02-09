@@ -150,7 +150,6 @@ def nohtyP_munit_test(env, munit_test):
         env.Append(MUNIT_FLAGS=[["--seed", "0x69d6ab6c"]])
 
     # Assertion failures and status updates go to stderr (see MUNIT_OUTPUT_FILE above).
-    # FIXME Round down! 1121 of 1122 (100%) tests successful, 0 (0%) test skipped.
     cov_archive, test_log = CoverageCommand(
         env,
         cov_target="$VTOP/munit_test",

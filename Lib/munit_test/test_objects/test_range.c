@@ -20,24 +20,22 @@ static void _test_rangeC(
     yp_ssize_t    i;
     yp_int_t      itemsC[8];
     yp_int_t      stepC;
-    ypObject     *i_zero = yp_intC(0);
-    ypObject     *i_one = yp_intC(1);
     ypObject     *items[yp_lengthof_array(itemsC)];
     obj_array_fill(items, uq, fixture_type_range->rand_items);
     for (i = 0; i < yp_lengthof_array(itemsC); i++) itemsC[i] = yp_asintC_not_raises(items[i]);
     stepC = itemsC[1] - itemsC[0];
 
     // Basic new.
-    ead(r, any_rangeC(1), assert_range(r, i_zero));
-    ead(r, any_rangeC(2), assert_range(r, i_zero, i_one));
-    ead(r, any_rangeC3(0, 1, 1), assert_range(r, i_zero));
-    ead(r, any_rangeC3(0, 2, 1), assert_range(r, i_zero, i_one));
+    ead(r, any_rangeC(1), assert_range(r, yp_i_zero));
+    ead(r, any_rangeC(2), assert_range(r, yp_i_zero, yp_i_one));
+    ead(r, any_rangeC3(0, 1, 1), assert_range(r, yp_i_zero));
+    ead(r, any_rangeC3(0, 2, 1), assert_range(r, yp_i_zero, yp_i_one));
     ead(r, any_rangeC3(itemsC[0], itemsC[1], stepC), assert_range(r, items[0]));
     ead(r, any_rangeC3(itemsC[0], itemsC[2], stepC), assert_range(r, items[0], items[1]));
 
     // Negated slice.
-    ead(r, any_rangeC3(1, 0, -1), assert_range(r, i_one));
-    ead(r, any_rangeC3(1, -1, -1), assert_range(r, i_one, i_zero));
+    ead(r, any_rangeC3(1, 0, -1), assert_range(r, yp_i_one));
+    ead(r, any_rangeC3(1, -1, -1), assert_range(r, yp_i_one, yp_i_zero));
     ead(r, any_rangeC3(itemsC[2], itemsC[1], -stepC), assert_range(r, items[2]));
     ead(r, any_rangeC3(itemsC[2], itemsC[0], -stepC), assert_range(r, items[2], items[1]));
 
@@ -87,7 +85,6 @@ static void _test_rangeC(
             yp_SystemLimitationError);  // too-large length
 
     obj_array_decref(items);
-    yp_decrefN(N(i_one, i_zero));
     uniqueness_dealloc(uq);
 }
 
@@ -99,33 +96,33 @@ static MunitResult test_rangeC(const MunitParameter params[], fixture_t *fixture
 
 static ypObject *rangeC_to_call_args_t_range(yp_int_t stop)
 {
-    ypObject *i_stop;
+    ypObject *ist_stop;
     ypObject *result;
-    assert_not_raises(i_stop = yp_intC(stop));
-    result = yp_callN(yp_t_range, 1, i_stop);
-    yp_decref(i_stop);
+    assert_not_raises(ist_stop = yp_intstoreC(stop));
+    result = yp_callN(yp_t_range, 1, ist_stop);
+    yp_decref(ist_stop);
     return result;
 }
 
 static ypObject *rangeC3_to_call_args_t_range(yp_int_t start, yp_int_t stop, yp_int_t step)
 {
-    ypObject *i_start;
-    ypObject *i_stop;
-    ypObject *i_step;
+    ypObject *ist_start;
+    ypObject *ist_stop;
+    ypObject *ist_step;
     ypObject *result;
-    assert_not_raises(i_start = yp_intC(start));
-    assert_not_raises(i_stop = yp_intC(stop));
-    assert_not_raises(i_step = yp_intC(step));
-    result = yp_callN(yp_t_range, 3, i_start, i_stop, i_step);
-    yp_decrefN(N(i_step, i_stop, i_start));
+    assert_not_raises(ist_start = yp_intstoreC(start));
+    assert_not_raises(ist_stop = yp_intstoreC(stop));
+    assert_not_raises(ist_step = yp_intstoreC(step));
+    result = yp_callN(yp_t_range, 3, ist_start, ist_stop, ist_step);
+    yp_decrefN(N(ist_step, ist_stop, ist_start));
     return result;
 }
 
 static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject *i_zero = yp_intC(0);
-    ypObject *i_one = yp_intC(1);
-    ypObject *i_two = yp_intC(2);
+    ypObject *ist_0 = yp_intstoreC(0);
+    ypObject *ist_1 = yp_intstoreC(1);
+    ypObject *ist_2 = yp_intstoreC(2);
     ypObject *f_value = rand_obj(NULL, fixture_type_float);
     ypObject *str_cls = yp_str_frombytesC2(-1, "cls");
     ypObject *str_x = yp_str_frombytesC2(-1, "x");
@@ -136,27 +133,27 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     _test_rangeC(rangeC_to_call_args_t_range, rangeC3_to_call_args_t_range);
 
     // Two arguments. Slice defaults to 1. Optimization: empty immortal when range is empty.
-    ead(r, yp_callN(yp_t_range, N(i_zero, i_one)), assert_range(r, i_zero));
-    ead(r, yp_callN(yp_t_range, N(i_zero, i_two)), assert_range(r, i_zero, i_one));
-    assert_obj(yp_callN(yp_t_range, N(i_two, i_zero)), is, yp_range_empty);
+    ead(r, yp_callN(yp_t_range, N(ist_0, ist_1)), assert_range(r, yp_i_zero));
+    ead(r, yp_callN(yp_t_range, N(ist_0, ist_2)), assert_range(r, yp_i_zero, yp_i_one));
+    assert_obj(yp_callN(yp_t_range, N(ist_2, ist_0)), is, yp_range_empty);
 
     // Bad argument types.
-    assert_raises(yp_callN(yp_t_range, N(f_value, i_two, i_one)), yp_TypeError);
-    assert_raises(yp_callN(yp_t_range, N(i_zero, f_value, i_one)), yp_TypeError);
-    assert_raises(yp_callN(yp_t_range, N(i_zero, i_two, f_value)), yp_TypeError);
+    assert_raises(yp_callN(yp_t_range, N(f_value, ist_2, ist_1)), yp_TypeError);
+    assert_raises(yp_callN(yp_t_range, N(ist_0, f_value, ist_1)), yp_TypeError);
+    assert_raises(yp_callN(yp_t_range, N(ist_0, ist_2, f_value)), yp_TypeError);
 
     // Invalid arguments.
     {
-        ypObject *args_two = yp_tupleN(N(i_zero, i_two));
-        ypObject *args_three = yp_tupleN(N(i_zero, i_two, i_one));
-        ypObject *args_four = yp_tupleN(N(i_zero, i_two, i_one, i_one));
-        ypObject *kwargs_cls = yp_frozendictK(K(str_cls, yp_t_range, str_x, i_two));
-        ypObject *kwargs_step = yp_frozendictK(K(str_step, i_one));
-        ypObject *kwargs_rand = yp_frozendictK(K(str_rand, i_zero));
+        ypObject *args_two = yp_tupleN(N(ist_0, ist_2));
+        ypObject *args_three = yp_tupleN(N(ist_0, ist_2, ist_1));
+        ypObject *args_four = yp_tupleN(N(ist_0, ist_2, ist_1, ist_1));
+        ypObject *kwargs_cls = yp_frozendictK(K(str_cls, yp_t_range, str_x, ist_2));
+        ypObject *kwargs_step = yp_frozendictK(K(str_step, ist_1));
+        ypObject *kwargs_rand = yp_frozendictK(K(str_rand, ist_0));
 
         assert_raises(yp_callN(yp_t_range, 0), yp_TypeError);
         assert_raises(yp_call_stars(yp_t_range, yp_tuple_empty, yp_frozendict_empty), yp_TypeError);
-        assert_raises(yp_callN(yp_t_range, N(i_zero, i_two, i_one, i_one)), yp_TypeError);
+        assert_raises(yp_callN(yp_t_range, N(ist_0, ist_2, ist_1, ist_1)), yp_TypeError);
         assert_raises(yp_call_stars(yp_t_range, args_four, yp_frozendict_empty), yp_TypeError);
 
         // Keyword arguments are not supported.
@@ -169,10 +166,10 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 
     // Exception passthrough.
     assert_isexception(yp_callN(yp_t_range, N(yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(yp_callN(yp_t_range, N(i_zero, yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(yp_callN(yp_t_range, N(i_zero, i_two, yp_SyntaxError)), yp_SyntaxError);
+    assert_isexception(yp_callN(yp_t_range, N(ist_0, yp_SyntaxError)), yp_SyntaxError);
+    assert_isexception(yp_callN(yp_t_range, N(ist_0, ist_2, yp_SyntaxError)), yp_SyntaxError);
 
-    yp_decrefN(N(str_rand, str_step, str_x, str_cls, f_value, i_one, i_zero));
+    yp_decrefN(N(str_rand, str_step, str_x, str_cls, f_value, ist_2, ist_1, ist_0));
     return MUNIT_OK;
 }
 
@@ -186,29 +183,29 @@ static void _test_contains(fixture_type_t *type, ypObject *(*any_contains)(ypObj
     // "first" and "last" are named assuming a positive step; flip them for negative steps. last
     // is inclusive, so use last+1 for the end.
     yp_int_t   first = (yp_int_t)((yp_int32_t)munit_rand_uint32());
-    ypObject  *i_first = yp_intC(first);
-    ypObject  *i_first_p1 = yp_intC(first + 1);
-    ypObject  *i_first_m1 = yp_intC(first - 1);
+    ypObject  *int_first = yp_intC(first);
+    ypObject  *int_first_p1 = yp_intC(first + 1);
+    ypObject  *int_first_m1 = yp_intC(first - 1);
     yp_int_t   multi_step = (yp_int_t)munit_rand_int_range(2, 128);
     yp_ssize_t multi_step_last_idx = (yp_ssize_t)munit_rand_int_range(2, 128);
     yp_int_t   last = first + (multi_step * multi_step_last_idx);
-    ypObject  *i_last = yp_intC(last);
-    ypObject  *i_last_p1 = yp_intC(last + 1);
-    ypObject  *i_last_m1 = yp_intC(last - 1);
+    ypObject  *int_last = yp_intC(last);
+    ypObject  *int_last_p1 = yp_intC(last + 1);
+    ypObject  *int_last_m1 = yp_intC(last - 1);
     yp_ssize_t multi_step_middle_idx =
             (yp_ssize_t)munit_rand_int_range(1, (int)(multi_step_last_idx - 1));
     yp_int_t  middle = first + (multi_step * multi_step_middle_idx);
-    ypObject *i_middle = yp_intC(middle);
-    ypObject *i_middle_p1 = yp_intC(middle + 1);
-    ypObject *i_middle_m1 = yp_intC(middle - 1);
+    ypObject *int_middle = yp_intC(middle);
+    ypObject *int_middle_p1 = yp_intC(middle + 1);
+    ypObject *int_middle_m1 = yp_intC(middle - 1);
 
     // Empty range.
     {
         ypObject *r = yp_rangeC3(first, first, 1);
 
-        assert_obj(any_contains(r, i_first), is, yp_False);
-        assert_obj(any_contains(r, i_first_p1), is, yp_False);
-        assert_obj(any_contains(r, i_first_m1), is, yp_False);
+        assert_obj(any_contains(r, int_first), is, yp_False);
+        assert_obj(any_contains(r, int_first_p1), is, yp_False);
+        assert_obj(any_contains(r, int_first_m1), is, yp_False);
 
         yp_decrefN(N(r));
     }
@@ -217,9 +214,9 @@ static void _test_contains(fixture_type_t *type, ypObject *(*any_contains)(ypObj
     {
         ypObject *r = yp_rangeC3(first, first + 1, 1);
 
-        assert_obj(any_contains(r, i_first), is, yp_True);
-        assert_obj(any_contains(r, i_first_p1), is, yp_False);
-        assert_obj(any_contains(r, i_first_m1), is, yp_False);
+        assert_obj(any_contains(r, int_first), is, yp_True);
+        assert_obj(any_contains(r, int_first_p1), is, yp_False);
+        assert_obj(any_contains(r, int_first_m1), is, yp_False);
 
         yp_decrefN(N(r));
     }
@@ -228,17 +225,17 @@ static void _test_contains(fixture_type_t *type, ypObject *(*any_contains)(ypObj
     {
         ypObject *r = yp_rangeC3(first, last + 1, 1);
 
-        assert_obj(any_contains(r, i_first), is, yp_True);
-        assert_obj(any_contains(r, i_first_p1), is, yp_True);
-        assert_obj(any_contains(r, i_first_m1), is, yp_False);
+        assert_obj(any_contains(r, int_first), is, yp_True);
+        assert_obj(any_contains(r, int_first_p1), is, yp_True);
+        assert_obj(any_contains(r, int_first_m1), is, yp_False);
 
-        assert_obj(any_contains(r, i_last), is, yp_True);
-        assert_obj(any_contains(r, i_last_p1), is, yp_False);
-        assert_obj(any_contains(r, i_last_m1), is, yp_True);
+        assert_obj(any_contains(r, int_last), is, yp_True);
+        assert_obj(any_contains(r, int_last_p1), is, yp_False);
+        assert_obj(any_contains(r, int_last_m1), is, yp_True);
 
-        assert_obj(any_contains(r, i_middle), is, yp_True);
-        assert_obj(any_contains(r, i_middle_p1), is, yp_True);
-        assert_obj(any_contains(r, i_middle_m1), is, yp_True);
+        assert_obj(any_contains(r, int_middle), is, yp_True);
+        assert_obj(any_contains(r, int_middle_p1), is, yp_True);
+        assert_obj(any_contains(r, int_middle_m1), is, yp_True);
 
         yp_decrefN(N(r));
     }
@@ -247,17 +244,17 @@ static void _test_contains(fixture_type_t *type, ypObject *(*any_contains)(ypObj
     {
         ypObject *r = yp_rangeC3(last, first - 1, -1);
 
-        assert_obj(any_contains(r, i_first), is, yp_True);
-        assert_obj(any_contains(r, i_first_p1), is, yp_True);
-        assert_obj(any_contains(r, i_first_m1), is, yp_False);
+        assert_obj(any_contains(r, int_first), is, yp_True);
+        assert_obj(any_contains(r, int_first_p1), is, yp_True);
+        assert_obj(any_contains(r, int_first_m1), is, yp_False);
 
-        assert_obj(any_contains(r, i_last), is, yp_True);
-        assert_obj(any_contains(r, i_last_p1), is, yp_False);
-        assert_obj(any_contains(r, i_last_m1), is, yp_True);
+        assert_obj(any_contains(r, int_last), is, yp_True);
+        assert_obj(any_contains(r, int_last_p1), is, yp_False);
+        assert_obj(any_contains(r, int_last_m1), is, yp_True);
 
-        assert_obj(any_contains(r, i_middle), is, yp_True);
-        assert_obj(any_contains(r, i_middle_p1), is, yp_True);
-        assert_obj(any_contains(r, i_middle_m1), is, yp_True);
+        assert_obj(any_contains(r, int_middle), is, yp_True);
+        assert_obj(any_contains(r, int_middle_p1), is, yp_True);
+        assert_obj(any_contains(r, int_middle_m1), is, yp_True);
 
         yp_decrefN(N(r));
     }
@@ -266,17 +263,17 @@ static void _test_contains(fixture_type_t *type, ypObject *(*any_contains)(ypObj
     {
         ypObject *r = yp_rangeC3(first, last + 1, multi_step);
 
-        assert_obj(any_contains(r, i_first), is, yp_True);
-        assert_obj(any_contains(r, i_first_p1), is, yp_False);
-        assert_obj(any_contains(r, i_first_m1), is, yp_False);
+        assert_obj(any_contains(r, int_first), is, yp_True);
+        assert_obj(any_contains(r, int_first_p1), is, yp_False);
+        assert_obj(any_contains(r, int_first_m1), is, yp_False);
 
-        assert_obj(any_contains(r, i_last), is, yp_True);
-        assert_obj(any_contains(r, i_last_p1), is, yp_False);
-        assert_obj(any_contains(r, i_last_m1), is, yp_False);
+        assert_obj(any_contains(r, int_last), is, yp_True);
+        assert_obj(any_contains(r, int_last_p1), is, yp_False);
+        assert_obj(any_contains(r, int_last_m1), is, yp_False);
 
-        assert_obj(any_contains(r, i_middle), is, yp_True);
-        assert_obj(any_contains(r, i_middle_p1), is, yp_False);
-        assert_obj(any_contains(r, i_middle_m1), is, yp_False);
+        assert_obj(any_contains(r, int_middle), is, yp_True);
+        assert_obj(any_contains(r, int_middle_p1), is, yp_False);
+        assert_obj(any_contains(r, int_middle_m1), is, yp_False);
 
         yp_decrefN(N(r));
     }
@@ -285,23 +282,23 @@ static void _test_contains(fixture_type_t *type, ypObject *(*any_contains)(ypObj
     {
         ypObject *r = yp_rangeC3(last, first - 1, -multi_step);
 
-        assert_obj(any_contains(r, i_first), is, yp_True);
-        assert_obj(any_contains(r, i_first_p1), is, yp_False);
-        assert_obj(any_contains(r, i_first_m1), is, yp_False);
+        assert_obj(any_contains(r, int_first), is, yp_True);
+        assert_obj(any_contains(r, int_first_p1), is, yp_False);
+        assert_obj(any_contains(r, int_first_m1), is, yp_False);
 
-        assert_obj(any_contains(r, i_last), is, yp_True);
-        assert_obj(any_contains(r, i_last_p1), is, yp_False);
-        assert_obj(any_contains(r, i_last_m1), is, yp_False);
+        assert_obj(any_contains(r, int_last), is, yp_True);
+        assert_obj(any_contains(r, int_last_p1), is, yp_False);
+        assert_obj(any_contains(r, int_last_m1), is, yp_False);
 
-        assert_obj(any_contains(r, i_middle), is, yp_True);
-        assert_obj(any_contains(r, i_middle_p1), is, yp_False);
-        assert_obj(any_contains(r, i_middle_m1), is, yp_False);
+        assert_obj(any_contains(r, int_middle), is, yp_True);
+        assert_obj(any_contains(r, int_middle_p1), is, yp_False);
+        assert_obj(any_contains(r, int_middle_m1), is, yp_False);
 
         yp_decrefN(N(r));
     }
 
-    yp_decrefN(N(i_first, i_first_p1, i_first_m1, i_last, i_last_p1, i_last_m1, i_middle,
-            i_middle_p1, i_middle_m1));
+    yp_decrefN(N(int_first, int_first_p1, int_first_m1, int_last, int_last_p1, int_last_m1,
+            int_middle, int_middle_p1, int_middle_m1));
 }
 
 static ypObject *contains_to_in(ypObject *r, ypObject *x) { return yp_in(x, r); }

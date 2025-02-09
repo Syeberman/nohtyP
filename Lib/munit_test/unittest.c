@@ -2353,15 +2353,17 @@ static ypObject *new_rand_function_code(ypObject *f, yp_ssize_t n, ypObject *con
     return rand_obj_any(NULL);
 }
 
-// TODO Randomly return a statically-allocated function.
 // TODO Randomize the parameters, default values, etc.
 static ypObject *new_rand_function(const rand_obj_supplier_memo_t *memo)
 {
-    yp_parameter_decl_t parameter_decl[] = {{yp_s_star_args}, {yp_s_star_star_kwargs}};
+    ypObject           *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject           *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    yp_parameter_decl_t parameter_decl[] = {{str_star_args}, {str_star_star_kwargs}};
     yp_function_decl_t  decl = {
             new_rand_function_code, 0, yp_lengthof_array(parameter_decl), parameter_decl};
     ypObject *result = yp_functionC(&decl);
     assert_not_exception(result);
+    yp_decrefN(N(str_star_star_kwargs, str_star_args));
     return result;
 }
 

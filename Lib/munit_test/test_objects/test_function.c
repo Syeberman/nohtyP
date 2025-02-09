@@ -152,7 +152,7 @@ static void parameter_decl_array_decref2(yp_ssize_t n, yp_parameter_decl_t *arra
 
 static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject *int_0 = yp_intC(0);
+    ypObject *ist_0 = yp_intstoreC(0);
     ypObject *str_a = yp_str_frombytesC2(-1, "a");
     ypObject *str_b = yp_str_frombytesC2(-1, "b");
     ypObject *str_c = yp_str_frombytesC2(-1, "c");
@@ -169,42 +169,42 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                 {0},                                                     // def f()
                 {1, {{str_a}}},                                          // def f(a)
                 {2, {{str_a}, {str_b}}},                                 // def f(a, b)
-                {1, {{str_a, int_0}}},                                   // def f(a=0)
+                {1, {{str_a, ist_0}}},                                   // def f(a=0)
                 {1, {{str_a, yp_NameError}}},                            // def f(a=<exc>)
-                {2, {{str_a, int_0}, {str_b, int_0}}},                   // def f(a=0, b=0)
+                {2, {{str_a, ist_0}, {str_b, ist_0}}},                   // def f(a=0, b=0)
                 {2, {{str_a}, {str_slash}}},                             // def f(a, /)
                 {3, {{str_a}, {str_slash}, {str_b}}},                    // def f(a, /, b)
                 {3, {{str_a}, {str_b}, {str_slash}}},                    // def f(a, b, /)
-                {2, {{str_a, int_0}, {str_slash}}},                      // def f(a=0, /)
+                {2, {{str_a, ist_0}, {str_slash}}},                      // def f(a=0, /)
                 {2, {{str_a, yp_NameError}, {str_slash}}},               // def f(a=<exc>, /)
-                {3, {{str_a, int_0}, {str_slash}, {str_b, int_0}}},      // def f(a=0, /, b=0)
-                {3, {{str_a, int_0}, {str_b, int_0}, {str_slash}}},      // def f(a=0, b=0, /)
+                {3, {{str_a, ist_0}, {str_slash}, {str_b, ist_0}}},      // def f(a=0, /, b=0)
+                {3, {{str_a, ist_0}, {str_b, ist_0}, {str_slash}}},      // def f(a=0, b=0, /)
                 {2, {{str_star}, {str_a}}},                              // def f(*, a)
                 {3, {{str_star}, {str_a}, {str_b}}},                     // def f(*, a, b)
-                {3, {{str_star}, {str_a}, {str_b, int_0}}},              // def f(*, a, b=0)
+                {3, {{str_star}, {str_a}, {str_b, ist_0}}},              // def f(*, a, b=0)
                 {3, {{str_a}, {str_star}, {str_b}}},                     // def f(a, *, b)
-                {3, {{str_a}, {str_star}, {str_b, int_0}}},              // def f(a, *, b=0)
-                {2, {{str_star}, {str_a, int_0}}},                       // def f(*, a=0)
+                {3, {{str_a}, {str_star}, {str_b, ist_0}}},              // def f(a, *, b=0)
+                {2, {{str_star}, {str_a, ist_0}}},                       // def f(*, a=0)
                 {2, {{str_star}, {str_a, yp_NameError}}},                // def f(*, a=<exc>)
-                {3, {{str_star}, {str_a, int_0}, {str_b}}},              // def f(*, a=0, b)
-                {3, {{str_star}, {str_a, int_0}, {str_b, int_0}}},       // def f(*, a=0, b=0)
-                {3, {{str_a, int_0}, {str_star}, {str_b}}},              // def f(a=0, *, b)
-                {3, {{str_a, int_0}, {str_star}, {str_b, int_0}}},       // def f(a=0, *, b=0)
+                {3, {{str_star}, {str_a, ist_0}, {str_b}}},              // def f(*, a=0, b)
+                {3, {{str_star}, {str_a, ist_0}, {str_b, ist_0}}},       // def f(*, a=0, b=0)
+                {3, {{str_a, ist_0}, {str_star}, {str_b}}},              // def f(a=0, *, b)
+                {3, {{str_a, ist_0}, {str_star}, {str_b, ist_0}}},       // def f(a=0, *, b=0)
                 {1, {{str_star_args}}},                                  // def f(*args)
                 {2, {{str_star_args}, {str_a}}},                         // def f(*args, a)
                 {2, {{str_a}, {str_star_args}}},                         // def f(a, *args)
                 {3, {{str_star_args}, {str_a}, {str_b}}},                // def f(*args, a, b)
-                {3, {{str_star_args}, {str_a}, {str_b, int_0}}},         // def f(*args, a, b=0)
+                {3, {{str_star_args}, {str_a}, {str_b, ist_0}}},         // def f(*args, a, b=0)
                 {3, {{str_a}, {str_star_args}, {str_b}}},                // def f(a, *args, b)
-                {3, {{str_a}, {str_star_args}, {str_b, int_0}}},         // def f(a, *args, b=0)
-                {2, {{str_star_args}, {str_a, int_0}}},                  // def f(*args, a=0)
+                {3, {{str_a}, {str_star_args}, {str_b, ist_0}}},         // def f(a, *args, b=0)
+                {2, {{str_star_args}, {str_a, ist_0}}},                  // def f(*args, a=0)
                 {2, {{str_star_args}, {str_a, yp_NameError}}},           // def f(*args, a=<exc>)
-                {2, {{str_a, int_0}, {str_star_args}}},                  // def f(a=0, *args)
-                {3, {{str_star_args}, {str_a, int_0}, {str_b}}},         // def f(*args, a=0, b)
-                {3, {{str_star_args}, {str_a, int_0}, {str_b, int_0}}},  // def f(*args, a=0, b=0)
-                {3, {{str_a, int_0}, {str_star_args}, {str_b}}},         // def f(a=0, *args, b)
-                {3, {{str_a, int_0}, {str_star_args}, {str_b, int_0}}},  // def f(a=0, *args, b=0)
-                {3, {{str_a, int_0}, {str_b, int_0}, {str_star_args}}},  // def f(a=0, b=0, *args)
+                {2, {{str_a, ist_0}, {str_star_args}}},                  // def f(a=0, *args)
+                {3, {{str_star_args}, {str_a, ist_0}, {str_b}}},         // def f(*args, a=0, b)
+                {3, {{str_star_args}, {str_a, ist_0}, {str_b, ist_0}}},  // def f(*args, a=0, b=0)
+                {3, {{str_a, ist_0}, {str_star_args}, {str_b}}},         // def f(a=0, *args, b)
+                {3, {{str_a, ist_0}, {str_star_args}, {str_b, ist_0}}},  // def f(a=0, *args, b=0)
+                {3, {{str_a, ist_0}, {str_b, ist_0}, {str_star_args}}},  // def f(a=0, b=0, *args)
                 {1, {{str_star_star_kwargs}}},                           // def f(**kwargs)
 
                 {6, {{str_a}, {str_slash}, {str_b}, {str_star}, {str_c},
@@ -329,24 +329,24 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                 {2, {{str_star_args}, {str_slash}}},          // / cannot be after *args
                 {2, {{str_star_star_kwargs}, {str_slash}}},   // / cannot be after **kwargs
                 {3, {{str_a}, {str_slash}, {str_slash}}},     // At most one /
-                {2, {{str_a}, {str_slash, int_0}}},           // / cannot have default
+                {2, {{str_a}, {str_slash, ist_0}}},           // / cannot have default
                 {1, {{str_star}}},                            // * cannot be last
                 {2, {{str_star}, {str_star_star_kwargs}}},    // * cannot be imm. before **kwargs
                 {3, {{str_star}, {str_star}, {str_a}}},       // At most one *
                 {2, {{str_star}, {str_star_args}}},           // * or *args, not both
                 {3, {{str_star_args}, {str_star}, {str_a}}},  // * or *args, not both
-                {2, {{str_star, int_0}, {str_a}}},            // * cannot have default
+                {2, {{str_star, ist_0}, {str_a}}},            // * cannot have default
                 {2, {{str_star_args}, {str_star_args}}},      // At most one *args
-                {1, {{str_star_args, int_0}}},                // *args cannot have default
+                {1, {{str_star_args, ist_0}}},                // *args cannot have default
                 {2, {{str_star_star_kwargs}, {str_a}}},       // **kwargs must be last
                 {2, {{str_star_star_kwargs}, {str_slash}}},   // **kwargs must be last
                 {3, {{str_star_star_kwargs}, {str_star}, {str_a}}},     // **kwargs must be last
                 {2, {{str_star_star_kwargs}, {str_star_args}}},         // **kwargs must be last
                 {2, {{str_star_star_kwargs}, {str_star_star_kwargs}}},  // At most one **kwargs
-                {1, {{str_star_star_kwargs, int_0}}},         // **kwargs cannot have default
-                {2, {{str_a, int_0}, {str_b}}},               // Defaults on remaining pos. args
-                {3, {{str_a, int_0}, {str_b}, {str_slash}}},  // Defaults on remaining pos. args
-                {3, {{str_a, int_0}, {str_slash}, {str_b}}},  // Defaults on remaining pos. args
+                {1, {{str_star_star_kwargs, ist_0}}},         // **kwargs cannot have default
+                {2, {{str_a, ist_0}, {str_b}}},               // Defaults on remaining pos. args
+                {3, {{str_a, ist_0}, {str_b}, {str_slash}}},  // Defaults on remaining pos. args
+                {3, {{str_a, ist_0}, {str_slash}, {str_b}}},  // Defaults on remaining pos. args
 
                 // Non-identifiers
                 {1, {{str_empty}}},
@@ -415,7 +415,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     }
 
     yp_decrefN(N(
-            int_0, str_a, str_b, str_c, str_slash, str_star, str_star_args, str_star_star_kwargs));
+            ist_0, str_a, str_b, str_c, str_slash, str_star, str_star_args, str_star_star_kwargs));
     return MUNIT_OK;
 }
 
@@ -425,6 +425,10 @@ static MunitResult test_new_immortal(const MunitParameter params[], fixture_t *f
 {
     yp_IMMORTAL_STR_LATIN_1(str_a, "a");
     yp_IMMORTAL_STR_LATIN_1(str_star, "*");
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *list_empty = yp_listN(0);
+    ypObject     *dict_empty = yp_dictK(0);
+    ypObject     *args[] = obj_array_init(2, rand_obj_any(uq));
 
     // Signatures of immortals are validated by yp_call*.
     {
@@ -436,25 +440,25 @@ static MunitResult test_new_immortal(const MunitParameter params[], fixture_t *f
         ypObject *f_call_arrayX_args[] = {f_call_arrayX};
         yp_IMMORTAL_FUNCTION(f_a_callN, capture_code, ({yp_CONST_REF(str_a)}));
         yp_IMMORTAL_FUNCTION(f_a_call_stars, capture_code, ({yp_CONST_REF(str_a)}));
-        ypObject *f_a_call_stars_args = yp_tupleN(1, yp_i_one);  // new ref
+        ypObject *f_a_call_stars_args = yp_tupleN(N(args[0]));  // new ref
         ypObject *f_a_call_stars_kwargs =
-                yp_frozendictK(1, yp_CONST_REF(str_a), yp_i_one);  // new ref
+                yp_frozendictK(1, yp_CONST_REF(str_a), args[0]);  // new ref
         yp_IMMORTAL_FUNCTION(f_a_call_arrayX, capture_code, ({yp_CONST_REF(str_a)}));
-        ypObject *f_a_call_arrayX_args[] = {f_a_call_arrayX, yp_i_one};
+        ypObject *f_a_call_arrayX_args[] = {f_a_call_arrayX, args[0]};
 
         ead(capt, yp_callN(f_callN, 0), assert_captured_is(capt, f_callN, 0, NULL));
-        ead(capt, yp_call_stars(f_call_stars, yp_tuple_empty, yp_frozendict_empty),
+        ead(capt, yp_call_stars(f_call_stars, list_empty, dict_empty),
                 assert_captured_is(capt, f_call_stars, 0, NULL));
         ead(capt, yp_call_arrayX(1, f_call_arrayX_args),
                 assert_captured_is(capt, f_call_arrayX, 0, NULL));
 
-        ead(capt, yp_callN(f_a_callN, 1, yp_i_one), assert_captured(capt, f_a_callN, yp_i_one));
-        ead(capt, yp_call_stars(f_a_call_stars, f_a_call_stars_args, yp_frozendict_empty),
-                assert_captured(capt, f_a_call_stars, yp_i_one));
-        ead(capt, yp_call_stars(f_a_call_stars, yp_tuple_empty, f_a_call_stars_kwargs),
-                assert_captured(capt, f_a_call_stars, yp_i_one));
+        ead(capt, yp_callN(f_a_callN, 1, args[0]), assert_captured(capt, f_a_callN, args[0]));
+        ead(capt, yp_call_stars(f_a_call_stars, f_a_call_stars_args, dict_empty),
+                assert_captured(capt, f_a_call_stars, args[0]));
+        ead(capt, yp_call_stars(f_a_call_stars, list_empty, f_a_call_stars_kwargs),
+                assert_captured(capt, f_a_call_stars, args[0]));
         ead(capt, yp_call_arrayX(2, f_a_call_arrayX_args),
-                assert_captured(capt, f_a_call_arrayX, yp_i_one));
+                assert_captured(capt, f_a_call_arrayX, args[0]));
 
         yp_decrefN(N(f_a_call_stars_args, f_a_call_stars_kwargs));
     }
@@ -467,11 +471,13 @@ static MunitResult test_new_immortal(const MunitParameter params[], fixture_t *f
         ypObject *f_star_call_arrayX_args[] = {f_star};
 
         assert_raises(yp_callN(f_star, 0), yp_ParameterSyntaxError);
-        assert_raises(yp_call_stars(f_star, yp_tuple_empty, yp_frozendict_empty),
-                yp_ParameterSyntaxError);
+        assert_raises(yp_call_stars(f_star, list_empty, dict_empty), yp_ParameterSyntaxError);
         assert_raises(yp_call_arrayX(1, f_star_call_arrayX_args), yp_ParameterSyntaxError);
     }
 
+    obj_array_decref(args);
+    yp_decrefN(N(dict_empty, list_empty));
+    uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
 
@@ -1259,50 +1265,55 @@ static void _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
     // yp_t_bool: pos-only self, pos-only, default
     {
+        ypObject *chrarray_empty = yp_chrarray0();
+
         ead(result, any_callN(yp_t_bool, 0), assert_obj(result, eq, yp_False));
-        ead(result, any_callN(yp_t_bool, N(yp_str_empty)), assert_obj(result, eq, yp_False));
+        ead(result, any_callN(yp_t_bool, N(chrarray_empty)), assert_obj(result, eq, yp_False));
         ead(result, any_callN(yp_t_bool, N(str_a)), assert_obj(result, eq, yp_True));
 
         assert_raises(any_callN(yp_t_bool, N(str_a, str_b)), yp_TypeError);
         assert_raises(any_callN(yp_t_bool, N(yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(chrarray_empty));
     }
 
     // yp_t_int: pos-only self, pos-only, pos-or-kw, default
     {
+        ypObject *ist_1 = yp_intstoreC(1);
         ypObject *str_two_two = yp_str_frombytesC2(-1, "22");
-        ypObject *int_twenty_two = yp_intC(22);
-        ypObject *int_three = yp_intC(3);
-        ypObject *int_eight = yp_intC(8);
+        ypObject *int_22 = yp_intC(22);
+        ypObject *ist_3 = yp_intstoreC(3);
+        ypObject *int_8 = yp_intC(8);
 
         ead(result, any_callN(yp_t_int, 0), assert_obj(result, eq, yp_i_zero));
-        ead(result, any_callN(yp_t_int, N(yp_i_one)), assert_obj(result, eq, yp_i_one));
-        ead(result, any_callN(yp_t_int, N(str_two_two)), assert_obj(result, eq, int_twenty_two));
-        ead(result, any_callN(yp_t_int, N(str_two_two, yp_None)),
-                assert_obj(result, eq, int_twenty_two));
-        ead(result, any_callN(yp_t_int, N(str_two_two, int_three)),
-                assert_obj(result, eq, int_eight));
+        ead(result, any_callN(yp_t_int, N(ist_1)), assert_obj(result, eq, yp_i_one));
+        ead(result, any_callN(yp_t_int, N(str_two_two)), assert_obj(result, eq, int_22));
+        ead(result, any_callN(yp_t_int, N(str_two_two, yp_None)), assert_obj(result, eq, int_22));
+        ead(result, any_callN(yp_t_int, N(str_two_two, ist_3)), assert_obj(result, eq, int_8));
 
-        assert_raises(any_callN(yp_t_int, N(str_two_two, int_three, int_three)), yp_TypeError);
+        assert_raises(any_callN(yp_t_int, N(str_two_two, ist_3, ist_3)), yp_TypeError);
         assert_raises(any_callN(yp_t_int, N(yp_NameError)), yp_NameError);
 
-        yp_decrefN(N(str_two_two, int_twenty_two, int_three, int_eight));
+        yp_decrefN(N(ist_1, str_two_two, int_22, ist_3, int_8));
     }
 
     // yp_t_bytes: pos-only self, pos-or-kw, default
     {
         ypObject *bytes_a = yp_bytesC(-1, "a");
+        ypObject *str_utf_8 = yp_str_frombytesC2(-1, "utf-8");
+        ypObject *str_strict = yp_str_frombytesC2(-1, "strict");
 
         ead(result, any_callN(yp_t_bytes, 0), assert_obj(result, eq, yp_bytes_empty));
         ead(result, any_callN(yp_t_bytes, N(bytes_a)), assert_obj(result, eq, bytes_a));
-        ead(result, any_callN(yp_t_bytes, N(str_a, yp_s_utf_8)), assert_obj(result, eq, bytes_a));
-        ead(result, any_callN(yp_t_bytes, N(str_a, yp_s_utf_8, yp_s_strict)),
+        ead(result, any_callN(yp_t_bytes, N(str_a, str_utf_8)), assert_obj(result, eq, bytes_a));
+        ead(result, any_callN(yp_t_bytes, N(str_a, str_utf_8, str_strict)),
                 assert_obj(result, eq, bytes_a));
 
         assert_raises(
-                any_callN(yp_t_bytes, N(str_a, yp_s_utf_8, yp_s_strict, bytes_a)), yp_TypeError);
+                any_callN(yp_t_bytes, N(str_a, str_utf_8, str_strict, bytes_a)), yp_TypeError);
         assert_raises(any_callN(yp_t_bytes, N(yp_NameError)), yp_NameError);
 
-        yp_decrefN(N(bytes_a));
+        yp_decrefN(N(str_strict, str_utf_8, bytes_a));
     }
 
     // yp_t_frozendict: pos-only self, pos-only, **kwargs, default
@@ -1336,14 +1347,18 @@ static void _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
     // Calling an exception.
     {
+        ypObject *list_empty = yp_listN(0);
+
         assert_raises(any_callN(yp_NameError, 0), yp_NameError);
         assert_raises(any_callN(yp_NameError, N(yp_None)), yp_NameError);
-        assert_raises(any_callN(yp_NameError, N(yp_tuple_empty)), yp_NameError);
+        assert_raises(any_callN(yp_NameError, N(list_empty)), yp_NameError);
 
         // yp_OSError holds no special meaning in the function implementation or these tests.
         assert_raises(any_callN(yp_OSError, 0), yp_OSError);
         assert_raises(any_callN(yp_OSError, N(yp_None)), yp_OSError);
-        assert_raises(any_callN(yp_OSError, N(yp_tuple_empty)), yp_OSError);
+        assert_raises(any_callN(yp_OSError, N(list_empty)), yp_OSError);
+
+        yp_decrefN(N(list_empty));
     }
 
     // None_code
@@ -2401,15 +2416,16 @@ static void _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
     // yp_t_bool: pos-only self, pos-only, default
     {
         ypObject *str_x = yp_str_frombytesC2(-1, "x");
+        ypObject *chrarray_empty = yp_chrarray0();
 
         // Positional-only parameters cannot be set from "callK" keyword arguments.
         ead(result, any_callK(yp_t_bool, 0), assert_obj(result, eq, yp_False));
 
-        assert_raises(any_callK(yp_t_bool, K(str_x, yp_str_empty)), yp_TypeError);
+        assert_raises(any_callK(yp_t_bool, K(str_x, chrarray_empty)), yp_TypeError);
         assert_raises(any_callK(yp_t_bool, K(str_x, str_a)), yp_TypeError);
         assert_raises(any_callK(yp_t_bool, K(str_x, yp_NameError)), yp_NameError);
 
-        yp_decrefN(N(str_x));
+        yp_decrefN(N(chrarray_empty, str_x));
     }
 
     // yp_t_int: pos-only self, pos-only, pos-or-kw, default
@@ -2417,44 +2433,45 @@ static void _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         ypObject *str_x = yp_str_frombytesC2(-1, "x");
         ypObject *str_base = yp_str_frombytesC2(-1, "base");
         ypObject *str_two_two = yp_str_frombytesC2(-1, "22");
-        ypObject *int_three = yp_intC(3);
+        ypObject *ist_3 = yp_intstoreC(3);
 
         // Positional-only parameters cannot be set from "callK" keyword arguments. Recall that
         // base requires x to be a bytes/str/etc, which also raises yp_TypeError.
         ead(result, any_callK(yp_t_int, 0), assert_obj(result, eq, yp_i_zero));
         ead(result, any_callK(yp_t_int, K(str_base, yp_None)), assert_obj(result, eq, yp_i_zero));
-        assert_raises(any_callK(yp_t_int, K(str_base, int_three)), yp_TypeError);
+        assert_raises(any_callK(yp_t_int, K(str_base, ist_3)), yp_TypeError);
 
         assert_raises(any_callK(yp_t_int, K(str_x, str_two_two)), yp_TypeError);
-        assert_raises(
-                any_callK(yp_t_int, K(str_x, str_two_two, str_base, int_three)), yp_TypeError);
+        assert_raises(any_callK(yp_t_int, K(str_x, str_two_two, str_base, ist_3)), yp_TypeError);
         assert_raises(any_callK(yp_t_int, K(str_x, yp_NameError)), yp_NameError);
 
-        yp_decrefN(N(str_x, str_base, str_two_two, int_three));
+        yp_decrefN(N(str_x, str_base, str_two_two, ist_3));
     }
 
     // yp_t_bytes: pos-only self, pos-or-kw, default
     {
         ypObject *str_source = yp_str_frombytesC2(-1, "source");
         ypObject *str_encoding = yp_str_frombytesC2(-1, "encoding");
+        ypObject *str_utf_8 = yp_str_frombytesC2(-1, "utf-8");
         ypObject *str_errors = yp_str_frombytesC2(-1, "errors");
+        ypObject *str_strict = yp_str_frombytesC2(-1, "strict");
         ypObject *bytes_a = yp_bytesC(-1, "a");
 
         ead(result, any_callK(yp_t_bytes, 0), assert_obj(result, eq, yp_bytes_empty));
         ead(result, any_callK(yp_t_bytes, K(str_source, bytes_a)), assert_obj(result, eq, bytes_a));
-        ead(result, any_callK(yp_t_bytes, K(str_source, str_a, str_encoding, yp_s_utf_8)),
+        ead(result, any_callK(yp_t_bytes, K(str_source, str_a, str_encoding, str_utf_8)),
                 assert_obj(result, eq, bytes_a));
         ead(result,
                 any_callK(yp_t_bytes,
-                        K(str_source, str_a, str_encoding, yp_s_utf_8, str_errors, yp_s_strict)),
+                        K(str_source, str_a, str_encoding, str_utf_8, str_errors, str_strict)),
                 assert_obj(result, eq, bytes_a));
 
-        assert_raises(any_callK(yp_t_bytes, K(str_source, str_a, str_encoding, yp_s_utf_8,
-                                                    str_errors, yp_s_strict, str_a, bytes_a)),
+        assert_raises(any_callK(yp_t_bytes, K(str_source, str_a, str_encoding, str_utf_8,
+                                                    str_errors, str_strict, str_a, bytes_a)),
                 yp_TypeError);
         assert_raises(any_callK(yp_t_bytes, K(str_source, yp_NameError)), yp_NameError);
 
-        yp_decrefN(N(str_source, str_encoding, str_errors, bytes_a));
+        yp_decrefN(N(str_source, str_encoding, str_utf_8, str_errors, str_strict, bytes_a));
     }
 
     // yp_t_frozendict: pos-only self, pos-only, **kwargs, default
@@ -2546,15 +2563,16 @@ static MunitResult test_func_iscallable(const MunitParameter params[], fixture_t
 
     // Invalid arguments.
     {
+        ypObject *list_empty = yp_listN(0);
         ypObject *kwargs_obj = yp_frozendictK(K(str_obj, x));
         ypObject *kwargs_rand = yp_frozendictK(K(str_rand, x));
 
         assert_raises(yp_callN(yp_func_iscallable, 0), yp_TypeError);
         assert_raises(yp_callN(yp_func_iscallable, N(x, yp_None)), yp_TypeError);
-        assert_raises(yp_call_stars(yp_func_iscallable, yp_tuple_empty, kwargs_obj), yp_TypeError);
-        assert_raises(yp_call_stars(yp_func_iscallable, yp_tuple_empty, kwargs_rand), yp_TypeError);
+        assert_raises(yp_call_stars(yp_func_iscallable, list_empty, kwargs_obj), yp_TypeError);
+        assert_raises(yp_call_stars(yp_func_iscallable, list_empty, kwargs_rand), yp_TypeError);
 
-        yp_decrefN(N(kwargs_rand, kwargs_obj));
+        yp_decrefN(N(kwargs_rand, kwargs_obj, list_empty));
     }
 
     // Exception passthrough.
@@ -2593,6 +2611,7 @@ static ypObject *callN_to_call_stars_tuple(ypObject *c, int n, ...)
     va_list   args;
     ypObject *as_tuple;
     ypObject *result;
+    ypObject *dict_empty = yp_dictK(0);
 
     // If args contains an exception, as_tuple will be that exception. We could assert_not_raises
     // here, but this tests that yp_call_stars fails if args is an exception.
@@ -2600,8 +2619,9 @@ static ypObject *callN_to_call_stars_tuple(ypObject *c, int n, ...)
     as_tuple = yp_tupleNV(n, args);  // new ref
     va_end(args);
 
-    result = yp_call_stars(c, as_tuple, yp_frozendict_empty);
-    yp_decref(as_tuple);
+    result = yp_call_stars(c, as_tuple, dict_empty);
+
+    yp_decrefN(N(as_tuple, dict_empty));
     return result;
 }
 
@@ -2613,6 +2633,7 @@ static ypObject *callN_to_call_stars_iter(ypObject *c, int n, ...)
     ypObject *as_tuple;
     ypObject *as_iter;
     ypObject *result;
+    ypObject *dict_empty = yp_dictK(0);
 
     // If args contains an exception, as_iter will be that exception. We could assert_not_raises
     // here, but this tests that yp_call_stars fails if args is an exception.
@@ -2621,8 +2642,8 @@ static ypObject *callN_to_call_stars_iter(ypObject *c, int n, ...)
     va_end(args);
 
     as_iter = yp_iter(as_tuple);
-    result = yp_call_stars(c, as_iter, yp_frozendict_empty);
-    yp_decrefN(N(as_tuple, as_iter));
+    result = yp_call_stars(c, as_iter, dict_empty);
+    yp_decrefN(N(dict_empty, as_tuple, as_iter));
     return result;
 }
 
@@ -2633,6 +2654,7 @@ static ypObject *callK_to_call_stars_frozendict(ypObject *c, int n, ...)
     va_list   args;
     ypObject *as_frozendict;
     ypObject *result;
+    ypObject *list_empty = yp_listN(0);
 
     // If args contains an exception, as_frozendict will be that exception. We could
     // assert_not_raises here, but this tests that yp_call_stars fails if kwargs is an exception.
@@ -2640,8 +2662,8 @@ static ypObject *callK_to_call_stars_frozendict(ypObject *c, int n, ...)
     as_frozendict = yp_frozendictKV(n, args);  // new ref
     va_end(args);
 
-    result = yp_call_stars(c, yp_tuple_empty, as_frozendict);
-    yp_decref(as_frozendict);
+    result = yp_call_stars(c, list_empty, as_frozendict);
+    yp_decrefN(N(as_frozendict, list_empty));
     return result;
 }
 
@@ -2656,6 +2678,8 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
     ypObject     *str_star = yp_str_frombytesC2(-1, "*");
     ypObject     *str_star_args = yp_str_frombytesC2(-1, "*args");
     ypObject     *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    ypObject     *list_empty = yp_listN(0);
+    ypObject     *dict_empty = yp_dictK(0);
 
     // Shared tests.
     _test_callN(callN_to_call_stars_tuple);
@@ -2695,7 +2719,7 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         define_function(f, capture_code, ({str_a}));
         ypObject *call_kwargs0 = yp_tupleN(N(str_a, args[0]));
         ypObject *call_kwargs = yp_tupleN(N(call_kwargs0));
-        assert_raises(yp_call_stars(f, yp_tuple_empty, call_kwargs), yp_TypeError);
+        assert_raises(yp_call_stars(f, list_empty, call_kwargs), yp_TypeError);
         yp_decrefN(N(f, call_kwargs0, call_kwargs));
     }
 
@@ -2704,7 +2728,7 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         define_function(f, capture_code, ({str_star_star_kwargs}));
         ypObject *call_kwargs0 = yp_tupleN(N(str_a, args[0]));
         ypObject *call_kwargs = yp_tupleN(N(call_kwargs0));
-        assert_raises(yp_call_stars(f, yp_tuple_empty, call_kwargs), yp_TypeError);
+        assert_raises(yp_call_stars(f, list_empty, call_kwargs), yp_TypeError);
         yp_decrefN(N(f, call_kwargs0, call_kwargs));
     }
 
@@ -2713,15 +2737,15 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         define_function(f, capture_code, ({str_star_args}, {str_star_star_kwargs}));
         ypObject *call_kwargs0 = yp_tupleN(N(str_a, args[0]));
         ypObject *call_kwargs = yp_tupleN(N(call_kwargs0));
-        assert_raises(yp_call_stars(f, yp_tuple_empty, call_kwargs), yp_TypeError);
+        assert_raises(yp_call_stars(f, list_empty, call_kwargs), yp_TypeError);
         yp_decrefN(N(f, call_kwargs0, call_kwargs));
     }
 
     // f is args or kwargs
     {
         define_function(f, capture_code, ({str_a}));
-        assert_raises(yp_call_stars(f, f, yp_frozendict_empty), yp_TypeError);
-        assert_raises(yp_call_stars(f, yp_tuple_empty, f), yp_TypeError);
+        assert_raises(yp_call_stars(f, f, dict_empty), yp_TypeError);
+        assert_raises(yp_call_stars(f, list_empty, f), yp_TypeError);
         assert_raises(yp_call_stars(f, f, f), yp_TypeError);
         yp_decrefN(N(f));
     }
@@ -2732,8 +2756,7 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         ypObject *call_args = yp_listN(N(args[0], args[1]));
         ypObject *one = yp_tupleN(N(args[1]));
 
-        ead(capt, yp_call_stars(f, call_args, yp_frozendict_empty),
-                assert_captured(capt, f, args[0], one));
+        ead(capt, yp_call_stars(f, call_args, dict_empty), assert_captured(capt, f, args[0], one));
 
         // This is very unlikely to fail, but we need this test case for kwargs, so for completeness
         // we'll test args as well.
@@ -2748,7 +2771,7 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         ypObject *call_kwargs = yp_dictK(K(str_a, args[0], str_b, args[1]));
         ypObject *one = yp_frozendictK(K(str_b, args[1]));
 
-        ead(capt, yp_call_stars(f, yp_tuple_empty, call_kwargs),
+        ead(capt, yp_call_stars(f, list_empty, call_kwargs),
                 assert_captured(capt, f, args[0], one));
 
         // If _ypFunction_call_make_var_kwargs neglects to make a copy of call_kwargs, it may
@@ -2766,13 +2789,13 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         ypObject *call_args = yp_tupleN(N(args[0], args[1]));
         ypObject *call_kwargs = yp_frozendictK(K(str_a, args[0]));
 
-        ead(capt, yp_call_stars(f_args, call_args, yp_frozendict_empty),
+        ead(capt, yp_call_stars(f_args, call_args, dict_empty),
                 assert_captured_arg(capt, 0, is, call_args));
-        ead(capt, yp_call_stars(f_args_a, call_args, yp_frozendict_empty),
+        ead(capt, yp_call_stars(f_args_a, call_args, dict_empty),
                 assert_captured_arg(capt, 0, is, call_args));
         ead(capt, yp_call_stars(f_args_a, call_args, call_kwargs),
                 assert_captured_arg(capt, 0, is, call_args));
-        ead(capt, yp_call_stars(f_args_kwargs, call_args, yp_frozendict_empty),
+        ead(capt, yp_call_stars(f_args_kwargs, call_args, dict_empty),
                 assert_captured_arg(capt, 0, is, call_args));
         ead(capt, yp_call_stars(f_args_kwargs, call_args, call_kwargs),
                 assert_captured_arg(capt, 0, is, call_args));
@@ -2794,24 +2817,24 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         ypObject *call_args = yp_tupleN(N(args[0]));
         ypObject *call_kwargs = yp_frozendictK(K(str_a, args[0]));
 
-        ead(capt, yp_call_stars(f_kwargs, yp_tuple_empty, call_kwargs),
+        ead(capt, yp_call_stars(f_kwargs, list_empty, call_kwargs),
                 assert_captured_arg(capt, 0, is, call_kwargs));
-        ead(capt, yp_call_stars(f_a_slash_kwargs, yp_tuple_empty, call_kwargs),
+        ead(capt, yp_call_stars(f_a_slash_kwargs, list_empty, call_kwargs),
                 assert_captured_arg(capt, 2, is, call_kwargs));
         ead(capt, yp_call_stars(f_a_slash_kwargs, call_args, call_kwargs),
                 assert_captured_arg(capt, 2, is, call_kwargs));
-        ead(capt, yp_call_stars(f_b_kwargs, yp_tuple_empty, call_kwargs),
+        ead(capt, yp_call_stars(f_b_kwargs, list_empty, call_kwargs),
                 assert_captured_arg(capt, 1, is, call_kwargs));
         ead(capt, yp_call_stars(f_b_kwargs, call_args, call_kwargs),
                 assert_captured_arg(capt, 1, is, call_kwargs));
-        ead(capt, yp_call_stars(f_star_b_kwargs, yp_tuple_empty, call_kwargs),
+        ead(capt, yp_call_stars(f_star_b_kwargs, list_empty, call_kwargs),
                 assert_captured_arg(capt, 2, is, call_kwargs));
-        ead(capt, yp_call_stars(f_args_kwargs, yp_tuple_empty, call_kwargs),
+        ead(capt, yp_call_stars(f_args_kwargs, list_empty, call_kwargs),
                 assert_captured_arg(capt, 1, is, call_kwargs));
         ead(capt, yp_call_stars(f_args_kwargs, call_args, call_kwargs),
                 assert_captured_arg(capt, 1, is, call_kwargs));
 
-        ead(result, yp_call_stars(yp_t_frozendict, yp_tuple_empty, call_kwargs),
+        ead(result, yp_call_stars(yp_t_frozendict, list_empty, call_kwargs),
                 assert_obj(result, is, call_kwargs));
 
         yp_decrefN(N(f_kwargs, f_a_slash_kwargs, f_b_kwargs, f_star_b_kwargs, f_args_kwargs,
@@ -2820,7 +2843,8 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
 
     obj_array_decref(defs);
     obj_array_decref(args);
-    yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
+    yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs, list_empty,
+            dict_empty));
     uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
@@ -2852,6 +2876,9 @@ static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fi
     ypObject     *str_a = yp_str_frombytesC2(-1, "a");
     ypObject     *str_b = yp_str_frombytesC2(-1, "b");
     ypObject     *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject     *instore_0 = yp_intstoreC(0);
+    ypObject     *instore_1 = yp_intstoreC(1);
+    ypObject     *instore_2 = yp_intstoreC(2);
 
     // Shared tests.
     _test_callN(callN_to_call_arrayX);
@@ -2870,7 +2897,7 @@ static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fi
         ypObject *call_NoneType[] = {yp_t_NoneType};
         ypObject *call_type[] = {yp_t_type, str_a};
         ypObject *call_iter[] = {yp_t_iter, yp_t_NoneType, yp_None};
-        ypObject *call_range[] = {yp_t_range, yp_i_zero, yp_i_two, yp_i_one};
+        ypObject *call_range[] = {yp_t_range, instore_0, instore_2, instore_1};
 
         ead(capt, yp_call_arrayX(2, call_f_a), assert_captured_is(capt, f_a, 1, call_f_a + 1));
         ead(capt, yp_call_arrayX(3, call_f_a_b),
@@ -2894,7 +2921,7 @@ static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fi
     assert_raises(yp_call_arrayX(0, NULL), yp_TypeError);
 
     obj_array_decref(args);
-    yp_decrefN(N(str_a, str_b, str_slash));
+    yp_decrefN(N(str_a, str_b, str_slash, instore_0, instore_1, instore_2));
     uniqueness_dealloc(uq);
     return MUNIT_OK;
 }
@@ -2995,6 +3022,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     ypObject     *str_b = yp_str_frombytesC2(-1, "b");
     ypObject     *str_star_args = yp_str_frombytesC2(-1, "*args");
     ypObject     *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    ypObject     *list_empty = yp_listN(0);
 
     // _ypFunction_validate_parameters, new set.
     {
@@ -3010,7 +3038,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         define_function(f, None_code, ({str_star_args}, {str_star_star_kwargs}));
         ypObject *kwargs = yp_dictK(K(str_a, args[0]));
         malloc_tracker_oom_after(0);
-        assert_raises(yp_call_stars(f, yp_tuple_empty, kwargs), yp_MemoryError);
+        assert_raises(yp_call_stars(f, list_empty, kwargs), yp_MemoryError);
         malloc_tracker_oom_disable();
         yp_decrefN(N(kwargs, f));
     }
@@ -3020,7 +3048,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         define_function(f, None_code, ({str_a}, {str_star_star_kwargs}));
         ypObject *kwargs = yp_dictK(K(str_a, args[0], str_b, args[1]));
         malloc_tracker_oom_after(0);
-        assert_raises(yp_call_stars(f, yp_tuple_empty, kwargs), yp_MemoryError);
+        assert_raises(yp_call_stars(f, list_empty, kwargs), yp_MemoryError);
         malloc_tracker_oom_disable();
         yp_decrefN(N(kwargs, f));
     }
@@ -3049,7 +3077,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
         malloc_tracker_oom_disable();
     }
 
-    yp_decrefN(N(str_star_star_kwargs, str_star_args, str_b, str_a));
+    yp_decrefN(N(list_empty, str_star_star_kwargs, str_star_args, str_b, str_a));
     obj_array_decref(args);
     uniqueness_dealloc(uq);
     return MUNIT_OK;

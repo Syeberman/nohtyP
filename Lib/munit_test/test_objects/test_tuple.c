@@ -313,18 +313,19 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 
     // Invalid arguments.
     {
-        ypObject *args_two = yp_tupleN(N(yp_tuple_empty, yp_tuple_empty));
-        ypObject *kwargs_iterable = yp_frozendictK(K(str_iterable, yp_tuple_empty));
+        ypObject *list_empty = yp_listN(0);
+        ypObject *args_two = yp_tupleN(N(list_empty, list_empty));
+        ypObject *kwargs_iterable = yp_frozendictK(K(str_iterable, list_empty));
         ypObject *kwargs_cls = yp_frozendictK(K(str_cls, type->yp_type));
-        ypObject *kwargs_rand = yp_frozendictK(K(str_rand, yp_tuple_empty));
+        ypObject *kwargs_rand = yp_frozendictK(K(str_rand, list_empty));
 
-        assert_raises(yp_callN(type->yp_type, N(yp_tuple_empty, yp_tuple_empty)), yp_TypeError);
+        assert_raises(yp_callN(type->yp_type, N(list_empty, list_empty)), yp_TypeError);
         assert_raises(yp_call_stars(type->yp_type, args_two, yp_frozendict_empty), yp_TypeError);
         assert_raises(yp_call_stars(type->yp_type, yp_tuple_empty, kwargs_iterable), yp_TypeError);
         assert_raises(yp_call_stars(type->yp_type, yp_tuple_empty, kwargs_cls), yp_TypeError);
         assert_raises(yp_call_stars(type->yp_type, yp_tuple_empty, kwargs_rand), yp_TypeError);
 
-        yp_decrefN(N(kwargs_rand, kwargs_cls, kwargs_iterable, args_two));
+        yp_decrefN(N(kwargs_rand, kwargs_cls, kwargs_iterable, args_two, list_empty));
     }
 
     // Exception passthrough.
