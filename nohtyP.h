@@ -249,9 +249,9 @@ ypAPI ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *er
 
 // Returns a new reference to a bytes/bytearray object, depending on the type of source:
 //
+// - bytes/bytearray: the elements of the array come from source
 // - integer: the array will have that size and be initialized with null bytes
-// - iterable: it must be an iterable of integers in range(256) used to initialize the array (this
-//   includes bytes and bytearray objects)
+// - iterable: it must be an iterable of integers in range(256) used to initialize the array
 //
 // Raises yp_TypeError if source is a str/chrarray; instead, use yp_bytes3/yp_bytearray3.
 ypAPI ypObject *yp_bytes(ypObject *source);
@@ -429,7 +429,29 @@ ypAPI ypObject *yp_ne(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_ge(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_gt(ypObject *x, ypObject *y);
 
-// FIXME Move max/min/etc here, closer to yp_lt?
+// Returns a new reference to the largest/smallest of the given n objects. key is a one-argument
+// function used to extract a comparison key from each element in iterable; to compare the elements
+// directly, use yp_None. Raises yp_ValueError if n is zero. Note that key is before n as you cannot
+// have arguments after ellipsis.
+ypAPI ypObject *yp_max_keyN(ypObject *key, int n, ...);
+ypAPI ypObject *yp_max_keyNV(ypObject *key, int n, va_list args);
+ypAPI ypObject *yp_min_keyN(ypObject *key, int n, ...);
+ypAPI ypObject *yp_min_keyNV(ypObject *key, int n, va_list args);
+
+// Equivalent to yp_max_keyN(yp_None, n, ...) and yp_min_keyN(yp_None, n, ...).
+ypAPI ypObject *yp_maxN(int n, ...);
+ypAPI ypObject *yp_maxNV(int n, va_list args);
+ypAPI ypObject *yp_minN(int n, ...);
+ypAPI ypObject *yp_minNV(int n, va_list args);
+
+// Returns a new reference to the largest/smallest element in iterable. key is as in yp_max_keyN.
+// Raises yp_ValueError if iterable is empty.
+ypAPI ypObject *yp_max_key(ypObject *iterable, ypObject *key);
+ypAPI ypObject *yp_min_key(ypObject *iterable, ypObject *key);
+
+// Equivalent to yp_max_key(iterable, yp_None) and yp_min_key(iterable, yp_None).
+ypAPI ypObject *yp_max(ypObject *iterable);
+ypAPI ypObject *yp_min(ypObject *iterable);
 
 // You may also be interested in yp_IF and yp_WHILE for working with boolean operations; see below.
 
@@ -477,30 +499,6 @@ ypAPI ypObject *yp_filter(ypObject *function, ypObject *iterable);
 
 // Similar to yp_filter, but yields values for which function returns false.
 ypAPI ypObject *yp_filterfalse(ypObject *function, ypObject *iterable);
-
-// Returns a new reference to the largest/smallest of the given n objects. key is a one-argument
-// function used to extract a comparison key from each element in iterable; to compare the elements
-// directly, use yp_None. Raises yp_ValueError if n is zero. Note that key is before n as you cannot
-// have arguments after ellipsis.
-ypAPI ypObject *yp_max_keyN(ypObject *key, int n, ...);
-ypAPI ypObject *yp_max_keyNV(ypObject *key, int n, va_list args);
-ypAPI ypObject *yp_min_keyN(ypObject *key, int n, ...);
-ypAPI ypObject *yp_min_keyNV(ypObject *key, int n, va_list args);
-
-// Equivalent to yp_max_keyN(yp_None, n, ...) and yp_min_keyN(yp_None, n, ...).
-ypAPI ypObject *yp_maxN(int n, ...);
-ypAPI ypObject *yp_maxNV(int n, va_list args);
-ypAPI ypObject *yp_minN(int n, ...);
-ypAPI ypObject *yp_minNV(int n, va_list args);
-
-// Returns a new reference to the largest/smallest element in iterable. key is as in yp_max_keyN.
-// Raises yp_ValueError if iterable is empty.
-ypAPI ypObject *yp_max_key(ypObject *iterable, ypObject *key);
-ypAPI ypObject *yp_min_key(ypObject *iterable, ypObject *key);
-
-// Equivalent to yp_max_key(iterable, yp_None) and yp_min_key(iterable, yp_None).
-ypAPI ypObject *yp_max(ypObject *iterable);
-ypAPI ypObject *yp_min(ypObject *iterable);
 
 // Returns a new reference to an iterator that yields the elements of iterable in reverse order.
 // Raises yp_TypeError if iterable is not reversible (i.e., iterators, sets).

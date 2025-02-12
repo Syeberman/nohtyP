@@ -7,14 +7,16 @@
 
 
 MunitSuite test_protocols_suites[] = {SUITE_OF_TESTS(test_all), SUITE_OF_TESTS(test_collection),
-        SUITE_OF_TESTS(test_iterable), SUITE_OF_TESTS(test_mapping), SUITE_OF_TESTS(test_sequence),
-        SUITE_OF_TESTS(test_setlike), SUITE_OF_TESTS(test_string), {NULL}};
+        SUITE_OF_TESTS(test_comparable), SUITE_OF_TESTS(test_iterable),
+        SUITE_OF_TESTS(test_mapping), SUITE_OF_TESTS(test_sequence), SUITE_OF_TESTS(test_setlike),
+        SUITE_OF_TESTS(test_string), {NULL}};
 
 
 extern void test_protocols_initialize(void)
 {
     test_all_initialize();
     test_collection_initialize();
+    test_comparable_initialize();
     test_iterable_initialize();
     test_mapping_initialize();
     test_sequence_initialize();

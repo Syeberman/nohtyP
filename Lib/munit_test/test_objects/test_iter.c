@@ -3,9 +3,6 @@
 // test_iterable validates the behaviour for iterators of iterables. This file validates all other
 // iterator-related behaviour, in particular generators and yp_iter2.
 
-// TODO Ensure yp_max_keyN/etc properly handles exception passthrough, even in cases where
-// one of the arguments would be ignored.
-
 
 #define ypIter_LENHINT_MAX 0x7FFFFFFF  // From nohtyP.c.
 

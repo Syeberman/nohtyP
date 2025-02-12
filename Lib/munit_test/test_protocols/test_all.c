@@ -45,6 +45,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises(yp_ge(self, self), yp_TypeError);
         assert_raises(yp_gt(self, self), yp_TypeError);
     }
+    // yp_max_key, yp_min_key, yp_max, and yp_min are tested elsewhere.
 
     if (!type->is_iterable) {
         assert_raises(yp_iter(self), yp_TypeError);

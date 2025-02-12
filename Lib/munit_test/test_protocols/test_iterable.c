@@ -1,9 +1,5 @@
-
 #include "munit_test/unittest.h"
 
-
-// TODO Ensure yp_max_key/etc properly handles exception passthrough, even in cases where
-// one of the arguments would be ignored.
 
 // Used as the code for a function. Unconditionally returns intstore zero.
 static ypObject *zero_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
@@ -294,62 +290,6 @@ static MunitResult test_filterfalse(const MunitParameter params[], fixture_t *fi
     {
         ypObject *x = rand_obj(NULL, type);
         assert_raises(yp_filterfalse(yp_None, x), yp_NotImplementedError);
-        yp_decrefN(N(x));
-    }
-
-    return MUNIT_OK;
-}
-
-static MunitResult test_max_key(const MunitParameter params[], fixture_t *fixture)
-{
-    fixture_type_t *type = fixture->type;
-
-    // yp_max_key is not yet implemented.
-    {
-        ypObject *x = rand_obj(NULL, type);
-        assert_raises(yp_max_key(x, yp_None), yp_NotImplementedError);
-        yp_decrefN(N(x));
-    }
-
-    return MUNIT_OK;
-}
-
-static MunitResult test_min_key(const MunitParameter params[], fixture_t *fixture)
-{
-    fixture_type_t *type = fixture->type;
-
-    // yp_min_key is not yet implemented.
-    {
-        ypObject *x = rand_obj(NULL, type);
-        assert_raises(yp_min_key(x, yp_None), yp_NotImplementedError);
-        yp_decrefN(N(x));
-    }
-
-    return MUNIT_OK;
-}
-
-static MunitResult test_max(const MunitParameter params[], fixture_t *fixture)
-{
-    fixture_type_t *type = fixture->type;
-
-    // yp_max is not yet implemented.
-    {
-        ypObject *x = rand_obj(NULL, type);
-        assert_raises(yp_max(x), yp_NotImplementedError);
-        yp_decrefN(N(x));
-    }
-
-    return MUNIT_OK;
-}
-
-static MunitResult test_min(const MunitParameter params[], fixture_t *fixture)
-{
-    fixture_type_t *type = fixture->type;
-
-    // yp_min is not yet implemented.
-    {
-        ypObject *x = rand_obj(NULL, type);
-        assert_raises(yp_min(x), yp_NotImplementedError);
         yp_decrefN(N(x));
     }
 
@@ -1743,9 +1683,7 @@ static MunitParameterEnum test_iterable_params[] = {
 
 MunitTest test_iterable_tests[] = {TEST(test_iter, test_iterable_params),
         TEST(test_unpackN, test_iterable_params), TEST(test_filter, test_iterable_params),
-        TEST(test_filterfalse, test_iterable_params), TEST(test_max_key, test_iterable_params),
-        TEST(test_min_key, test_iterable_params), TEST(test_max, test_iterable_params),
-        TEST(test_min, test_iterable_params), TEST(test_reversed, test_iterable_params),
+        TEST(test_filterfalse, test_iterable_params), TEST(test_reversed, test_iterable_params),
         TEST(test_func_reversed, test_iterable_params), TEST(test_sorted, test_iterable_params),
         TEST(test_func_sorted, test_iterable_params), TEST(test_zipN, test_iterable_params),
         TEST(test_send, test_iterable_params), TEST(test_next2, test_iterable_params),

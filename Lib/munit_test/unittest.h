@@ -1201,6 +1201,7 @@ SUITE_OF_TESTS_DECLS(test_tuple);
 SUITE_OF_SUITES_DECLS(test_protocols);
 SUITE_OF_TESTS_DECLS(test_all);
 SUITE_OF_TESTS_DECLS(test_collection);
+SUITE_OF_TESTS_DECLS(test_comparable);
 SUITE_OF_TESTS_DECLS(test_iterable);
 SUITE_OF_TESTS_DECLS(test_mapping);
 SUITE_OF_TESTS_DECLS(test_sequence);
