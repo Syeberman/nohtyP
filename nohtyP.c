@@ -475,7 +475,13 @@ typedef struct {
     ypObject_HEAD;
     yp_uint64_t tp_flags;  // flags describing this type (ismapping, iscallable, etc)
     // TODO Fill tp_name and use in DEBUG statements
-    // TODO Rename to qualname to follow Python?
+    // TODO Replace this with a ypClassMethods struct for methods that operate on the type object.
+    // Move tp_name and tp_func_new in there, then add qualname, module, bases, mro, and any other
+    // "special attributes" that apply to types (aka class methods).
+    // TODO If tp_name is turned into a function that returns the str, then all properties of a type
+    // will have a runtime component, meaning multiple types can share the same method table. For
+    // example, it'd be nice to make all the exception objects proper types without having a bunch
+    // of copies of the large ypBaseException_Type struct.
     ypObject *tp_name;  // For printing, in format "<module>.<name>"
 
     // Object fundamentals
@@ -555,7 +561,7 @@ static ypTypeObject *ypTypeTable[255];
 // clang-format off
 #define ypInvalidated_CODE          (  0u)
 // no mutable ypInvalidated type    (  1u)
-#define ypException_CODE            (  2u)
+#define ypBaseException_CODE        (  2u)
 // no mutable ypException type      (  3u)
 #define ypType_CODE                 (  4u)
 // no mutable ypType type           (  5u)
@@ -774,7 +780,7 @@ static ypObject *Immutable_freezefunc(ypObject *x)
 #define _yp_BAD_TYPE(bad_ob, exception) ( \
     ypObject_TYPE_PAIR_CODE(bad_ob) == ypInvalidated_CODE ? \
         yp_InvalidatedError : \
-    ypObject_TYPE_PAIR_CODE(bad_ob) == ypException_CODE ? \
+    ypObject_TYPE_PAIR_CODE(bad_ob) == ypBaseException_CODE ? \
         (bad_ob) : \
     /* else */ \
         (exception))
@@ -791,7 +797,7 @@ static ypObject *Immutable_freezefunc(ypObject *x)
     return_yp_CEXC_ERR((retval), (exc), yp_METHOD_ERR(bad_ob))
 #define return_yp_EXC_METHOD_ERR(exc, bad_ob) return_yp_EXC_ERR((exc), yp_METHOD_ERR(bad_ob))
 
-#define yp_IS_EXCEPTION_C(x) (ypObject_TYPE_PAIR_CODE(x) == ypException_CODE)
+#define yp_IS_EXCEPTION_C(x) (ypObject_TYPE_PAIR_CODE(x) == ypBaseException_CODE)
 int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 
 // sizeof and offsetof as yp_ssize_t, and sizeof a structure member
@@ -4034,7 +4040,7 @@ yp_IMMORTAL_FUNCTION_static(exception_func_new, exception_func_new_code,
         ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
                 {yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
 
-static ypTypeObject ypException_Type = {
+static ypTypeObject ypBaseException_Type = {
         yp_TYPE_HEAD_INIT,
         0,     // tp_flags
         NULL,  // tp_name
@@ -4110,14 +4116,19 @@ static ypTypeObject ypException_Type = {
 //  http://docs.python.org/3/library/exceptions.html
 
 // FIXME These exception names (the strings) all start with yp_.
-#define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)                             \
-    yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                                    \
-    static ypExceptionObject _##name##_struct = {                                   \
-            yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, ypObject_LEN_INVALID, NULL), \
-            yp_CONST_REF(name##_name), (superptr)};                                 \
+#define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)                                 \
+    yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                                        \
+    static ypExceptionObject _##name##_struct = {                                       \
+            yp_IMMORTAL_HEAD_INIT(ypBaseException_CODE, 0, ypObject_LEN_INVALID, NULL), \
+            yp_CONST_REF(name##_name), (superptr)};                                     \
     ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_EXCEPTION(name, super) \
     _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, yp_CONST_REF(super))
+
+// TODO Make all of these exception objects proper type objects, as in Python. With one change to
+// tp_name (making it a class method), the ypBaseException_Type method table could be used for all
+// the exceptions. Then remove yp_t_exception, and update the docs for yp_type to state that
+// if the object is an exception yp_t_type is returned (because it's a type object).
 
 // clang-format off
 _yp_IMMORTAL_EXCEPTION_SUPERPTR(yp_BaseException, NULL);
@@ -21013,44 +21024,44 @@ yp_IMMORTAL_FUNCTION(yp_func_sorted, yp_func_sorted_code,
 // Recall that C helpfully sets missing array elements to NULL
 // clang-format off
 static ypTypeObject *ypTypeTable[255] = {
-    &ypInvalidated_Type,// ypInvalidated_CODE          (  0u)
-    &ypInvalidated_Type,//                             (  1u)
-    &ypException_Type,  // ypException_CODE            (  2u)
-    &ypException_Type,  //                             (  3u)
-    &ypType_Type,       // ypType_CODE                 (  4u)
-    &ypType_Type,       //                             (  5u)
+    &ypInvalidated_Type,    // ypInvalidated_CODE          (  0u)
+    &ypInvalidated_Type,    //                             (  1u)
+    &ypBaseException_Type,  // ypBaseException_CODE        (  2u)
+    &ypBaseException_Type,  //                             (  3u)
+    &ypType_Type,           // ypType_CODE                 (  4u)
+    &ypType_Type,           //                             (  5u)
 
-    &ypNoneType_Type,   // ypNoneType_CODE             (  6u)
-    &ypNoneType_Type,   //                             (  7u)
-    &ypBool_Type,       // ypBool_CODE                 (  8u)
-    &ypBool_Type,       //                             (  9u)
+    &ypNoneType_Type,       // ypNoneType_CODE             (  6u)
+    &ypNoneType_Type,       //                             (  7u)
+    &ypBool_Type,           // ypBool_CODE                 (  8u)
+    &ypBool_Type,           //                             (  9u)
 
-    &ypInt_Type,        // ypInt_CODE                  ( 10u)
-    &ypIntStore_Type,   // ypIntStore_CODE             ( 11u)
-    &ypFloat_Type,      // ypFloat_CODE                ( 12u)
-    &ypFloatStore_Type, // ypFloatStore_CODE           ( 13u)
+    &ypInt_Type,            // ypInt_CODE                  ( 10u)
+    &ypIntStore_Type,       // ypIntStore_CODE             ( 11u)
+    &ypFloat_Type,          // ypFloat_CODE                ( 12u)
+    &ypFloatStore_Type,     // ypFloatStore_CODE           ( 13u)
 
-    &ypIter_Type,       // ypIter_CODE                 ( 14u)
-    &ypIter_Type,       //                             ( 15u)
+    &ypIter_Type,           // ypIter_CODE                 ( 14u)
+    &ypIter_Type,           //                             ( 15u)
 
-    &ypBytes_Type,      // ypBytes_CODE                ( 16u)
-    &ypByteArray_Type,  // ypByteArray_CODE            ( 17u)
-    &ypStr_Type,        // ypStr_CODE                  ( 18u)
-    &ypChrArray_Type,   // ypChrArray_CODE             ( 19u)
-    &ypTuple_Type,      // ypTuple_CODE                ( 20u)
-    &ypList_Type,       // ypList_CODE                 ( 21u)
+    &ypBytes_Type,          // ypBytes_CODE                ( 16u)
+    &ypByteArray_Type,      // ypByteArray_CODE            ( 17u)
+    &ypStr_Type,            // ypStr_CODE                  ( 18u)
+    &ypChrArray_Type,       // ypChrArray_CODE             ( 19u)
+    &ypTuple_Type,          // ypTuple_CODE                ( 20u)
+    &ypList_Type,           // ypList_CODE                 ( 21u)
 
-    &ypFrozenSet_Type,  // ypFrozenSet_CODE            ( 22u)
-    &ypSet_Type,        // ypSet_CODE                  ( 23u)
+    &ypFrozenSet_Type,      // ypFrozenSet_CODE            ( 22u)
+    &ypSet_Type,            // ypSet_CODE                  ( 23u)
 
-    &ypFrozenDict_Type, // ypFrozenDict_CODE           ( 24u)
-    &ypDict_Type,       // ypDict_CODE                 ( 25u)
+    &ypFrozenDict_Type,     // ypFrozenDict_CODE           ( 24u)
+    &ypDict_Type,           // ypDict_CODE                 ( 25u)
 
-    &ypRange_Type,      // ypRange_CODE                ( 26u)
-    &ypRange_Type,      //                             ( 27u)
+    &ypRange_Type,          // ypRange_CODE                ( 26u)
+    &ypRange_Type,          //                             ( 27u)
 
-    &ypFunction_Type,   // ypFunction_CODE             ( 28u)
-    &ypFunction_Type,   //                             ( 29u)
+    &ypFunction_Type,       // ypFunction_CODE             ( 28u)
+    &ypFunction_Type,       //                             ( 29u)
 };
 // clang-format on
 
@@ -21059,10 +21070,8 @@ static ypTypeObject *ypTypeTable[255] = {
 ypObject *yp_type(ypObject *object) { return (ypObject *)ypObject_TYPE(object); }
 
 // The immortal type objects
-// TODO Rename to yp_type_*? We might want to use the 't' in yp_t_* with tuples....
 ypObject *const yp_t_invalidated = (ypObject *)&ypInvalidated_Type;
-// FIXME Rename to yp_t_BaseException...or is yp_t_exception closer to a metaclass?
-ypObject *const yp_t_exception = (ypObject *)&ypException_Type;
+ypObject *const yp_t_exception = (ypObject *)&ypBaseException_Type;
 ypObject *const yp_t_type = (ypObject *)&ypType_Type;
 ypObject *const yp_t_NoneType = (ypObject *)&ypNoneType_Type;
 ypObject *const yp_t_bool = (ypObject *)&ypBool_Type;

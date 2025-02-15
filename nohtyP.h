@@ -508,7 +508,6 @@ ypAPI ypObject *yp_reversed(ypObject *iterable);
 // function used to extract a comparison key from each element in iterable; to compare the elements
 // directly, use yp_None. If reverse is true, the list elements are sorted as if each comparison
 // were reversed.
-// FIXME Here, keyword-only args are treated as positional (3). In yp_max, we use _key instead.
 ypAPI ypObject *yp_sorted3(ypObject *iterable, ypObject *key, ypObject *reverse);
 
 // Equivalent to yp_sorted3(iterable, yp_None, yp_False).
@@ -718,12 +717,13 @@ ypAPI void yp_irepeatC(ypObject *sequence, yp_ssize_t factor, ypObject **exc);
 // *exc on error.
 ypAPI void yp_insertC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc);
 
-// Removes the i-th item from sequence and returns it. Returns yp_IndexError if i is out of bounds.
-// The Python-equivalent "default" for i is -1.
+// Removes the i-th item from sequence and returns a new reference to it. Returns yp_IndexError if i
+// is out of bounds. The Python-equivalent "default" for i is -1.
 ypAPI ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i);
 
-// Removes the last item from sequence and returns it. Returns yp_IndexError if sequence is empty.
-// Note that for sequences, yp_push and yp_pop together implement a stack (last in, first out).
+// Removes the last item from sequence and returns a new reference to it. Returns yp_IndexError if
+// sequence is empty. Note that for sequences, yp_push and yp_pop together implement a stack (last
+// in, first out).
 ypAPI ypObject *yp_pop(ypObject *sequence);
 
 // Removes the first item from sequence that equals x. Raises yp_ValueError if x is not contained in
@@ -1432,13 +1432,13 @@ ypAPI yp_int_t     yp_asintLF(yp_float_t x, ypObject **exc);
 // Return a new reference to x rounded to ndigits after the decimal point.
 ypAPI ypObject *yp_roundC(ypObject *x, int ndigits);
 
-// Sums the n given objects and returns the total. If n is zero yp_ValueError is raised.
-// FIXME Am I consistent on where I specify "new reference"/etc and where I don't?
+// Sums the n given objects using yp_add and returns a new reference to the total. If n is zero
+// yp_ValueError is raised.
 ypAPI ypObject *yp_sumN(int n, ...);
 ypAPI ypObject *yp_sumNV(int n, va_list args);
 
-// Sums the start value with the items of iterable using yp_add, returning the total. If iterable is
-// empty the start value is returned.
+// Sums the start value with the items of iterable using yp_add, returning a new reference to the
+// total. If iterable is empty the start value is returned.
 ypAPI ypObject *yp_sum_start(ypObject *iterable, ypObject *start);
 
 // Equivalent to yp_sum_start(iterable, yp_i_zero).
@@ -1536,8 +1536,6 @@ ypAPI ypObject *yp_type(ypObject *object);
 // yp_t_invalidated does not currently support yp_call.
 ypAPI ypObject *const yp_t_invalidated;
 // yp_t_exception does not currently support yp_call.
-// FIXME Should this be yp_t_BaseException? Or drop the `t_` and treat all exceptions as objects?
-// Or call it yp_t_ExceptionType like for None?
 ypAPI ypObject *const yp_t_exception;
 // yp_call signature: yp_t_type(object, /)
 ypAPI ypObject *const yp_t_type;
@@ -1733,7 +1731,8 @@ ypAPI void yp_i2s_setitemC5(
 //
 //      value = yp_s2o_getitemC3(o, -1, "mykey");
 //
-// it is more efficient to use yp_IMMORTAL_STR_LATIN_1 (also compatible with ascii), as in:
+// you can avoid allocating a short-lived str using yp_IMMORTAL_STR_LATIN_1 (which also accepts
+// ascii strings), as in:
 //
 //      yp_IMMORTAL_STR_LATIN_1(s_mykey, "mykey");
 //      value = yp_getitem(o, s_mykey);
@@ -1953,12 +1952,12 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **
 
 // str and chrarray internally store their Unicode characters in particular encodings, usually
 // depending on the contents of the string. This function sets *encoded to the beginning of that
-// data, *size to the number of bytes in encoded, and *encoding to the immortal str representing the
-// encoding used (yp_s_latin_1, perhaps). *encoded will point into internal object memory which MUST
-// NOT be modified; furthermore, the string itself must not be modified while using the array. As a
-// special case, if size is NULL, the string must not contain null characters and *encoded will
-// point to a null-terminated string. On error, sets *size to zero (if size is not NULL), *encoded
-// to NULL, *encoding to the exception, and returns the exception.
+// data, *size to the number of bytes in encoded, *encoding to the immortal str representing the
+// encoding used (yp_s_latin_1, perhaps), and returns the immortal yp_None. *encoded will point into
+// internal object memory which MUST NOT be modified; furthermore, the string itself must not be
+// modified while using the array. As a special case, if size is NULL, the string must not contain
+// null characters and *encoded will point to a null-terminated string. On error, sets *size to zero
+// (if size is not NULL), *encoded to NULL, *encoding to the exception, and returns the exception.
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding);
 
