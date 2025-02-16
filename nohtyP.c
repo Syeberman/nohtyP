@@ -10428,15 +10428,6 @@ static int _ypBytes_are_equal(ypObject *b, ypObject *x)
     yp_ssize_t x_len = ypBytes_LEN(x);
     if (b_len != x_len) return FALSE;
 
-    // The pre-computed hash, if available, can save us some time when b!=x.
-    // TODO Is this worth it? We would need to have two strings that have a long shared prefix for
-    // this to be beneficial. How often does that happen?
-    if (ypObject_CACHED_HASH(b) != ypObject_HASH_INVALID &&
-            ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
-            ypObject_CACHED_HASH(b) != ypObject_CACHED_HASH(x)) {
-        return FALSE;
-    }
-
     return yp_memcmp(ypBytes_DATA(b), ypBytes_DATA(x), b_len) == 0;
 }
 static ypObject *bytes_eq(ypObject *b, ypObject *x)
@@ -11459,15 +11450,6 @@ static int _ypStr_are_equal(ypObject *s, ypObject *x)
     // Recall strs are stored in the smallest encoding that can hold them, so different encodings
     // means differing characters
     if (ypStr_ENC_CODE(s) != ypStr_ENC_CODE(x)) return 0;
-
-    // The pre-computed hash, if available, can save us some time when s!=x.
-    // TODO Is this worth it? We would need to have two strings that have a long shared prefix for
-    // this to be beneficial. How often does that happen?
-    if (ypObject_CACHED_HASH(s) != ypObject_HASH_INVALID &&
-            ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
-            ypObject_CACHED_HASH(s) != ypObject_CACHED_HASH(x)) {
-        return FALSE;
-    }
 
     return ypStr_MEMCMP(ypStr_ENC(s)->sizeshift, ypStr_DATA(s), (yp_ssize_t)0, ypStr_DATA(x),
                    (yp_ssize_t)0, s_len) == 0;
