@@ -21,8 +21,11 @@ def CheckVarargFunctions(warnings: list[str], header: ypHeader):
                 f"vararg function contains input count postfix: {func.name}"
             )
 
-        if func.params[-2].type != "int" or func.params[-2].name != "n":
-            warnings.append(f"must have `int n` argument before varargs: {func.name}")
+        count_param = "k" if "K" in func.postfixes else "n"
+        if func.params[-2].type != "int" or func.params[-2].name != count_param:
+            warnings.append(
+                f"must have `int {count_param}` argument before varargs: {func.name}"
+            )
 
         if "V" in func.postfixes:
             if func.params[-1].type != "va_list":

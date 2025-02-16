@@ -93,7 +93,7 @@ static MunitResult test_clear(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
-    ypObject       *items[4];
+    ypObject       *items[32];
     obj_array_fill(items, uq, type->rand_items);
 
     // Immutables don't support clear.
@@ -120,6 +120,20 @@ static MunitResult test_clear(const MunitParameter params[], fixture_t *fixture)
     // self is empty.
     {
         ypObject *self = type->newN(0);
+        assert_not_raises_exc(yp_clear(self, &exc));
+        assert_len(self, 0);
+        assert_obj(yp_contains(self, items[0]), is, yp_False);
+        assert_obj(yp_contains(self, items[1]), is, yp_False);
+        yp_decref(self);
+    }
+
+    // Clear a large collection (with a separate ob_data).
+    {
+        ypObject *self = type->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[8], items[9], items[10], items[11], items[12], items[13],
+                items[14], items[15], items[16], items[17], items[18], items[19], items[20],
+                items[21], items[22], items[23], items[24], items[25], items[26], items[27],
+                items[28], items[29], items[30], items[31]));
         assert_not_raises_exc(yp_clear(self, &exc));
         assert_len(self, 0);
         assert_obj(yp_contains(self, items[0]), is, yp_False);

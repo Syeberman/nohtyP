@@ -5,6 +5,16 @@
 #include "munit_test/unittest.h"
 
 
+// Finds the peer matching type in the null-terminated array of peers.
+static peer_type_t *find_peer_type(peer_type_t *peers, fixture_type_t *type)
+{
+    peer_type_t *peer;
+    for (peer = peers; peer->type != NULL; peer++) {
+        if (peer->type == type) return peer;
+    }
+    return NULL;  // GCOVR_EXCL_LINE
+}
+
 // Ensure PRIint, PRIssize, and similar are correct. Part of this test is ensuring it passes the
 // compiler's format string checks. Recall that these macros are copied in nohtyP.c and unittest.h.
 static MunitResult test_PRI_formats(const MunitParameter params[], fixture_t *fixture)
@@ -33,6 +43,7 @@ static MunitResult test_PRI_formats(const MunitParameter params[], fixture_t *fi
 #endif
 
 #undef assert_PRI_format
+
     return MUNIT_OK;
 }
 
@@ -437,11 +448,11 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
     fixture_type_t *type = fixture->type;
 
     assert_not_null(type->name);
-    assert_type_is(type->type, yp_t_type);
+    assert_type_is(type->yp_type, yp_t_type);
     if (type->is_mutable) {
         assert_null(type->falsy);
     } else if (type->falsy != NULL) {
-        assert_type_is(type->falsy, type->type);
+        assert_type_is(type->falsy, type->yp_type);
     }
     assert_not_null(type->pair);
 
@@ -451,8 +462,38 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
     if (type->is_collection && type != fixture_type_range) {
         ypObject *x = rand_obj(NULL, type);
         ypObject *self = type->new_(x);
-        assert_type_is(self, type->type);
+        assert_type_is(self, type->yp_type);
         yp_decrefN(N(self, x));
+    }
+
+    // peers should always contain the type and its pair.
+    assert_not_null(find_peer_type(type->peers, type));
+    assert_not_null(find_peer_type(type->peers, type->pair));
+
+    // peers should be reciprocal (i.e. a tuple is a peer of a str, so a str is a peer of a tuple).
+    {
+        peer_type_t *peer;
+        for (peer = type->peers; peer->type != NULL; peer++) {
+            peer_type_t *peer_peer = find_peer_type(peer->type->peers, type);
+            assert_not_null(peer_peer);
+            assert_ptr(peer_peer->rand_items, ==, peer->rand_items);
+            assert_ptr(peer_peer->rand_values, ==, peer->rand_values);
+        }
+    }
+
+    // new_itemsK is used by collection types that are peers with frozendict/etc.
+    if (type->is_collection && !type->is_string && type != fixture_type_range) {
+        ypObject *keys[1];
+        ypObject *values[1];
+        ypObject *self;
+        obj_array_fill(keys, NULL, type->rand_items);
+        obj_array_fill(values, NULL, type->rand_values);
+        self = new_itemsK(type, fixture_type_tuple, 1, keys[0], values[0]);
+        assert_type_is(self, type->yp_type);
+        assert_len(self, 1);
+        obj_array_decref(values);
+        obj_array_decref(keys);
+        yp_decrefN(N(self));
     }
 
     return MUNIT_OK;
@@ -511,12 +552,12 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
     {
         ypObject *of_type = rand_obj(NULL, type);
         assert_not_exception(of_type);
-        assert_type_is(of_type, type->type);
+        assert_type_is(of_type, type->yp_type);
         yp_decref(of_type);
     }
 
     // Ensure generated functions are callable.
-    if (type == fixture_type_function) {
+    if (type->yp_type == yp_t_function) {
         ypObject *function = rand_obj(NULL, type);
         ypObject *result;
         assert_not_raises(result = yp_callN(function, 0));
@@ -621,14 +662,22 @@ static MunitResult test_rand_obj_uniqueness(const MunitParameter params[], fixtu
     return MUNIT_OK;
 }
 
-static MunitParameterEnum test_types_all_params[] = {
-        {param_key_type, param_values_types_all}, {NULL}};
+static MunitResult test_munit_rand(const MunitParameter params[], fixture_t *fixture)
+{
+    // There was a divide-by-zero error when min equals max.
+    // https://github.com/nemequ/munit/pull/106
+    munit_assert_int(munit_rand_int_range(42, 42), ==, 42);
+
+    return MUNIT_OK;
+}
+
+static MunitParameterEnum test_all_params[] = {{param_key_type, param_values_types_all}, {NULL}};
 
 MunitTest test_unittest_tests[] = {TEST(test_PRI_formats, NULL),
         TEST(test_assert_setlike_helper, NULL), TEST(test_assert_mapping_helper, NULL),
         TEST(test_fixture_types, NULL), TEST(test_param_values_types, NULL),
-        TEST(test_fixture_type, test_types_all_params), TEST(test_rand_obj, test_types_all_params),
-        TEST(test_rand_obj_uniqueness, test_types_all_params), {NULL}};
+        TEST(test_fixture_type, test_all_params), TEST(test_rand_obj, test_all_params),
+        TEST(test_rand_obj_uniqueness, test_all_params), TEST(test_munit_rand, NULL), {NULL}};
 
 
 extern void test_unittest_initialize(void) {}

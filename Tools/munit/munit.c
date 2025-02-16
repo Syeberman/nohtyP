@@ -103,6 +103,7 @@
 #include <limits.h>
 #include <time.h>
 #include <errno.h>
+#include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -976,6 +977,7 @@ munit_rand_memory(size_t size, munit_uint8_t data[MUNIT_ARRAY_PARAM(size)]) {
   } while (!munit_atomic_cas(&munit_rand_state, &old, state));
 }
 
+/* max cannot be zero. */
 static munit_uint32_t
 munit_rand_state_at_most(munit_uint32_t* state, munit_uint32_t salt, munit_uint32_t max) {
   /* We want (UINT32_MAX + 1) % max, which in unsigned arithmetic is the same
@@ -997,6 +999,7 @@ munit_rand_state_at_most(munit_uint32_t* state, munit_uint32_t salt, munit_uint3
   return x % max;
 }
 
+/* max cannot be zero. */
 static munit_uint32_t
 munit_rand_at_most(munit_uint32_t salt, munit_uint32_t max) {
   munit_uint32_t old, state;
@@ -1012,10 +1015,14 @@ munit_rand_at_most(munit_uint32_t salt, munit_uint32_t max) {
 
 int
 munit_rand_int_range(int min, int max) {
-  munit_uint64_t range = (munit_uint64_t) max - (munit_uint64_t) min;
+  munit_uint64_t range;
 
-  if (min > max)
+  if (min == max)
+    return min;
+  else if (min > max)
     return munit_rand_int_range(max, min);
+
+  range = (munit_uint64_t) max - (munit_uint64_t) min;
 
   if (range > (~((munit_uint32_t) 0U)))
     range = (~((munit_uint32_t) 0U));
@@ -1632,7 +1639,10 @@ munit_test_runner_run_test(MunitTestRunner* runner,
          * running a single test, but we don't want every test with
          * the same number of parameters to choose the same parameter
          * number, so use the test name as a primitive salt. */
-        pidx = munit_rand_at_most(munit_str_hash(test_name), possible - 1);
+        if (possible > 1)
+          pidx = munit_rand_at_most(munit_str_hash(test_name), possible - 1);
+        else
+          pidx = 0;
         if (MUNIT_UNLIKELY(munit_parameters_add(&params_l, &params, pe->name, pe->values[pidx]) != MUNIT_OK))
           goto cleanup;
       } else {
@@ -2050,9 +2060,9 @@ munit_suite_main_custom(const MunitSuite* suite, void* user_data,
   } else {
     fprintf(MUNIT_OUTPUT_FILE, "%d of %d (%0.0f%%) tests successful, %d (%0.0f%%) test skipped.\n",
             runner.report.successful, tests_run,
-            (((double) runner.report.successful) / ((double) tests_run)) * 100.0,
+            floor((((double) runner.report.successful) / ((double) tests_run)) * 100.0),
             runner.report.skipped,
-            (((double) runner.report.skipped) / ((double) tests_total)) * 100.0);
+            ceil((((double) runner.report.skipped) / ((double) tests_total)) * 100.0));
   }
 
   if (runner.report.failed == 0 && runner.report.errored == 0) {

@@ -2,17 +2,9 @@
 #include "munit_test/unittest.h"
 
 
-// TODO fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, and
-// fixture_type_set_dirty are tricky because they require hashable types but in (key, value) the
-// value may not be hashable.
-// TODO "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
-#define x_types_init()                                                                  \
-    {fixture_type_frozendict, fixture_type_dict, fixture_type_iter, fixture_type_tuple, \
-            fixture_type_list, fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL}
-
-#define friend_types_init()                                                     \
-    {fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
-            fixture_type_dict_dirty, NULL}
+// TODO Instead of always using tuples for key/value pairs, make tests for other 2-item
+// sequences. This would be for both new/etc (this file) and for update/etc (test_mapping). Then
+// also test for too-short and too-long pairs.
 
 // A copy of ypDictMiState from nohtyP.c, as a union with yp_uint64_t to maintain strict aliasing.
 typedef union {
@@ -55,7 +47,7 @@ static void _test_newK(
     // Basic newK.
     {
         ypObject *mp = any_newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp));
     }
@@ -63,7 +55,7 @@ static void _test_newK(
     // n is zero.
     {
         ypObject *mp = any_newK(0);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_len(mp, 0);
         yp_decrefN(N(mp));
     }
@@ -71,7 +63,7 @@ static void _test_newK(
     // n is negative.
     {
         ypObject *mp = any_newK(-1);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_len(mp, 0);
         yp_decrefN(N(mp));
     }
@@ -79,7 +71,7 @@ static void _test_newK(
     // Duplicate arguments; last value is retained.
     {
         ypObject *mp = any_newK(K(keys[0], values[0], keys[1], values[1], keys[1], values[2]));
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, keys[0], values[0], keys[1], values[2]);
         yp_decrefN(N(mp));
     }
@@ -109,9 +101,9 @@ static void _test_newK(
         assert_isexception(any_newK(K(yp_SyntaxError, yp_None)), yp_SyntaxError);
         assert_isexception(any_newK(K(yp_None, yp_SyntaxError)), yp_SyntaxError);
         assert_isexception(
-                any_newK(K(yp_i_one, yp_i_one, yp_SyntaxError, yp_None)), yp_SyntaxError);
+                any_newK(K(keys[0], values[0], yp_SyntaxError, yp_None)), yp_SyntaxError);
         assert_isexception(
-                any_newK(K(yp_i_one, yp_i_one, yp_None, yp_SyntaxError)), yp_SyntaxError);
+                any_newK(K(keys[0], values[0], yp_None, yp_SyntaxError)), yp_SyntaxError);
     }
 
     obj_array_decref(values);
@@ -120,81 +112,70 @@ static void _test_newK(
     uniqueness_dealloc(uq);
 }
 
-static void _test_new(
-        fixture_type_t *type, ypObject *(*any_new)(ypObject *), int test_exception_passthrough)
+static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_new)(ypObject *),
+        int test_exception_passthrough)
 {
-    fixture_type_t    *x_types[] = x_types_init();
-    fixture_type_t    *friend_types[] = friend_types_init();
-    fixture_type_t   **x_type;
+    fixture_type_t    *x_type = peer->type;
     uniqueness_t      *uq = uniqueness_new();
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, peer->rand_items);
+    obj_array_fill(values, uq, peer->rand_values);
 
     // Basic new.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = new_itemsK(*x_type, K(keys[0], values[0], keys[1], values[1]));
+    {
+        ypObject *x = x_type->newK(K(keys[0], values[0], keys[1], values[1]));
         ypObject *mp = any_new(x);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp, x));
     }
 
     // x is empty.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = (*x_type)->newN(0);
+    {
+        ypObject *x = x_type->newN(0);
         ypObject *mp = any_new(x);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_len(mp, 0);
         yp_decrefN(N(mp, x));
     }
 
     // x contains duplicates; last value is retained.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *x =
-                new_itemsK(*x_type, K(keys[0], values[0], keys[1], values[1], keys[0], values[2]));
+    // TODO Once the order items are yielded from sets/etc is guaranteed, we can support setlike.
+    if (!x_type->is_setlike) {
+        ypObject *x = x_type->newK(K(keys[0], values[0], keys[1], values[1], keys[0], values[2]));
         ypObject *mp = any_new(x);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, keys[0], values[2], keys[1], values[1]);
         yp_decrefN(N(mp, x));
     }
 
     // x contains an unhashable key.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->hashable_items_only) {
-            ypObject *unhashable = rand_obj_any_mutable(uq);
-            ead(x, new_itemsK(*x_type, K(unhashable, values[0])),
-                    assert_raises(any_new(x), yp_TypeError));
-            ead(x, new_itemsK(*x_type, K(keys[0], values[0], unhashable, values[1])),
-                    assert_raises(any_new(x), yp_TypeError));
-            ead(x,
-                    new_itemsK(*x_type,
-                            K(keys[0], values[0], keys[1], values[1], unhashable, values[2])),
-                    assert_raises(any_new(x), yp_TypeError));
-            yp_decrefN(N(unhashable));
-        }
+    if (!x_type->hashable_items_only) {
+        ypObject *unhashable = rand_obj_any_mutable(uq);
+        ead(x, x_type->newK(K(unhashable, values[0])), assert_raises(any_new(x), yp_TypeError));
+        ead(x, x_type->newK(K(keys[0], values[0], unhashable, values[1])),
+                assert_raises(any_new(x), yp_TypeError));
+        ead(x, x_type->newK(K(keys[0], values[0], keys[1], values[1], unhashable, values[2])),
+                assert_raises(any_new(x), yp_TypeError));
+        yp_decrefN(N(unhashable));
     }
 
     // Unhashable key rejected even if equal to other hashable key.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->hashable_items_only) {
-            ead(x, new_itemsK(*x_type, K(pair.hashable, values[0], pair.unhashable, values[1])),
-                    assert_raises(any_new(x), yp_TypeError));
-            ead(x, new_itemsK(*x_type, K(pair.unhashable, values[0], pair.hashable, values[1])),
-                    assert_raises(any_new(x), yp_TypeError));
-        }
+    if (!x_type->hashable_items_only) {
+        ead(x, x_type->newK(K(pair.hashable, values[0], pair.unhashable, values[1])),
+                assert_raises(any_new(x), yp_TypeError));
+        ead(x, x_type->newK(K(pair.unhashable, values[0], pair.hashable, values[1])),
+                assert_raises(any_new(x), yp_TypeError));
     }
 
     // Optimization: lazy shallow copy of a friendly immutable x to immutable mp.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = new_itemsK(*x_type, K(keys[0], values[0], keys[1], values[1]));
+    if (are_friend_types(type, x_type)) {
+        ypObject *x = x_type->newK(K(keys[0], values[0], keys[1], values[1]));
         ypObject *mp = any_new(x);
-        if (type->is_mutable || (*x_type)->is_mutable) {
+        if (type->is_mutable || x_type->is_mutable) {
             assert_obj(mp, is_not, x);
         } else {
             assert_obj(mp, is, x);
@@ -204,19 +185,16 @@ static void _test_new(
 
     // Optimization: empty immortal when x is empty.
     if (type->falsy != NULL) {
-        for (x_type = x_types; (*x_type) != NULL; x_type++) {
-            ypObject *x = (*x_type)->newN(0);
-            ypObject *mp = any_new(x);
-            assert_obj(mp, is, type->falsy);
-            yp_decrefN(N(mp, x));
-        }
+        ypObject *x = x_type->newN(0);
+        ypObject *mp = any_new(x);
+        assert_obj(mp, is, type->falsy);
+        yp_decrefN(N(mp, x));
     }
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject * mp, x,
-            new_itemsK(fixture_type_tuple, K(keys[0], values[0], keys[1], values[1])),
-            mp = any_new(x), assert_mapping(mp, keys[0], values[0], keys[1], values[1]),
-            yp_decref(mp));
+            fixture_type_tuple->newK(K(keys[0], values[0], keys[1], values[1])), mp = any_new(x),
+            assert_mapping(mp, keys[0], values[0], keys[1], values[1]), yp_decref(mp));
 
     // x is not an iterable.
     assert_raises(any_new(not_iterable), yp_TypeError);
@@ -232,24 +210,24 @@ static void _test_new(
     uniqueness_dealloc(uq);
 }
 
-static ypObject *newK_to_frozendictKV(int n, ...)
+static ypObject *newK_to_frozendictKV(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = yp_frozendictKV(n, args);
+    va_start(args, k);
+    result = yp_frozendictKV(k, args);
     va_end(args);
     return result;
 }
 
-static ypObject *newK_to_dictKV(int n, ...)
+static ypObject *newK_to_dictKV(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = yp_dictKV(n, args);
+    va_start(args, k);
+    result = yp_dictKV(k, args);
     va_end(args);
     return result;
 }
@@ -260,11 +238,11 @@ static MunitResult test_newK(const MunitParameter params[], fixture_t *fixture)
     ypObject *(*newK)(int, ...);
     ypObject *(*newK_to_newKV)(int, ...);
 
-    if (type->type == yp_t_frozendict) {
+    if (type->yp_type == yp_t_frozendict) {
         newK = yp_frozendictK;
         newK_to_newKV = newK_to_frozendictKV;
     } else {
-        assert_ptr(type->type, ==, yp_t_dict);
+        assert_ptr(type->yp_type, ==, yp_t_dict);
         newK = yp_dictK;
         newK_to_newKV = newK_to_dictKV;
     }
@@ -276,14 +254,14 @@ static MunitResult test_newK(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-static ypObject *newK_to_frozendict(int n, ...)
+static ypObject *newK_to_frozendict(int k, ...)
 {
     va_list   args;
     ypObject *iterable;
     ypObject *result;
 
-    va_start(args, n);
-    iterable = new_itemsKV(fixture_type_list, n, args);  // new ref
+    va_start(args, k);
+    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     result = yp_frozendict(iterable);
@@ -291,14 +269,14 @@ static ypObject *newK_to_frozendict(int n, ...)
     return result;
 }
 
-static ypObject *newK_to_dict(int n, ...)
+static ypObject *newK_to_dict(int k, ...)
 {
     va_list   args;
     ypObject *iterable;
     ypObject *result;
 
-    va_start(args, n);
-    iterable = new_itemsKV(fixture_type_list, n, args);  // new ref
+    va_start(args, k);
+    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     result = yp_dict(iterable);
@@ -309,33 +287,37 @@ static ypObject *newK_to_dict(int n, ...)
 static MunitResult test_new(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    peer_type_t    *peer;
     ypObject *(*newK_to_new)(int, ...);
     ypObject *(*new_)(ypObject *);
 
-    if (type->type == yp_t_frozendict) {
+    if (type->yp_type == yp_t_frozendict) {
         newK_to_new = newK_to_frozendict;
         new_ = yp_frozendict;
     } else {
-        assert_ptr(type->type, ==, yp_t_dict);
+        assert_ptr(type->yp_type, ==, yp_t_dict);
         newK_to_new = newK_to_dict;
         new_ = yp_dict;
     }
 
     // Shared tests.
     _test_newK(type, newK_to_new, /*test_exception_passthrough=*/FALSE);
-    _test_new(type, new_, /*test_exception_passthrough=*/TRUE);
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        _test_new(type, peer, new_, /*test_exception_passthrough=*/TRUE);
+    }
 
     return MUNIT_OK;
 }
 
-static ypObject *newK_to_call_args_t_frozendict(int n, ...)
+static ypObject *newK_to_call_args_t_frozendict(int k, ...)
 {
     va_list   args;
     ypObject *iterable;
     ypObject *result;
 
-    va_start(args, n);
-    assert_not_raises(iterable = new_itemsKV(fixture_type_list, n, args));  // new ref
+    va_start(args, k);
+    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     result = yp_callN(yp_t_frozendict, 1, iterable);
@@ -348,14 +330,14 @@ static ypObject *new_to_call_args_t_frozendict(ypObject *iterable)
     return yp_callN(yp_t_frozendict, 1, iterable);
 }
 
-static ypObject *newK_to_call_args_t_dict(int n, ...)
+static ypObject *newK_to_call_args_t_dict(int k, ...)
 {
     va_list   args;
     ypObject *iterable;
     ypObject *result;
 
-    va_start(args, n);
-    assert_not_raises(iterable = new_itemsKV(fixture_type_list, n, args));  // new ref
+    va_start(args, k);
+    iterable = new_itemsKV(fixture_type_list, fixture_type_tuple, k, args);  // new ref
     va_end(args);
 
     result = yp_callN(yp_t_dict, 1, iterable);
@@ -378,39 +360,22 @@ static ypObject *test_call_type_faulty_iter_helper(
     return result;
 }
 
-static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixture)
+static void _test_call_type(fixture_type_t *type, peer_type_t *peer)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init();
-    fixture_type_t **x_type;
-    ypObject *(*newK_to_call_args_type)(int, ...);
-    ypObject *(*new_to_call_args_type)(ypObject *);
-    uniqueness_t *uq = uniqueness_new();
-    ypObject     *str_rand = rand_obj(uq, fixture_type_str);
-    ypObject     *str_cls = yp_str_frombytesC2(-1, "cls");
-    ypObject     *str_object = yp_str_frombytesC2(-1, "object");
-    ypObject     *keys[4];
-    ypObject     *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
-
-    if (type->type == yp_t_frozendict) {
-        newK_to_call_args_type = newK_to_call_args_t_frozendict;
-        new_to_call_args_type = new_to_call_args_t_frozendict;
-    } else {
-        assert_ptr(type->type, ==, yp_t_dict);
-        newK_to_call_args_type = newK_to_call_args_t_dict;
-        new_to_call_args_type = new_to_call_args_t_dict;
-    }
-
-    // Shared tests.
-    _test_newK(type, newK_to_call_args_type, /*test_exception_passthrough=*/FALSE);
-    _test_new(type, new_to_call_args_type, /*test_exception_passthrough=*/TRUE);
+    fixture_type_t *x_type = peer->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *str_rand = rand_obj(uq, fixture_type_str);
+    ypObject       *str_cls = yp_str_frombytesC2(-1, "cls");
+    ypObject       *str_object = yp_str_frombytesC2(-1, "object");
+    ypObject       *keys[4];
+    ypObject       *values[4];
+    obj_array_fill(keys, uq, peer->rand_items);
+    obj_array_fill(values, uq, peer->rand_values);
 
     // Zero arguments.
     {
-        ypObject *mp = yp_callN(type->type, 0);
-        assert_type_is(mp, type->type);
+        ypObject *mp = yp_callN(type->yp_type, 0);
+        assert_type_is(mp, type->yp_type);
         assert_len(mp, 0);
         yp_decrefN(N(mp));
     }
@@ -420,8 +385,8 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         // cls and object are positional-only params, so cls and object are valid keyword args.
         ypObject *kwargs =
                 yp_dictK(K(str_rand, values[0], str_cls, values[1], str_object, values[2]));
-        ypObject *mp = yp_call_stars(type->type, yp_tuple_empty, kwargs);
-        assert_type_is(mp, type->type);
+        ypObject *mp = yp_call_stars(type->yp_type, yp_tuple_empty, kwargs);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, str_rand, values[0], str_cls, values[1], str_object, values[2]);
         assert_obj(mp, is_not, kwargs);
         assert_mapping(kwargs, str_rand, values[0], str_cls, values[1], str_object, values[2]);
@@ -429,64 +394,64 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     }
 
     // Keyword arguments and an empty positional argument.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *iterable = (*x_type)->newN(0);
-        ypObject *args = yp_listN(N(iterable));
+    {
+        ypObject *x = x_type->newN(0);
+        ypObject *args = yp_listN(N(x));
         ypObject *kwargs = yp_dictK(K(str_rand, values[0]));
-        ypObject *mp = yp_call_stars(type->type, args, kwargs);
-        assert_type_is(mp, type->type);
+        ypObject *mp = yp_call_stars(type->yp_type, args, kwargs);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, str_rand, values[0]);
         assert_obj(mp, is_not, kwargs);
         assert_mapping(kwargs, str_rand, values[0]);
-        yp_decrefN(N(mp, kwargs, args, iterable));
+        yp_decrefN(N(mp, kwargs, args, x));
     }
 
     // The positional argument is merged with the keyword arguments.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *iterable = new_itemsK(*x_type, K(keys[0], values[0]));
-        ypObject *args = yp_listN(N(iterable));
+    {
+        ypObject *x = x_type->newK(K(keys[0], values[0]));
+        ypObject *args = yp_listN(N(x));
         ypObject *kwargs = yp_dictK(K(str_rand, values[1]));
-        ypObject *mp = yp_call_stars(type->type, args, kwargs);
-        assert_type_is(mp, type->type);
+        ypObject *mp = yp_call_stars(type->yp_type, args, kwargs);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, keys[0], values[0], str_rand, values[1]);
         assert_obj(mp, is_not, kwargs);
         assert_mapping(kwargs, str_rand, values[1]);
-        yp_decrefN(N(mp, kwargs, args, iterable));
+        yp_decrefN(N(mp, kwargs, args, x));
     }
 
     // Values from keyword arguments replace values from the positional argument.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *iterable = new_itemsK(*x_type, K(str_rand, values[0]));
-        ypObject *args = yp_listN(N(iterable));
+    {
+        ypObject *x = x_type->newK(K(str_rand, values[0]));
+        ypObject *args = yp_listN(N(x));
         ypObject *kwargs = yp_dictK(K(str_rand, values[1]));
-        ypObject *mp = yp_call_stars(type->type, args, kwargs);
-        assert_type_is(mp, type->type);
+        ypObject *mp = yp_call_stars(type->yp_type, args, kwargs);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, str_rand, values[1]);
         assert_obj(mp, is_not, kwargs);
         assert_mapping(kwargs, str_rand, values[1]);
-        yp_decrefN(N(mp, kwargs, args, iterable));
+        yp_decrefN(N(mp, kwargs, args, x));
     }
 
     // Bug: frozendict_func_new_code would (attempt to) modify yp_frozendict_empty when given an
     // empty positional argument and keyword arguments.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *iterable = (*x_type)->newN(0);
-        ypObject *args = yp_listN(N(iterable));
+    {
+        ypObject *x = x_type->newN(0);
+        ypObject *args = yp_listN(N(x));
         ypObject *kwargs = yp_dictK(K(str_rand, values[0]));
-        ypObject *mp = yp_call_stars(type->type, args, kwargs);
+        ypObject *mp = yp_call_stars(type->yp_type, args, kwargs);
         assert_len(yp_frozendict_empty, 0);
-        yp_decrefN(N(mp, kwargs, args, iterable));
+        yp_decrefN(N(mp, kwargs, args, x));
     }
 
     // Optimization: empty immortal with zero arguments.
     if (type->falsy != NULL) {
-        assert_obj(yp_callN(type->type, 0), is, type->falsy);
+        assert_obj(yp_callN(type->yp_type, 0), is, type->falsy);
     }
 
     // Optimization: lazy shallow copy of frozendict kwargs to frozendict.
     {
         ypObject *kwargs = yp_frozendictK(K(str_rand, values[0]));
-        ypObject *mp = yp_call_stars(type->type, yp_tuple_empty, kwargs);
+        ypObject *mp = yp_call_stars(type->yp_type, yp_tuple_empty, kwargs);
         if (type->is_mutable) {
             assert_obj(mp, is_not, kwargs);
         } else {
@@ -497,31 +462,56 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 
     // Invalid arguments.
     {
-        ypObject *args_two = yp_tupleN(N(yp_frozendict_empty, yp_frozendict_empty));
-        assert_raises(
-                yp_callN(type->type, N(yp_frozendict_empty, yp_frozendict_empty)), yp_TypeError);
-        assert_raises(yp_call_stars(type->type, args_two, yp_frozendict_empty), yp_TypeError);
-        yp_decrefN(N(args_two));
+        ypObject *dict_empty = yp_dictK(0);
+        ypObject *args_two = yp_tupleN(N(dict_empty, dict_empty));
+        assert_raises(yp_callN(type->yp_type, N(dict_empty, dict_empty)), yp_TypeError);
+        assert_raises(yp_call_stars(type->yp_type, args_two, yp_frozendict_empty), yp_TypeError);
+        yp_decrefN(N(args_two, dict_empty));
     }
 
     // Iterator exceptions and bad length hints when merged with keyword arguments.
     {
         ypObject *kwargs = yp_frozendictK(K(str_rand, values[2]));
         faulty_iter_tests(ypObject * mp, x,
-                new_itemsK(fixture_type_tuple, K(keys[0], values[0], keys[1], values[1])),
-                mp = test_call_type_faulty_iter_helper(type->type, x, kwargs),
+                fixture_type_tuple->newK(K(keys[0], values[0], keys[1], values[1])),
+                mp = test_call_type_faulty_iter_helper(type->yp_type, x, kwargs),
                 assert_mapping(mp, keys[0], values[0], keys[1], values[1], str_rand, values[2]),
                 yp_decref(mp));
         yp_decref(kwargs);
     }
 
     // Exception passthrough.
-    assert_isexception(yp_callN(type->type, N(yp_SyntaxError)), yp_SyntaxError);
+    assert_isexception(yp_callN(type->yp_type, N(yp_SyntaxError)), yp_SyntaxError);
 
     obj_array_decref(values);
     obj_array_decref(keys);
     yp_decrefN(N(str_object, str_cls, str_rand));
     uniqueness_dealloc(uq);
+}
+
+static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    peer_type_t    *peer;
+    ypObject *(*newK_to_call_args_type)(int, ...);
+    ypObject *(*new_to_call_args_type)(ypObject *);
+
+    if (type->yp_type == yp_t_frozendict) {
+        newK_to_call_args_type = newK_to_call_args_t_frozendict;
+        new_to_call_args_type = new_to_call_args_t_frozendict;
+    } else {
+        assert_ptr(type->yp_type, ==, yp_t_dict);
+        newK_to_call_args_type = newK_to_call_args_t_dict;
+        new_to_call_args_type = new_to_call_args_t_dict;
+    }
+
+    _test_newK(type, newK_to_call_args_type, /*test_exception_passthrough=*/FALSE);
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        _test_new(type, peer, new_to_call_args_type, /*test_exception_passthrough=*/TRUE);
+        _test_call_type(type, peer);
+    }
+
     return MUNIT_OK;
 }
 
@@ -538,7 +528,7 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
     // Basic fromkeysN.
     {
         ypObject *mp = any_fromkeysN(values[0], N(keys[0], keys[1]));
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, keys[0], values[0], keys[1], values[0]);
         yp_decrefN(N(mp));
     }
@@ -546,7 +536,7 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
     // n is zero.
     {
         ypObject *mp = any_fromkeysN(values[0], 0);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_len(mp, 0);
         yp_decrefN(N(mp));
     }
@@ -554,7 +544,7 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
     // n is negative.
     {
         ypObject *mp = any_fromkeysN(values[0], -1);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_len(mp, 0);
         yp_decrefN(N(mp));
     }
@@ -562,7 +552,7 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
     // Duplicate keys.
     {
         ypObject *mp = any_fromkeysN(values[0], N(keys[0], keys[1], keys[1], keys[0]));
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, keys[0], values[0], keys[1], values[0]);
         yp_decrefN(N(mp));
     }
@@ -600,80 +590,71 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
     uniqueness_dealloc(uq);
 }
 
-static void _test_fromkeys(fixture_type_t *type, ypObject *(*any_fromkeys)(ypObject *, ypObject *),
-        int                                test_exception_passthrough)
+static void _test_fromkeys(fixture_type_t *type, peer_type_t  *peer,
+        ypObject *(*any_fromkeys)(ypObject *, ypObject *), int test_exception_passthrough)
 {
-    fixture_type_t    *x_types[] = x_types_init();
-    fixture_type_t   **x_type;
+    fixture_type_t    *x_type = peer->type;
     uniqueness_t      *uq = uniqueness_new();
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, peer->rand_items);
+    obj_array_fill(values, uq, peer->rand_values);
 
     // Basic fromkeys.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = (*x_type)->newN(N(keys[0], keys[1]));
+    {
+        ypObject *x = x_type->newN(N(keys[0], keys[1]));
         ypObject *mp = any_fromkeys(x, values[0]);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, keys[0], values[0], keys[1], values[0]);
         yp_decrefN(N(mp, x));
     }
 
     // x is empty.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = (*x_type)->newN(0);
+    {
+        ypObject *x = x_type->newN(0);
         ypObject *mp = any_fromkeys(x, values[0]);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_len(mp, 0);
         yp_decrefN(N(mp, x));
     }
 
     // x contains duplicates.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *x = (*x_type)->newN(N(keys[0], keys[1], keys[0]));
+    {
+        ypObject *x = x_type->newN(N(keys[0], keys[1], keys[0]));
         ypObject *mp = any_fromkeys(x, values[0]);
-        assert_type_is(mp, type->type);
+        assert_type_is(mp, type->yp_type);
         assert_mapping(mp, keys[0], values[0], keys[1], values[0]);
         yp_decrefN(N(mp, x));
     }
 
     // x contains an unhashable key.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->hashable_items_only) {
-            ypObject *unhashable = rand_obj_any_mutable(uq);
-            ead(x, (*x_type)->newN(N(unhashable)),
-                    assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
-            ead(x, (*x_type)->newN(N(keys[0], unhashable)),
-                    assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
-            ead(x, (*x_type)->newN(N(keys[0], keys[1], unhashable)),
-                    assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
-            yp_decrefN(N(unhashable));
-        }
+    if (!x_type->hashable_items_only) {
+        ypObject *unhashable = rand_obj_any_mutable(uq);
+        ead(x, x_type->newN(N(unhashable)),
+                assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
+        ead(x, x_type->newN(N(keys[0], unhashable)),
+                assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
+        ead(x, x_type->newN(N(keys[0], keys[1], unhashable)),
+                assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
+        yp_decrefN(N(unhashable));
     }
 
     // Unhashable key rejected even if equal to other hashable key.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->hashable_items_only) {
-            ead(x, (*x_type)->newN(N(pair.hashable, pair.unhashable)),
-                    assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
-            ead(x, (*x_type)->newN(N(pair.unhashable, pair.hashable)),
-                    assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
-        }
+    if (!x_type->hashable_items_only) {
+        ead(x, x_type->newN(N(pair.hashable, pair.unhashable)),
+                assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
+        ead(x, x_type->newN(N(pair.unhashable, pair.hashable)),
+                assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
     }
 
     // Optimization: empty immortal when x is empty.
     if (type->falsy != NULL) {
-        for (x_type = x_types; (*x_type) != NULL; x_type++) {
-            ypObject *x = (*x_type)->newN(0);
-            ypObject *mp = any_fromkeys(x, values[0]);
-            assert_obj(mp, is, type->falsy);
-            yp_decrefN(N(mp, x));
-        }
+        ypObject *x = x_type->newN(0);
+        ypObject *mp = any_fromkeys(x, values[0]);
+        assert_obj(mp, is, type->falsy);
+        yp_decrefN(N(mp, x));
     }
 
     // Iterator exceptions and bad length hints.
@@ -686,8 +667,10 @@ static void _test_fromkeys(fixture_type_t *type, ypObject *(*any_fromkeys)(ypObj
 
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_fromkeys(yp_SyntaxError, yp_None), yp_SyntaxError);
-        assert_isexception(any_fromkeys(yp_tuple_empty, yp_SyntaxError), yp_SyntaxError);
+        ypObject *list_empty = yp_listN(0);
+        assert_isexception(any_fromkeys(yp_SyntaxError, list_empty), yp_SyntaxError);
+        assert_isexception(any_fromkeys(list_empty, yp_SyntaxError), yp_SyntaxError);
+        yp_decrefN(N(list_empty));
     }
 
     obj_array_decref(values);
@@ -724,11 +707,11 @@ static MunitResult test_fromkeysN(const MunitParameter params[], fixture_t *fixt
     ypObject *(*fromkeysN)(ypObject *, int, ...);
     ypObject *(*fromkeysN_to_fromkeysNV)(ypObject *, int, ...);
 
-    if (type->type == yp_t_frozendict) {
+    if (type->yp_type == yp_t_frozendict) {
         fromkeysN = yp_frozendict_fromkeysN;
         fromkeysN_to_fromkeysNV = fromkeysN_to_frozendict_fromkeysNV;
     } else {
-        assert_ptr(type->type, ==, yp_t_dict);
+        assert_ptr(type->yp_type, ==, yp_t_dict);
         fromkeysN = yp_dict_fromkeysN;
         fromkeysN_to_fromkeysNV = fromkeysN_to_dict_fromkeysNV;
     }
@@ -773,21 +756,25 @@ static ypObject *fromkeysN_to_dict_fromkeys(ypObject *value, int n, ...)
 static MunitResult test_fromkeys(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    peer_type_t    *peer;
     ypObject *(*fromkeysN_to_fromkeys)(ypObject *, int, ...);
     ypObject *(*fromkeys)(ypObject *, ypObject *);
 
-    if (type->type == yp_t_frozendict) {
+    if (type->yp_type == yp_t_frozendict) {
         fromkeysN_to_fromkeys = fromkeysN_to_frozendict_fromkeys;
         fromkeys = yp_frozendict_fromkeys;
     } else {
-        assert_ptr(type->type, ==, yp_t_dict);
+        assert_ptr(type->yp_type, ==, yp_t_dict);
         fromkeysN_to_fromkeys = fromkeysN_to_dict_fromkeys;
         fromkeys = yp_dict_fromkeys;
     }
 
     // Shared tests.
     _test_fromkeysN(type, fromkeysN_to_fromkeys, /*test_exception_passthrough=*/TRUE);
-    _test_fromkeys(type, fromkeys, /*test_exception_passthrough=*/TRUE);
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        _test_fromkeys(type, peer, fromkeys, /*test_exception_passthrough=*/TRUE);
+    }
 
     return MUNIT_OK;
 }
@@ -891,6 +878,194 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
+static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *str_keys[] = obj_array_init(16, rand_obj(uq, fixture_type_str));
+    ypObject       *keys[16];
+    obj_array_fill(keys, uq, type->rand_items);
+
+    // Ensure that the function object has been validated first. _ypFunction_validate_parameters is
+    // called once per object, and always allocates a set; this allocation interferes with our
+    // malloc_tracker_oom_after allocation counts. Avoid this issue by triggering validation now.
+    // XXX Interestingly, munit's forking capability (disabled on Windows) exposes these issues.
+    ead(mp, yp_call_stars(type->yp_type, yp_tuple_empty, yp_frozendict_empty),
+            assert_not_exception(mp));
+
+    // _ypDict_copy
+    {
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_unfrozen_copy(mp), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp));
+    }
+
+    // _ypDict_update_fromdict, new keyset
+    if (type->is_mutable) {
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        ypObject *x = yp_frozendict_fromkeysN(
+                yp_None, N(keys[2], keys[3], keys[4], keys[5], keys[6], keys[7], keys[8], keys[9],
+                                 keys[10], keys[11], keys[12], keys[13], keys[14], keys[15]));
+        malloc_tracker_oom_after(0);
+        assert_raises_exc(yp_update(mp, x, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp, x));
+    }
+
+    // _ypDict_update_fromdict, resize
+    if (type->is_mutable) {
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        ypObject *x = yp_frozendict_fromkeysN(
+                yp_None, N(keys[2], keys[3], keys[4], keys[5], keys[6], keys[7], keys[8], keys[9],
+                                 keys[10], keys[11], keys[12], keys[13], keys[14], keys[15]));
+        malloc_tracker_oom_after(1);  // allow _ypSet_new to succeed
+        assert_raises_exc(yp_update(mp, x, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp, x));
+    }
+
+    // dict_clear
+    if (type->is_mutable) {
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        malloc_tracker_oom_after(0);
+        assert_raises_exc(yp_clear(mp, &exc), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp));
+    }
+
+    // dict_setdefault
+    if (type->is_mutable) {
+        int       i;
+        ypObject *result = yp_None;
+        ypObject *mp = type->newN(N(keys[0], keys[1]));
+        malloc_tracker_oom_after(0);
+        for (i = 2; i < yp_lengthof_array(keys); i++) {
+            result = yp_setdefault(mp, keys[i], yp_None);
+            if (yp_isexceptionC(result)) break;
+        }
+        assert_isexception(result, yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(mp));
+    }
+
+    // frozendict_func_new_code/dict_func_new_code, new keyset
+    // XXX The type->yp_type function object must already be validated (see above).
+    {
+        ypObject *x = yp_dictK(0);
+        ypObject *args = yp_tupleN(N(x));
+        ypObject *kwargs = yp_frozendict_fromkeysN(yp_None, N(str_keys[0]));
+        malloc_tracker_oom_after(0);
+        assert_raises(yp_call_stars(type->yp_type, args, kwargs), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(kwargs, args, x));
+    }
+
+    // frozendict_func_new_code/dict_func_new_code, new dict
+    // XXX The type->yp_type function object must already be validated (see above).
+    {
+        ypObject *x = yp_dictK(0);
+        ypObject *args = yp_tupleN(N(x));
+        ypObject *kwargs = yp_frozendict_fromkeysN(yp_None, N(str_keys[0]));
+        malloc_tracker_oom_after(1);  // allow _ypDict_new (keyset) to succeed
+        assert_raises(yp_call_stars(type->yp_type, args, kwargs), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(kwargs, args, x));
+    }
+
+    // frozendict_func_new_code/dict_func_new_code, resize
+    // XXX The type->yp_type function object must already be validated (see above).
+    {
+        ypObject *x = yp_dictK(0);
+        ypObject *args = yp_tupleN(N(x));
+        ypObject *kwargs = yp_frozendict_fromkeysN(yp_None,
+                N(str_keys[0], str_keys[1], str_keys[2], str_keys[3], str_keys[4], str_keys[5],
+                        str_keys[6], str_keys[7], str_keys[8], str_keys[9], str_keys[10],
+                        str_keys[11], str_keys[12], str_keys[13], str_keys[14], str_keys[15]));
+        malloc_tracker_oom_after(2);  // allow _ypDict_new (keyset and dict) to succeed
+        assert_raises(yp_call_stars(type->yp_type, args, kwargs), yp_MemoryError);
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(kwargs, args, x));
+    }
+
+    // _ypDictKV, new keyset
+    {
+        malloc_tracker_oom_after(0);
+        if (type->yp_type == yp_t_frozendict) {
+            assert_raises(yp_frozendictK(K(keys[0], yp_None)), yp_MemoryError);
+        } else {
+            assert_raises(yp_dictK(K(keys[0], yp_None)), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypDictKV, new dict
+    {
+        malloc_tracker_oom_after(1);  // allow _ypDict_new (keyset) to succeed
+        if (type->yp_type == yp_t_frozendict) {
+            assert_raises(yp_frozendictK(K(keys[0], yp_None)), yp_MemoryError);
+        } else {
+            assert_raises(yp_dictK(K(keys[0], yp_None)), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypDict_new_fromiterable
+    {
+        ypObject *x = fixture_type_list->newK(K(keys[0], yp_None));
+        malloc_tracker_oom_after(0);
+        if (type->yp_type == yp_t_frozendict) {
+            assert_raises(yp_frozendict(x), yp_MemoryError);
+        } else {
+            assert_raises(yp_dict(x), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(x));
+    }
+
+    // _ypDict_fromkeysNV, new keyset
+    {
+        malloc_tracker_oom_after(0);
+        if (type->yp_type == yp_t_frozendict) {
+            assert_raises(yp_frozendict_fromkeysN(yp_None, N(keys[0])), yp_MemoryError);
+        } else {
+            assert_raises(yp_dict_fromkeysN(yp_None, N(keys[0])), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypDict_fromkeysNV, new dict ob_data
+    if (type->yp_type == yp_t_dict) {
+        malloc_tracker_oom_after(2);  // allow _ypDict_new (keyset and dict) to succeed
+        assert_raises(yp_dict_fromkeysN(yp_None,
+                              N(str_keys[0], str_keys[1], str_keys[2], str_keys[3], str_keys[4],
+                                      str_keys[5], str_keys[6], str_keys[7], str_keys[8],
+                                      str_keys[9], str_keys[10], str_keys[11], str_keys[12],
+                                      str_keys[13], str_keys[14], str_keys[15])),
+                yp_MemoryError);
+        malloc_tracker_oom_disable();
+    }
+
+    // _ypDict_fromkeys
+    {
+        ypObject *x = yp_listN(N(keys[0]));
+        malloc_tracker_oom_after(0);
+        if (type->yp_type == yp_t_frozendict) {
+            assert_raises(yp_frozendict_fromkeys(x, yp_None), yp_MemoryError);
+        } else {
+            assert_raises(yp_dict_fromkeys(x, yp_None), yp_MemoryError);
+        }
+        malloc_tracker_oom_disable();
+        yp_decrefN(N(x));
+    }
+
+    obj_array_decref(keys);
+    obj_array_decref(str_keys);
+    uniqueness_dealloc(uq);
+    return MUNIT_OK;
+}
+
 
 char *param_values_test_frozendict[] = {
         "frozendict", "dict", "frozendict_dirty", "dict_dirty", NULL};
@@ -901,7 +1076,8 @@ static MunitParameterEnum test_frozendict_params[] = {
 MunitTest test_frozendict_tests[] = {TEST(test_newK, test_frozendict_params),
         TEST(test_new, test_frozendict_params), TEST(test_call_type, test_frozendict_params),
         TEST(test_fromkeysN, test_frozendict_params), TEST(test_fromkeys, test_frozendict_params),
-        TEST(test_miniiter, test_frozendict_params), {NULL}};
+        TEST(test_miniiter, test_frozendict_params), TEST(test_oom, test_frozendict_params),
+        {NULL}};
 
 
 extern void test_frozendict_initialize(void) {}

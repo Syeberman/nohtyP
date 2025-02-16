@@ -7,6 +7,23 @@
 // TODO Test deepcopy/etc generally here. Specific tests can then be added lower (i.e.
 // test_collections can test with various items, knowing that items are stored in the object).
 
+// Reference counting is implicitly tested everywhere (i.e. malloc_tracker). But there's a few cases
+// that need to be covered specifically.
+static MunitResult test_reference_counting(const MunitParameter params[], fixture_t *fixture)
+{
+    // yp_increfN
+    {
+        ypObject *a = rand_obj_any(NULL);
+        ypObject *b = rand_obj_any(NULL);
+        ypObject *c = rand_obj_any(NULL);
+        yp_increfN(N(a, b, c));  // Use yp_increfN.
+        yp_decrefN(N(a, b, c));  // Undo yp_increfN.
+        yp_decrefN(N(a, b, c));  // Clean-up rand_obj_any.
+    }
+
+    return MUNIT_OK;
+}
+
 // Ensures that yp_TypeError or similar is raised when a type doesn't support a protocol. This
 // doesn't deal with methods only supported on mutable or immutable types: mutability is not a
 // "protocol".
@@ -28,6 +45,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises(yp_ge(self, self), yp_TypeError);
         assert_raises(yp_gt(self, self), yp_TypeError);
     }
+    // yp_max_key, yp_min_key, yp_max, and yp_min are tested elsewhere.
 
     if (!type->is_iterable) {
         assert_raises(yp_iter(self), yp_TypeError);
@@ -412,6 +430,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
 
 static MunitParameterEnum test_all_params[] = {{param_key_type, param_values_types_all}, {NULL}};
 
-MunitTest test_all_tests[] = {TEST(test_unsupported_protocols, test_all_params), {NULL}};
+MunitTest test_all_tests[] = {TEST(test_reference_counting, NULL),
+        TEST(test_unsupported_protocols, test_all_params), {NULL}};
 
 extern void test_all_initialize(void) {}

@@ -16,9 +16,4 @@ BreakBeforeTernaryOperators: false
 BreakBeforeBraces: Linux
 CommentPragmas: '^lint '
 ---
-# TODO clang-format 15 supports `InsertBraces: true`!!
-# TODO clang-tidy YOUR_FILE.cpp -fix -checks="readability-braces-around-statements" -- COMPILE_OPTIONS
-# TODO clang-tidy has a -format-style=file option that automatically invokes clang-format too
-# TODO can move these files to a different directory and then read them in and supply their contents
-# on the command line, possibly
-# TODO It might also be possible to embed .clang-format in .clang-tidy in FormatStyle
+# TODO clang-format 15 supports `InsertBraces: true`!! But it inserts braces on single lines. :-(

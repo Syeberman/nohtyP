@@ -21,10 +21,9 @@ component_management:
     - component_id: munit_test
       paths:
         - ^Lib/munit_test/.*$
-      # TODO Use target: 100 when https://github.com/gcovr/gcovr/pull/1012 is available.
       statuses:
         - type: project
-          target: 99
+          target: 100
 
 ignore:
   - ^Tools/.*$

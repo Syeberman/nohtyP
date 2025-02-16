@@ -249,9 +249,9 @@ ypAPI ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *er
 
 // Returns a new reference to a bytes/bytearray object, depending on the type of source:
 //
+// - bytes/bytearray: the elements of the array come from source
 // - integer: the array will have that size and be initialized with null bytes
-// - iterable: it must be an iterable of integers in range(256) used to initialize the array (this
-//   includes bytes and bytearray objects)
+// - iterable: it must be an iterable of integers in range(256) used to initialize the array
 //
 // Raises yp_TypeError if source is a str/chrarray; instead, use yp_bytes3/yp_bytearray3.
 ypAPI ypObject *yp_bytes(ypObject *source);
@@ -326,15 +326,15 @@ ypAPI ypObject *yp_setNV(int n, va_list args);
 ypAPI ypObject *yp_frozenset(ypObject *iterable);
 ypAPI ypObject *yp_set(ypObject *iterable);
 
-// Returns a new reference to a frozendict/dict containing the given n (key, value) pairs (for a
-// total of 2*n objects); the length will be n, unless there are duplicate keys, in which case the
+// Returns a new reference to a frozendict/dict containing the given k (key, value) pairs (for a
+// total of 2*k objects); the length will be k, unless there are duplicate keys, in which case the
 // last value will be retained.
 //
 // Ex: yp_dictK(3, key0, value0, key1, value1, key2, value2)
-ypAPI ypObject *yp_frozendictK(int n, ...);
-ypAPI ypObject *yp_frozendictKV(int n, va_list args);
-ypAPI ypObject *yp_dictK(int n, ...);
-ypAPI ypObject *yp_dictKV(int n, va_list args);
+ypAPI ypObject *yp_frozendictK(int k, ...);
+ypAPI ypObject *yp_frozendictKV(int k, va_list args);
+ypAPI ypObject *yp_dictK(int k, ...);
+ypAPI ypObject *yp_dictKV(int k, va_list args);
 
 // Returns a new reference to a frozendict/dict containing the given n keys all set to value; the
 // length will be n, unless there are duplicate keys. The Python-equivalent default of value is
@@ -429,6 +429,30 @@ ypAPI ypObject *yp_ne(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_ge(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_gt(ypObject *x, ypObject *y);
 
+// Returns a new reference to the largest/smallest of the given n objects. key is a one-argument
+// function used to extract a comparison key from each element in iterable; to compare the elements
+// directly, use yp_None. Raises yp_ValueError if n is zero. Note that key is before n as you cannot
+// have arguments after ellipsis.
+ypAPI ypObject *yp_max_keyN(ypObject *key, int n, ...);
+ypAPI ypObject *yp_max_keyNV(ypObject *key, int n, va_list args);
+ypAPI ypObject *yp_min_keyN(ypObject *key, int n, ...);
+ypAPI ypObject *yp_min_keyNV(ypObject *key, int n, va_list args);
+
+// Equivalent to yp_max_keyN(yp_None, n, ...) and yp_min_keyN(yp_None, n, ...).
+ypAPI ypObject *yp_maxN(int n, ...);
+ypAPI ypObject *yp_maxNV(int n, va_list args);
+ypAPI ypObject *yp_minN(int n, ...);
+ypAPI ypObject *yp_minNV(int n, va_list args);
+
+// Returns a new reference to the largest/smallest element in iterable. key is as in yp_max_keyN.
+// Raises yp_ValueError if iterable is empty.
+ypAPI ypObject *yp_max_key(ypObject *iterable, ypObject *key);
+ypAPI ypObject *yp_min_key(ypObject *iterable, ypObject *key);
+
+// Equivalent to yp_max_key(iterable, yp_None) and yp_min_key(iterable, yp_None).
+ypAPI ypObject *yp_max(ypObject *iterable);
+ypAPI ypObject *yp_min(ypObject *iterable);
+
 // You may also be interested in yp_IF and yp_WHILE for working with boolean operations; see below.
 
 
@@ -452,8 +476,8 @@ ypAPI yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc);
 
 // An "iterable" is an object that implements yp_iter, returning an "iterator" that yields values
 // from yp_next. Examples of iterables include range, bytes, str, tuple, set, and dict; examples of
-// iterators include files and generators. It is usually unwise to modify an object being iterated
-// over.
+// iterators include files and generators. All iterators are iterables: they all support yp_iter. It
+// is usually unwise to modify an object being iterated over.
 
 // Returns a new reference to an iterator for object x.
 ypAPI ypObject *yp_iter(ypObject *x);
@@ -463,9 +487,9 @@ ypAPI ypObject *yp_iter(ypObject *x);
 // arguments; the sentinel value is never yielded.
 ypAPI ypObject *yp_iter2(ypObject *callable, ypObject *sentinel);
 
-// Sets the given n ypObject**s to new references for the values yielded from iterable. Iterable
-// must yield exactly n objects, or else a yp_ValueError is raised. Sets all n ypObject**s to the
-// same exception on error.
+// Sets the given n ypObject**s to new references for the values yielded from iterable. iterable
+// must yield exactly n objects, or else a yp_ValueError is raised. Raises yp_ValueError if n is
+// zero. Sets all n ypObject**s to the same exception on error.
 ypAPI void yp_unpackN(ypObject *iterable, int n, ...);
 ypAPI void yp_unpackNV(ypObject *iterable, int n, va_list args);
 
@@ -475,28 +499,6 @@ ypAPI ypObject *yp_filter(ypObject *function, ypObject *iterable);
 
 // Similar to yp_filter, but yields values for which function returns false.
 ypAPI ypObject *yp_filterfalse(ypObject *function, ypObject *iterable);
-
-// Returns a new reference to the largest/smallest of the given n objects. key is a one-argument
-// function used to extract a comparison key from each element in iterable; to compare the elements
-// directly, use yp_None. Note that key is before n as you cannot have arguments after ellipsis.
-ypAPI ypObject *yp_max_keyN(ypObject *key, int n, ...);
-ypAPI ypObject *yp_max_keyNV(ypObject *key, int n, va_list args);
-ypAPI ypObject *yp_min_keyN(ypObject *key, int n, ...);
-ypAPI ypObject *yp_min_keyNV(ypObject *key, int n, va_list args);
-
-// Equivalent to yp_max_keyN(yp_None, n, ...) and yp_min_keyN(yp_None, n, ...).
-ypAPI ypObject *yp_maxN(int n, ...);
-ypAPI ypObject *yp_maxNV(int n, va_list args);
-ypAPI ypObject *yp_minN(int n, ...);
-ypAPI ypObject *yp_minNV(int n, va_list args);
-
-// Returns a new reference to the largest/smallest element in iterable. key is as in yp_max_keyN.
-ypAPI ypObject *yp_max_key(ypObject *iterable, ypObject *key);
-ypAPI ypObject *yp_min_key(ypObject *iterable, ypObject *key);
-
-// Equivalent to yp_max_key(iterable, yp_None) and yp_min_key(iterable, yp_None).
-ypAPI ypObject *yp_max(ypObject *iterable);
-ypAPI ypObject *yp_min(ypObject *iterable);
 
 // Returns a new reference to an iterator that yields the elements of iterable in reverse order.
 // Raises yp_TypeError if iterable is not reversible (i.e., iterators, sets).
@@ -715,12 +717,13 @@ ypAPI void yp_irepeatC(ypObject *sequence, yp_ssize_t factor, ypObject **exc);
 // *exc on error.
 ypAPI void yp_insertC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc);
 
-// Removes the i-th item from sequence and returns it. Returns yp_IndexError if i is out of bounds.
-// The Python-equivalent "default" for i is -1.
+// Removes the i-th item from sequence and returns a new reference to it. Returns yp_IndexError if i
+// is out of bounds. The Python-equivalent "default" for i is -1.
 ypAPI ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i);
 
-// Removes the last item from sequence and returns it. Returns yp_IndexError if sequence is empty.
-// Note that for sequences, yp_push and yp_pop together implement a stack (last in, first out).
+// Removes the last item from sequence and returns a new reference to it. Returns yp_IndexError if
+// sequence is empty. Note that for sequences, yp_push and yp_pop together implement a stack (last
+// in, first out).
 ypAPI ypObject *yp_pop(ypObject *sequence);
 
 // Removes the first item from sequence that equals x. Raises yp_ValueError if x is not contained in
@@ -911,11 +914,11 @@ ypAPI void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value);
 // not in the map. The Python-equivalent "default" for default_ is yp_None.
 ypAPI ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *default_);
 
-// Add the given n (key, value) pairs (for a total of 2*n objects) to mapping, overwriting existing
+// Add the given k (key, value) pairs (for a total of 2*k objects) to mapping, overwriting existing
 // keys. If a given key is seen more than once, the last value is retained. Sets *exc on error. Note
-// that exc is before n as you cannot have arguments after ellipsis.
-ypAPI void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...);
-ypAPI void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args);
+// that exc is before k as you cannot have arguments after ellipsis.
+ypAPI void yp_updateK(ypObject *mapping, ypObject **exc, int k, ...);
+ypAPI void yp_updateKV(ypObject *mapping, ypObject **exc, int k, va_list args);
 
 // Add the elements from x to mapping. x is handled as per yp_dict. Sets *exc on error.
 ypAPI void yp_update(ypObject *mapping, ypObject *x, ypObject **exc);
@@ -1163,11 +1166,11 @@ ypAPI ypObject *const yp_str_empty;
 ypAPI ypObject *yp_formatN(ypObject *s, int n, ...);
 ypAPI ypObject *yp_formatNV(ypObject *s, int n, va_list args);
 
-// Similar to yp_formatN, except each replacement field contains the name of one of the n (key,
-// value) pairs (for a total of 2*n objects). (Implementation note: this function is optimized for
+// Similar to yp_formatN, except each replacement field contains the name of one of the k (key,
+// value) pairs (for a total of 2*k objects). (Implementation note: this function is optimized for
 // in-order replacement field names.)
-ypAPI ypObject *yp_formatK(ypObject *s, int n, ...);
-ypAPI ypObject *yp_formatKV(ypObject *s, int n, va_list args);
+ypAPI ypObject *yp_formatK(ypObject *s, int k, ...);
+ypAPI ypObject *yp_formatKV(ypObject *s, int k, va_list args);
 
 // Similar to yp_formatN, except each replacement field can contain either the numeric index of an
 // item in sequence, or the name of a key from mapping. The Python-equivalent default for sequence
@@ -1429,11 +1432,16 @@ ypAPI yp_int_t     yp_asintLF(yp_float_t x, ypObject **exc);
 // Return a new reference to x rounded to ndigits after the decimal point.
 ypAPI ypObject *yp_roundC(ypObject *x, int ndigits);
 
-// Sums the n given objects and returns the total.
+// Sums the n given objects using yp_add and returns a new reference to the total. If n is zero
+// yp_ValueError is raised.
 ypAPI ypObject *yp_sumN(int n, ...);
 ypAPI ypObject *yp_sumNV(int n, va_list args);
 
-// Sums the items of iterable and returns the total.
+// Sums the start value with the items of iterable using yp_add, returning a new reference to the
+// total. If iterable is empty the start value is returned.
+ypAPI ypObject *yp_sum_start(ypObject *iterable, ypObject *start);
+
+// Equivalent to yp_sum_start(iterable, yp_i_zero).
 ypAPI ypObject *yp_sum(ypObject *iterable);
 
 // Return the number of bits necessary to represent an integer in binary, excluding the sign and
@@ -1723,7 +1731,8 @@ ypAPI void yp_i2s_setitemC5(
 //
 //      value = yp_s2o_getitemC3(o, -1, "mykey");
 //
-// it is more efficient to use yp_IMMORTAL_STR_LATIN_1 (also compatible with ascii), as in:
+// you can avoid allocating a short-lived str using yp_IMMORTAL_STR_LATIN_1 (which also accepts
+// ascii strings), as in:
 //
 //      yp_IMMORTAL_STR_LATIN_1(s_mykey, "mykey");
 //      value = yp_getitem(o, s_mykey);
@@ -1943,12 +1952,12 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **
 
 // str and chrarray internally store their Unicode characters in particular encodings, usually
 // depending on the contents of the string. This function sets *encoded to the beginning of that
-// data, *size to the number of bytes in encoded, and *encoding to the immortal str representing the
-// encoding used (yp_s_latin_1, perhaps). *encoded will point into internal object memory which MUST
-// NOT be modified; furthermore, the string itself must not be modified while using the array. As a
-// special case, if size is NULL, the string must not contain null characters and *encoded will
-// point to a null-terminated string. On error, sets *size to zero (if size is not NULL), *encoded
-// to NULL, *encoding to the exception, and returns the exception.
+// data, *size to the number of bytes in encoded, *encoding to the immortal str representing the
+// encoding used (yp_s_latin_1, perhaps), and returns the immortal yp_None. *encoded will point into
+// internal object memory which MUST NOT be modified; furthermore, the string itself must not be
+// modified while using the array. As a special case, if size is NULL, the string must not contain
+// null characters and *encoded will point to a null-terminated string. On error, sets *size to zero
+// (if size is not NULL), *encoded to NULL, *encoding to the exception, and returns the exception.
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding);
 

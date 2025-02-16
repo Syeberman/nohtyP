@@ -7,6 +7,9 @@
 // under test. If this becomes a problem the tests will fail, but it may become a problem.
 
 
+#define FIXTURE_TYPES_ALL_LEN 24  // Verified in initialize_fixture_types.
+
+
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
 {
     yp_ssize_t i;
@@ -79,6 +82,29 @@ static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
         if (result == yp_True) return TRUE;
     }
     return FALSE;
+}
+
+static int _array_sort_cmp(const void *_x, const void *_y)
+{
+    ypObject *x = *((ypObject **)_x);
+    ypObject *y = *((ypObject **)_y);
+    ypObject *result;
+    assert_not_raises(result = yp_lt(x, y));
+    if (result == yp_True) return -1;
+    assert_not_raises(result = yp_gt(x, y));
+    if (result == yp_True) return 1;
+    // GCOVR_EXCL_START The arrays we are sorting contain unique elements.
+    assert_not_raises(result = yp_eq(x, y));
+    assert_obj(result, is, yp_True);
+    return 0;
+    // GCOVR_EXCL_STOP
+}
+
+// Sorts the array of objects in ascending order. The objects must all support total ordering with
+// each other.
+static void array_sort(yp_ssize_t n, ypObject **array)
+{
+    qsort(array, (size_t)n, sizeof(ypObject *), _array_sort_cmp);
 }
 
 
@@ -303,13 +329,17 @@ static ypObject *rand_obj_any_keyvalue_memo(const rand_obj_supplier_memo_t *memo
     return result;
 }
 
+static ypObject *rand_obj_int(uniqueness_t *uq) { _return_unique(uq, yp_intC(rand_intC())); }
+
 // XXX Interesting. 0 is a falsy byte, but '\x00' is not a falsy char.
+// TODO Could also return an intstore.
 static ypObject *rand_obj_byte(uniqueness_t *uq)
 {
     _return_unique(uq, yp_intC(munit_rand_int_range(0, 255)));
 }
 
 // TODO Return more than just latin-1 characters
+// TODO Could also return a chrarray.
 static ypObject *rand_obj_chr(uniqueness_t *uq)
 {
     _return_unique(uq, yp_chrC(munit_rand_int_range(0, 255)));
@@ -334,7 +364,7 @@ static ypObject *_rand_obj(fixture_type_t *type)
 extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type)
 {
     // None and bool have limited possible values, making uniqueness impossible.
-    if (type == fixture_type_NoneType || type == fixture_type_bool) {
+    if (type->yp_type == yp_t_NoneType || type->yp_type == yp_t_bool) {
         if (uq != NULL) {
             munit_error("cannot ensure uniqueness for None and bool");  // GCOVR_EXCL_LINE
         }
@@ -347,6 +377,11 @@ extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type)
 extern ypObject *rand_obj_any_not_iterable(uniqueness_t *uq)
 {
     _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_not_iterable)));
+}
+
+extern ypObject *rand_obj_any_not_callable(uniqueness_t *uq)
+{
+    _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_not_callable)));
 }
 
 extern ypObject *rand_obj_any_hashable_not_str(uniqueness_t *uq)
@@ -384,6 +419,12 @@ extern ypObject *rand_obj_any(uniqueness_t *uq)
     _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_all)));
 }
 
+static void rand_objs_int(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) array[i] = rand_obj_int(uq);  // new ref
+}
+
 static void rand_objs_byte(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
     yp_ssize_t i;
@@ -408,39 +449,82 @@ static void rand_objs_any(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
     for (i = 0; i < n; i++) array[i] = rand_obj_any(uq);  // new ref
 }
 
+static void rand_objs_int_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    rand_objs_int(uq, n, array);
+    array_sort(n, array);
+}
 
-static ypObject *_new_items_listKV(yp_ssize_t n, va_list args)
+static void rand_objs_byte_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    rand_objs_byte(uq, n, array);
+    array_sort(n, array);
+}
+
+static void rand_objs_chr_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    rand_objs_chr(uq, n, array);
+    array_sort(n, array);
+}
+
+// All objects will be of the same type that supports yp_hash and total ordering.
+// TODO There are other types of objects we _could_ support here: tuples of strs fit the criteria,
+// ints and floats can be compared, etc.
+static void rand_objs_any_hashable_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    void (*funcs[])(uniqueness_t *uq, yp_ssize_t n, ypObject **array) = {
+            rand_objs_int_ordered, rand_objs_byte_ordered, rand_objs_chr_ordered};
+    rand_choice_array(funcs)(uq, n, array);
+}
+
+// All objects will be of the same type that supports total ordering.
+// TODO We can support not just the rand_objs_any_hashable_ordered types (which can be expanded),
+// but we can support immutable forms.
+static void rand_objs_any_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    rand_objs_any_hashable_ordered(uq, n, array);
+}
+
+
+static ypObject *_new_items_listKV(fixture_type_t *inner, int k, va_list args)
 {
     ypObject *result;
     assert_not_raises(result = yp_listN(0));  // new ref
-    for (/*n already initialized*/; n > 0; n--) {
+    for (/*k already initialized*/; k > 0; k--) {
         ypObject *item;
         // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
-        ypObject *key = va_arg(args, ypObject *);            // borrowed
-        ypObject *value = va_arg(args, ypObject *);          // borrowed
-        assert_not_raises(item = yp_tupleN(2, key, value));  // new ref
+        ypObject *key = va_arg(args, ypObject *);              // borrowed
+        ypObject *value = va_arg(args, ypObject *);            // borrowed
+        assert_not_raises(item = inner->newN(2, key, value));  // new ref
         assert_not_raises_exc(yp_append(result, item, &exc));
         yp_decref(item);
     }
     return result;
 }
 
-extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args)
+extern ypObject *new_itemsKV(fixture_type_t *outer, fixture_type_t *inner, int k, va_list args)
 {
     ypObject *result;
-    ypObject *list = _new_items_listKV(n, args);  // new ref
-    if (type == fixture_type_list) return list;
-    result = type->new_(list);
-    yp_decref(list);
-    return result;
+    ypObject *list = _new_items_listKV(inner, k, args);  // new ref
+
+    if (outer == fixture_type_list) {
+        return list;
+    } else if (outer == fixture_type_tuple) {
+        assert_not_raises_exc(yp_freeze(list, &exc));
+        return list;
+    } else {
+        assert_not_raises(result = outer->new_(list));
+        yp_decref(list);
+        return result;
+    }
 }
 
-extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...)
+extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int k, ...)
 {
     ypObject *result;
     va_list   args;
-    va_start(args, n);
-    result = new_itemsKV(type, n, args);  // new ref
+    va_start(args, k);
+    result = new_itemsKV(outer, inner, k, args);  // new ref
     va_end(args);
     return result;
 }
@@ -521,8 +605,10 @@ extern ypObject *new_faulty_iter(
 // Returns a random type object, except invalidated and exception objects.
 static ypObject *new_rand_type(const rand_obj_supplier_memo_t *memo)
 {
-    return rand_choice_fixture_types(fixture_types_all)->type;
+    return rand_choice_fixture_types(fixture_types_all)->yp_type;
 }
+
+static peer_type_t peers_type[] = {{&fixture_type_type_struct, rand_objs_func_error}, {NULL}};
 
 static fixture_type_t fixture_type_type_struct = {
         "type",                     // name
@@ -532,13 +618,16 @@ static fixture_type_t fixture_type_type_struct = {
 
         new_rand_type,  // _new_rand
 
-        yp_type,  // new_
+        yp_type,     // new_
+        peers_type,  // peers
 
         objvarargfunc_error,   // newN
         rand_objs_func_error,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -554,8 +643,16 @@ static fixture_type_t fixture_type_type_struct = {
         FALSE,  // hashable_items_only
 };
 
+fixture_type_t *fixture_type_type = &fixture_type_type_struct;
+
+static void initialize_fixture_type_type(void) { fixture_type_type->yp_type = yp_t_type; }
+
+
 // There is only one NoneType object: yp_None.
 static ypObject *new_rand_NoneType(const rand_obj_supplier_memo_t *memo) { return yp_None; }
+
+static peer_type_t peers_NoneType[] = {
+        {&fixture_type_NoneType_struct, rand_objs_func_error}, {NULL}};
 
 static fixture_type_t fixture_type_NoneType_struct = {
         "NoneType",                     // name
@@ -566,12 +663,15 @@ static fixture_type_t fixture_type_NoneType_struct = {
         new_rand_NoneType,  // _new_rand
 
         objobjfunc_error,  // new_
+        peers_NoneType,    // peers
 
         objvarargfunc_error,   // newN
         rand_objs_func_error,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -586,6 +686,15 @@ static fixture_type_t fixture_type_NoneType_struct = {
         FALSE,  // original_object_return
         FALSE,  // hashable_items_only
 };
+
+fixture_type_t *fixture_type_NoneType = &fixture_type_NoneType_struct;
+
+static void initialize_fixture_type_NoneType(void)
+{
+    fixture_type_NoneType->yp_type = yp_t_NoneType;
+    fixture_type_NoneType->falsy = yp_None;
+}
+
 
 static ypObject *new_rand_bool(const rand_obj_supplier_memo_t *memo)
 {
@@ -596,6 +705,8 @@ static ypObject *new_rand_bool(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+static peer_type_t peers_bool[] = {{&fixture_type_bool_struct, rand_objs_func_error}, {NULL}};
+
 static fixture_type_t fixture_type_bool_struct = {
         "bool",                     // name
         NULL,                       // type (initialized at runtime)
@@ -604,13 +715,16 @@ static fixture_type_t fixture_type_bool_struct = {
 
         new_rand_bool,  // _new_rand
 
-        yp_bool,  // new_
+        yp_bool,     // new_
+        peers_bool,  // peers
 
         objvarargfunc_error,   // newN
         rand_objs_func_error,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -626,12 +740,27 @@ static fixture_type_t fixture_type_bool_struct = {
         FALSE,  // hashable_items_only
 };
 
+fixture_type_t *fixture_type_bool = &fixture_type_bool_struct;
+
+static void initialize_fixture_type_bool(void)
+{
+    fixture_type_bool->yp_type = yp_t_bool;
+    fixture_type_bool->falsy = yp_False;
+}
+
+
 static ypObject *new_rand_int(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = yp_intC(rand_intC());
     assert_not_exception(result);
     return result;
 }
+
+// All numbers (int, float, etc) have the same peers.
+static peer_type_t peers_numeric[] = {{&fixture_type_int_struct, rand_objs_func_error},
+        {&fixture_type_intstore_struct, rand_objs_func_error},
+        {&fixture_type_float_struct, rand_objs_func_error},
+        {&fixture_type_floatstore_struct, rand_objs_func_error}, {NULL}};
 
 static fixture_type_t fixture_type_int_struct = {
         "int",                          // name
@@ -641,13 +770,16 @@ static fixture_type_t fixture_type_int_struct = {
 
         new_rand_int,  // _new_rand
 
-        yp_int,  // new_
+        yp_int,         // new_
+        peers_numeric,  // peers
 
         objvarargfunc_error,   // newN
         rand_objs_func_error,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -662,6 +794,8 @@ static fixture_type_t fixture_type_int_struct = {
         FALSE,  // original_object_return
         FALSE,  // hashable_items_only
 };
+
+fixture_type_t *fixture_type_int = &fixture_type_int_struct;
 
 static ypObject *new_rand_intstore(const rand_obj_supplier_memo_t *memo)
 {
@@ -678,13 +812,16 @@ static fixture_type_t fixture_type_intstore_struct = {
 
         new_rand_intstore,  // _new_rand
 
-        yp_intstore,  // new_
+        yp_intstore,    // new_
+        peers_numeric,  // peers
 
         objvarargfunc_error,   // newN
         rand_objs_func_error,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -699,6 +836,16 @@ static fixture_type_t fixture_type_intstore_struct = {
         FALSE,  // original_object_return
         FALSE,  // hashable_items_only
 };
+
+fixture_type_t *fixture_type_intstore = &fixture_type_intstore_struct;
+
+static void initialize_fixture_type_int(void)
+{
+    fixture_type_int->yp_type = yp_t_int;
+    fixture_type_int->falsy = yp_i_zero;
+    fixture_type_intstore->yp_type = yp_t_intstore;
+}
+
 
 static ypObject *new_rand_float(const rand_obj_supplier_memo_t *memo)
 {
@@ -715,13 +862,16 @@ static fixture_type_t fixture_type_float_struct = {
 
         new_rand_float,  // _new_rand
 
-        yp_float,  // new_
+        yp_float,       // new_
+        peers_numeric,  // peers
 
         objvarargfunc_error,   // newN
         rand_objs_func_error,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -736,6 +886,8 @@ static fixture_type_t fixture_type_float_struct = {
         FALSE,  // original_object_return
         FALSE,  // hashable_items_only
 };
+
+fixture_type_t *fixture_type_float = &fixture_type_float_struct;
 
 static ypObject *new_rand_floatstore(const rand_obj_supplier_memo_t *memo)
 {
@@ -753,12 +905,15 @@ static fixture_type_t fixture_type_floatstore_struct = {
         new_rand_floatstore,  // _new_rand
 
         yp_floatstore,  // new_
+        peers_numeric,  // peers
 
         objvarargfunc_error,   // newN
         rand_objs_func_error,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -774,27 +929,57 @@ static fixture_type_t fixture_type_floatstore_struct = {
         FALSE,  // hashable_items_only
 };
 
+fixture_type_t *fixture_type_floatstore = &fixture_type_floatstore_struct;
+
+static void initialize_fixture_type_float(void)
+{
+    fixture_type_float->yp_type = yp_t_float;
+    // TODO Falsy immortal for float?
+    fixture_type_floatstore->yp_type = yp_t_floatstore;
+}
+
+
 static ypObject *new_rand_iter(const rand_obj_supplier_memo_t *memo)
 {
     yp_ssize_t n = memo->depth < 1 ? 0 : munit_rand_int_range(0, 16);
     return new_rand_iter3(n, rand_obj_any_memo, memo);
 }
 
-static ypObject *newN_iter(int n, ...)
+extern ypObject *new_iterNV(int n, va_list args)
 {
-    va_list   args;
-    ypObject *tuple;
-    ypObject *result;
-
-    va_start(args, n);
-    tuple = yp_tupleNV(n, args);  // new ref
-    va_end(args);
-
-    result = yp_iter(tuple);
+    ypObject *tuple = yp_tupleNV(n, args);  // new ref
+    ypObject *result = yp_iter(tuple);
     yp_decref(tuple);
     assert_not_exception(result);
     return result;
 }
+
+extern ypObject *new_iterN(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = new_iterNV(n, args);  // new ref
+    va_end(args);
+
+    return result;
+}
+
+static ypObject *newK_iter(int k, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_iter, fixture_type_tuple, k, args);  // new ref
+    va_end(args);
+
+    return result;
+}
+
+// Shared amongst iter, tuple, and list, as these types work with any given iterable.
+static peer_type_t peers_all_iterables[FIXTURE_TYPES_ALL_LEN + 1] = {0};
 
 static fixture_type_t fixture_type_iter_struct = {
         "iter",                     // name
@@ -804,13 +989,16 @@ static fixture_type_t fixture_type_iter_struct = {
 
         new_rand_iter,  // _new_rand
 
-        yp_iter,  // new_
+        yp_iter,              // new_
+        peers_all_iterables,  // peers
 
-        newN_iter,      // newN
+        new_iterN,      // newN
         rand_objs_any,  // rand_items
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        newK_iter,      // newK
+        rand_objs_any,  // rand_values
+
+        rand_objs_any_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -825,6 +1013,28 @@ static fixture_type_t fixture_type_iter_struct = {
         TRUE,   // original_object_return
         FALSE,  // hashable_items_only
 };
+
+fixture_type_t *fixture_type_iter = &fixture_type_iter_struct;
+
+static void initialize_fixture_type_iter(void)
+{
+    fixture_type_t **iterable;
+    peer_type_t     *peer;
+
+    fixture_type_iter->yp_type = yp_t_iter;
+
+    // We initialize peers_all_iterables on behalf of all types that use it.
+    peer = peers_all_iterables;
+    for (iterable = fixture_types_iterable->types; (*iterable) != NULL; iterable++) {
+        peer->type = (*iterable);
+        peer->rand_items = (*iterable)->rand_items;
+        if ((*iterable)->is_mapping) {
+            peer->rand_values = (*iterable)->rand_values;
+        }
+        peer++;
+    }
+}
+
 
 // TODO Ranges that cover more values, not just 32-bit-ish.
 static yp_int_t range_rand_start(void) { return (yp_int_t)((yp_int32_t)munit_rand_uint32()); }
@@ -851,6 +1061,7 @@ static ypObject *new_rand_range(const rand_obj_supplier_memo_t *memo)
 
 // XXX The arguments must follow a valid range pattern, in order. Note that rand_items_range creates
 // objects that follow this pattern.
+// TODO We should be using the index forms here that don't accept floats.
 static ypObject *newN_range(int n, ...)
 {
     va_list   args;
@@ -888,12 +1099,14 @@ args_end:
 
 // Fills array with n integers that cover a range with a random start and step. Any slice of these
 // integers is suitable to pass to newN_range to construct a new range.
-static void rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+static void _rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array, int ordered)
 {
     while (1) {
         yp_ssize_t i;
         yp_int_t   start = range_rand_start();
         yp_int_t   step = range_rand_step();
+        if (ordered && step < 0) step = -step;  // rand_ordered_items requires ascending values.
+
         for (i = 0; i < n; i++) {
             assert_not_raises(array[i] = yp_intC(start + (i * step)));
         }
@@ -905,6 +1118,21 @@ static void rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
     }
 }
 
+static void rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    _rand_items_range(uq, n, array, /*ordered=*/FALSE);
+}
+
+static void rand_ordered_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    _rand_items_range(uq, n, array, /*ordered=*/TRUE);
+}
+
+static peer_type_t peers_range[] = {{&fixture_type_iter_struct, rand_items_range},
+        {&fixture_type_range_struct, rand_items_range},
+        {&fixture_type_tuple_struct, rand_items_range},
+        {&fixture_type_list_struct, rand_items_range}, {NULL}};
+
 static fixture_type_t fixture_type_range_struct = {
         "range",                     // name
         NULL,                        // type (initialized at runtime)
@@ -914,12 +1142,15 @@ static fixture_type_t fixture_type_range_struct = {
         new_rand_range,  // _new_rand
 
         objobjfunc_error,  // new_
+        peers_range,       // peers
 
         newN_range,        // newN
         rand_items_range,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_ordered_items_range,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -932,8 +1163,17 @@ static fixture_type_t fixture_type_range_struct = {
         FALSE,  // is_callable
         TRUE,   // is_patterned
         FALSE,  // original_object_return
-        FALSE,  // hashable_items_only
+        TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_range = &fixture_type_range_struct;
+
+static void initialize_fixture_type_range(void)
+{
+    fixture_type_range->yp_type = yp_t_range;
+    fixture_type_range->falsy = yp_range_empty;
+}
+
 
 static ypObject *new_rand_bytes(const rand_obj_supplier_memo_t *memo)
 {
@@ -967,6 +1207,20 @@ static ypObject *newN_bytes(int n, ...)
     return result;
 }
 
+// TODO _Could_ support range here, for ints in range(256) that follow a pattern.
+static peer_type_t peers_bytes[] = {{&fixture_type_iter_struct, rand_objs_byte},
+        {&fixture_type_bytes_struct, rand_objs_byte},
+        {&fixture_type_bytearray_struct, rand_objs_byte},
+        {&fixture_type_tuple_struct, rand_objs_byte}, {&fixture_type_list_struct, rand_objs_byte},
+        {&fixture_type_frozenset_struct, rand_objs_byte},
+        {&fixture_type_set_struct, rand_objs_byte},
+        {&fixture_type_frozenset_dirty_struct, rand_objs_byte},
+        {&fixture_type_set_dirty_struct, rand_objs_byte},
+        {&fixture_type_frozendict_struct, rand_objs_byte},
+        {&fixture_type_dict_struct, rand_objs_byte},
+        {&fixture_type_frozendict_dirty_struct, rand_objs_byte},
+        {&fixture_type_dict_dirty_struct, rand_objs_byte}, {NULL}};
+
 static fixture_type_t fixture_type_bytes_struct = {
         "bytes",                         // name
         NULL,                            // type (initialized at runtime)
@@ -975,13 +1229,16 @@ static fixture_type_t fixture_type_bytes_struct = {
 
         new_rand_bytes,  // _new_rand
 
-        yp_bytes,  // new_
+        yp_bytes,     // new_
+        peers_bytes,  // peers
 
         newN_bytes,      // newN
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_byte_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -994,8 +1251,10 @@ static fixture_type_t fixture_type_bytes_struct = {
         FALSE,  // is_callable
         FALSE,  // is_patterned
         FALSE,  // original_object_return
-        FALSE,  // hashable_items_only
+        TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_bytes = &fixture_type_bytes_struct;
 
 static ypObject *new_rand_bytearray(const rand_obj_supplier_memo_t *memo)
 {
@@ -1038,12 +1297,15 @@ static fixture_type_t fixture_type_bytearray_struct = {
         new_rand_bytearray,  // _new_rand
 
         yp_bytearray,  // new_
+        peers_bytes,   // peers
 
         newN_bytearray,  // newN
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_byte_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1056,8 +1318,18 @@ static fixture_type_t fixture_type_bytearray_struct = {
         FALSE,  // is_callable
         FALSE,  // is_patterned
         FALSE,  // original_object_return
-        FALSE,  // hashable_items_only
+        TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_bytearray = &fixture_type_bytearray_struct;
+
+static void initialize_fixture_type_bytes(void)
+{
+    fixture_type_bytes->yp_type = yp_t_bytes;
+    fixture_type_bytes->falsy = yp_bytes_empty;
+    fixture_type_bytearray->yp_type = yp_t_bytearray;
+}
+
 
 // TODO Return larger characters than just ascii.
 static ypObject *new_rand_str(const rand_obj_supplier_memo_t *memo)
@@ -1093,6 +1365,17 @@ static ypObject *newN_str(int n, ...)
     return result;
 }
 
+static peer_type_t peers_str[] = {{&fixture_type_iter_struct, rand_objs_chr},
+        {&fixture_type_str_struct, rand_objs_chr}, {&fixture_type_chrarray_struct, rand_objs_chr},
+        {&fixture_type_tuple_struct, rand_objs_chr}, {&fixture_type_list_struct, rand_objs_chr},
+        {&fixture_type_frozenset_struct, rand_objs_chr}, {&fixture_type_set_struct, rand_objs_chr},
+        {&fixture_type_frozenset_dirty_struct, rand_objs_chr},
+        {&fixture_type_set_dirty_struct, rand_objs_chr},
+        {&fixture_type_frozendict_struct, rand_objs_chr},
+        {&fixture_type_dict_struct, rand_objs_chr},
+        {&fixture_type_frozendict_dirty_struct, rand_objs_chr},
+        {&fixture_type_dict_dirty_struct, rand_objs_chr}, {NULL}};
+
 static fixture_type_t fixture_type_str_struct = {
         "str",                          // name
         NULL,                           // type (initialized at runtime)
@@ -1101,13 +1384,16 @@ static fixture_type_t fixture_type_str_struct = {
 
         new_rand_str,  // _new_rand
 
-        yp_str,  // new_
+        yp_str,     // new_
+        peers_str,  // peers
 
         newN_str,       // newN
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_chr_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1120,8 +1406,10 @@ static fixture_type_t fixture_type_str_struct = {
         FALSE,  // is_callable
         FALSE,  // is_patterned
         FALSE,  // original_object_return
-        FALSE,  // hashable_items_only
+        TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_str = &fixture_type_str_struct;
 
 // TODO Return larger characters than just ascii.
 static ypObject *new_rand_chrarray(const rand_obj_supplier_memo_t *memo)
@@ -1167,12 +1455,15 @@ static fixture_type_t fixture_type_chrarray_struct = {
         new_rand_chrarray,  // _new_rand
 
         yp_chrarray,  // new_
+        peers_str,    // peers
 
         newN_chrarray,  // newN
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_chr_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1185,8 +1476,18 @@ static fixture_type_t fixture_type_chrarray_struct = {
         FALSE,  // is_callable
         FALSE,  // is_patterned
         FALSE,  // original_object_return
-        FALSE,  // hashable_items_only
+        TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_chrarray = &fixture_type_chrarray_struct;
+
+static void initialize_fixture_type_str(void)
+{
+    fixture_type_str->yp_type = yp_t_str;
+    fixture_type_str->falsy = yp_str_empty;
+    fixture_type_chrarray->yp_type = yp_t_chrarray;
+}
+
 
 static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
 {
@@ -1202,6 +1503,18 @@ static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *newK_tuple(int k, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_tuple, fixture_type_tuple, k, args);  // new ref
+    va_end(args);
+
+    return result;
+}
+
 static fixture_type_t fixture_type_tuple_struct = {
         "tuple",                    // name
         NULL,                       // type (initialized at runtime)
@@ -1210,13 +1523,16 @@ static fixture_type_t fixture_type_tuple_struct = {
 
         new_rand_tuple,  // _new_rand
 
-        yp_tuple,  // new_
+        yp_tuple,             // new_
+        peers_all_iterables,  // peers
 
         yp_tupleN,      // newN
         rand_objs_any,  // rand_items
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        newK_tuple,     // newK
+        rand_objs_any,  // rand_values
+
+        rand_objs_any_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1232,6 +1548,8 @@ static fixture_type_t fixture_type_tuple_struct = {
         FALSE,  // hashable_items_only
 };
 
+fixture_type_t *fixture_type_tuple = &fixture_type_tuple_struct;
+
 static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
 {
     if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
@@ -1246,6 +1564,18 @@ static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *newK_list(int k, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, k);
+    result = _new_items_listKV(fixture_type_tuple, k, args);  // new ref
+    va_end(args);
+
+    return result;
+}
+
 static fixture_type_t fixture_type_list_struct = {
         "list",                      // name
         NULL,                        // type (initialized at runtime)
@@ -1254,13 +1584,16 @@ static fixture_type_t fixture_type_list_struct = {
 
         new_rand_list,  // _new_rand
 
-        yp_list,  // new_
+        yp_list,              // new_
+        peers_all_iterables,  // peers
 
         yp_listN,       // newN
         rand_objs_any,  // rand_items
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        newK_list,      // newK
+        rand_objs_any,  // rand_values
+
+        rand_objs_any_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1275,6 +1608,16 @@ static fixture_type_t fixture_type_list_struct = {
         TRUE,   // original_object_return
         FALSE,  // hashable_items_only
 };
+
+fixture_type_t *fixture_type_list = &fixture_type_list_struct;
+
+static void initialize_fixture_type_tuple(void)
+{
+    fixture_type_tuple->yp_type = yp_t_tuple;
+    fixture_type_tuple->falsy = yp_tuple_empty;
+    fixture_type_list->yp_type = yp_t_list;
+}
+
 
 static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
 {
@@ -1291,6 +1634,20 @@ static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *newK_frozenset(int k, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_frozenset, fixture_type_tuple, k, args);  // new ref
+    va_end(args);
+
+    return result;
+}
+
+static peer_type_t peers_frozenset[FIXTURE_TYPES_ALL_LEN + 1] = {0};
+
 static fixture_type_t fixture_type_frozenset_struct = {
         "frozenset",               // name
         NULL,                      // type (initialized at runtime)
@@ -1299,13 +1656,16 @@ static fixture_type_t fixture_type_frozenset_struct = {
 
         new_rand_frozenset,  // _new_rand
 
-        yp_frozenset,  // new_
+        yp_frozenset,     // new_
+        peers_frozenset,  // peers
 
         yp_frozensetN,           // newN
         rand_objs_any_hashable,  // rand_items
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        newK_frozenset,          // newK
+        rand_objs_any_hashable,  // rand_values
+
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1320,6 +1680,8 @@ static fixture_type_t fixture_type_frozenset_struct = {
         TRUE,   // original_object_return
         TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_frozenset = &fixture_type_frozenset_struct;
 
 static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
 {
@@ -1336,6 +1698,18 @@ static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *newK_set(int k, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_set, fixture_type_tuple, k, args);  // new ref
+    va_end(args);
+
+    return result;
+}
+
 static fixture_type_t fixture_type_set_struct = {
         "set",                           // name
         NULL,                            // type (initialized at runtime)
@@ -1344,13 +1718,16 @@ static fixture_type_t fixture_type_set_struct = {
 
         new_rand_set,  // _new_rand
 
-        yp_set,  // new_
+        yp_set,           // new_
+        peers_frozenset,  // peers
 
         yp_setN,                 // newN
         rand_objs_any_hashable,  // rand_items
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        newK_set,                // newK
+        rand_objs_any_hashable,  // rand_values
+
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1365,6 +1742,8 @@ static fixture_type_t fixture_type_set_struct = {
         TRUE,   // original_object_return
         TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_set = &fixture_type_set_struct;
 
 // Adds and discards a unique object from so such that it will contain a deleted entry.
 static void make_set_dirty(ypObject *so)
@@ -1421,6 +1800,18 @@ static ypObject *new_frozenset_dirtyN(int n, ...)
     return result;
 }
 
+static ypObject *newK_frozenset_dirty(int k, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_frozenset_dirty, fixture_type_tuple, k, args);  // new ref
+    va_end(args);
+
+    return result;
+}
+
 // "Dirty" refers to the frozenset containing a deleted entry (i.e. ypSet_dummy).
 static fixture_type_t fixture_type_frozenset_dirty_struct = {
         "frozenset_dirty",               // name
@@ -1431,12 +1822,15 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         new_rand_frozenset_dirty,  // _new_rand
 
         new_frozenset_dirty,  // new_
+        peers_frozenset,      // peers
 
         new_frozenset_dirtyN,    // newN
         rand_objs_any_hashable,  // rand_items
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        newK_frozenset_dirty,    // newK
+        rand_objs_any_hashable,  // rand_values
+
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1451,6 +1845,8 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         TRUE,   // original_object_return
         TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_frozenset_dirty = &fixture_type_frozenset_dirty_struct;
 
 static ypObject *new_set_dirty(ypObject *x)
 {
@@ -1480,6 +1876,18 @@ static ypObject *new_set_dirtyN(int n, ...)
     return result;
 }
 
+static ypObject *newK_set_dirty(int k, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, k);
+    result = new_itemsKV(fixture_type_set_dirty, fixture_type_tuple, k, args);  // new ref
+    va_end(args);
+
+    return result;
+}
+
 // "Dirty" refers to the set containing a deleted entry (i.e. ypSet_dummy).
 static fixture_type_t fixture_type_set_dirty_struct = {
         "set_dirty",                           // name
@@ -1489,13 +1897,16 @@ static fixture_type_t fixture_type_set_dirty_struct = {
 
         new_rand_set_dirty,  // _new_rand
 
-        new_set_dirty,  // new_
+        new_set_dirty,    // new_
+        peers_frozenset,  // peers
 
         new_set_dirtyN,          // newN
         rand_objs_any_hashable,  // rand_items
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        newK_set_dirty,          // newK
+        rand_objs_any_hashable,  // rand_values
+
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1510,6 +1921,42 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         TRUE,   // original_object_return
         TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_set_dirty = &fixture_type_set_dirty_struct;
+
+static void initialize_fixture_type_frozenset(void)
+{
+    fixture_type_t **iterable;
+    peer_type_t     *peer;
+
+    fixture_type_frozenset->yp_type = yp_t_frozenset;
+    fixture_type_frozenset->falsy = yp_frozenset_empty;
+    fixture_type_set->yp_type = yp_t_set;
+    fixture_type_frozenset_dirty->yp_type = yp_t_frozenset;
+    fixture_type_frozenset_dirty->falsy = yp_frozenset_empty;
+    fixture_type_set_dirty->yp_type = yp_t_set;
+
+    // TODO frozendict key and item views should be a part of this (when implemented).
+    peer = peers_frozenset;
+    for (iterable = fixture_types_iterable->types; (*iterable) != NULL; iterable++) {
+        // Order is important for range, but our types can't guarantee order.
+        // TODO Once the order items are yielded is guaranteed, we can support range.
+        if ((*iterable)->is_patterned) continue;
+
+        peer->type = (*iterable);
+        if ((*iterable)->is_mapping) {
+            peer->rand_items = (*iterable)->rand_items;
+            peer->rand_values = rand_objs_any_hashable;
+        } else if ((*iterable)->hashable_items_only) {
+            peer->rand_items = (*iterable)->rand_items;
+        } else {
+            assert_true((*iterable)->original_object_return);
+            peer->rand_items = rand_objs_any_hashable;
+        }
+        peer++;
+    }
+}
+
 
 static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
 {
@@ -1574,6 +2021,8 @@ static ypObject *new_frozendictN(int n, ...)
     return result;
 }
 
+static peer_type_t peers_frozendict[FIXTURE_TYPES_ALL_LEN + 1] = {0};
+
 static fixture_type_t fixture_type_frozendict_struct = {
         "frozendict",               // name
         NULL,                       // type (initialized at runtime)
@@ -1582,13 +2031,16 @@ static fixture_type_t fixture_type_frozendict_struct = {
 
         new_rand_frozendict,  // _new_rand
 
-        yp_frozendict,  // new_
+        yp_frozendict,     // new_
+        peers_frozendict,  // peers
 
         new_frozendictN,         // newN
         rand_objs_any_hashable,  // rand_items
 
         yp_frozendictK,  // newK
         rand_objs_any,   // rand_values
+
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1603,6 +2055,8 @@ static fixture_type_t fixture_type_frozendict_struct = {
         TRUE,   // original_object_return
         TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_frozendict = &fixture_type_frozendict_struct;
 
 static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
 {
@@ -1646,13 +2100,16 @@ static fixture_type_t fixture_type_dict_struct = {
 
         new_rand_dict,  // _new_rand
 
-        yp_dict,  // new_
+        yp_dict,           // new_
+        peers_frozendict,  // peers
 
         new_dictN,               // newN
         rand_objs_any_hashable,  // rand_items
 
         yp_dictK,       // newK
         rand_objs_any,  // rand_values
+
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1667,6 +2124,8 @@ static fixture_type_t fixture_type_dict_struct = {
         TRUE,   // original_object_return
         TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_dict = &fixture_type_dict_struct;
 
 // Adds and discards a unique object from mp such that it will contain a deleted entry.
 static void make_dict_dirty(ypObject *mp)
@@ -1715,7 +2174,7 @@ static ypObject *new_frozendict_dirtyN(int n, ...)
     ypObject *result;
 
     va_start(args, n);
-    result = new_dictNV(n, args);  // new ref
+    assert_not_raises(result = new_dictNV(n, args));  // new ref
     va_end(args);
 
     make_dict_dirty(result);
@@ -1724,13 +2183,13 @@ static ypObject *new_frozendict_dirtyN(int n, ...)
     return result;
 }
 
-static ypObject *new_frozendict_dirtyK(int n, ...)
+static ypObject *new_frozendict_dirtyK(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = yp_dictKV(n, args);  // new ref
+    va_start(args, k);
+    assert_not_raises(result = yp_dictKV(k, args));  // new ref
     va_end(args);
 
     make_dict_dirty(result);
@@ -1739,6 +2198,7 @@ static ypObject *new_frozendict_dirtyK(int n, ...)
     return result;
 }
 
+// TODO "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
 static fixture_type_t fixture_type_frozendict_dirty_struct = {
         "frozendict_dirty",               // name
         NULL,                             // type (initialized at runtime)
@@ -1748,12 +2208,15 @@ static fixture_type_t fixture_type_frozendict_dirty_struct = {
         new_rand_frozendict_dirty,  // _new_rand
 
         new_frozendict_dirty,  // new_
+        peers_frozendict,      // peers
 
         new_frozendict_dirtyN,   // newN
         rand_objs_any_hashable,  // rand_items
 
         new_frozendict_dirtyK,  // newK
         rand_objs_any,          // rand_values
+
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1768,6 +2231,8 @@ static fixture_type_t fixture_type_frozendict_dirty_struct = {
         TRUE,   // original_object_return
         TRUE,   // hashable_items_only
 };
+
+fixture_type_t *fixture_type_frozendict_dirty = &fixture_type_frozendict_dirty_struct;
 
 static ypObject *new_dict_dirty(ypObject *x)
 {
@@ -1790,20 +2255,20 @@ static ypObject *new_dict_dirtyN(int n, ...)
     ypObject *result;
 
     va_start(args, n);
-    result = new_dictNV(n, args);  // new ref
+    assert_not_raises(result = new_dictNV(n, args));  // new ref
     va_end(args);
 
     make_dict_dirty(result);
     return result;
 }
 
-static ypObject *new_dict_dirtyK(int n, ...)
+static ypObject *new_dict_dirtyK(int k, ...)
 {
     va_list   args;
     ypObject *result;
 
-    va_start(args, n);
-    result = yp_dictKV(n, args);  // new ref
+    va_start(args, k);
+    assert_not_raises(result = yp_dictKV(k, args));  // new ref
     va_end(args);
 
     make_dict_dirty(result);
@@ -1818,13 +2283,16 @@ static fixture_type_t fixture_type_dict_dirty_struct = {
 
         new_rand_dict_dirty,  // _new_rand
 
-        new_dict_dirty,  // new_
+        new_dict_dirty,    // new_
+        peers_frozendict,  // peers
 
         new_dict_dirtyN,         // newN
         rand_objs_any_hashable,  // rand_items
 
         new_dict_dirtyK,  // newK
         rand_objs_any,    // rand_values
+
+        rand_objs_any_hashable_ordered,  // rand_ordered_items
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1840,22 +2308,66 @@ static fixture_type_t fixture_type_dict_dirty_struct = {
         TRUE,   // hashable_items_only
 };
 
+fixture_type_t *fixture_type_dict_dirty = &fixture_type_dict_dirty_struct;
+
+static void initialize_fixture_type_frozendict(void)
+{
+    fixture_type_t **iterable;
+    peer_type_t     *peer;
+
+    fixture_type_frozendict->yp_type = yp_t_frozendict;
+    fixture_type_frozendict->falsy = yp_frozendict_empty;
+    fixture_type_dict->yp_type = yp_t_dict;
+    fixture_type_frozendict_dirty->yp_type = yp_t_frozendict;
+    fixture_type_frozendict_dirty->falsy = yp_frozendict_empty;
+    fixture_type_dict_dirty->yp_type = yp_t_dict;
+
+    // TODO frozendict key and item views should be a part of this (when implemented).
+    peer = peers_frozendict;
+    for (iterable = fixture_types_iterable->types; (*iterable) != NULL; iterable++) {
+        // Order is important for range, but our types can't guarantee order.
+        // TODO Once the order items are yielded is guaranteed, we can support range.
+        if ((*iterable)->is_patterned) continue;
+
+        peer->type = (*iterable);
+        if ((*iterable)->is_mapping) {
+            peer->rand_items = (*iterable)->rand_items;
+            peer->rand_values = (*iterable)->rand_values;
+        } else if ((*iterable)->hashable_items_only) {
+            peer->rand_items = (*iterable)->rand_items;
+            if (!(*iterable)->is_string) {
+                peer->rand_values = (*iterable)->rand_values;
+            }
+        } else {
+            assert_true((*iterable)->original_object_return);
+            peer->rand_items = rand_objs_any_hashable;
+            peer->rand_values = rand_objs_any;
+        }
+        peer++;
+    }
+}
+
+
 static ypObject *new_rand_function_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     return rand_obj_any(NULL);
 }
 
-// TODO Randomly return a statically-allocated function.
 // TODO Randomize the parameters, default values, etc.
 static ypObject *new_rand_function(const rand_obj_supplier_memo_t *memo)
 {
-    yp_parameter_decl_t parameter_decl[] = {{yp_s_star_args}, {yp_s_star_star_kwargs}};
+    ypObject           *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject           *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    yp_parameter_decl_t parameter_decl[] = {{str_star_args}, {str_star_star_kwargs}};
     yp_function_decl_t  decl = {
             new_rand_function_code, 0, yp_lengthof_array(parameter_decl), parameter_decl};
     ypObject *result = yp_functionC(&decl);
     assert_not_exception(result);
+    yp_decrefN(N(str_star_star_kwargs, str_star_args));
     return result;
 }
+
+static peer_type_t peers_function[] = {{&fixture_type_function_struct}, {NULL}};
 
 static fixture_type_t fixture_type_function_struct = {
         "function",                     // name
@@ -1866,12 +2378,15 @@ static fixture_type_t fixture_type_function_struct = {
         new_rand_function,  // _new_rand
 
         objobjfunc_error,  // new_
+        peers_function,    // peers
 
         objvarargfunc_error,   // newN
         rand_objs_func_error,  // rand_items
 
         objvarargfunc_error,   // newK
         rand_objs_func_error,  // rand_values
+
+        rand_objs_func_error,  // rand_ordered_items
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1887,32 +2402,14 @@ static fixture_type_t fixture_type_function_struct = {
         FALSE,  // hashable_items_only
 };
 
-fixture_type_t *fixture_type_type = &fixture_type_type_struct;
-fixture_type_t *fixture_type_NoneType = &fixture_type_NoneType_struct;
-fixture_type_t *fixture_type_bool = &fixture_type_bool_struct;
-fixture_type_t *fixture_type_int = &fixture_type_int_struct;
-fixture_type_t *fixture_type_intstore = &fixture_type_intstore_struct;
-fixture_type_t *fixture_type_float = &fixture_type_float_struct;
-fixture_type_t *fixture_type_floatstore = &fixture_type_floatstore_struct;
-fixture_type_t *fixture_type_iter = &fixture_type_iter_struct;
-fixture_type_t *fixture_type_range = &fixture_type_range_struct;
-fixture_type_t *fixture_type_bytes = &fixture_type_bytes_struct;
-fixture_type_t *fixture_type_bytearray = &fixture_type_bytearray_struct;
-fixture_type_t *fixture_type_str = &fixture_type_str_struct;
-fixture_type_t *fixture_type_chrarray = &fixture_type_chrarray_struct;
-fixture_type_t *fixture_type_tuple = &fixture_type_tuple_struct;
-fixture_type_t *fixture_type_list = &fixture_type_list_struct;
-fixture_type_t *fixture_type_frozenset = &fixture_type_frozenset_struct;
-fixture_type_t *fixture_type_set = &fixture_type_set_struct;
-fixture_type_t *fixture_type_frozenset_dirty = &fixture_type_frozenset_dirty_struct;
-fixture_type_t *fixture_type_set_dirty = &fixture_type_set_dirty_struct;
-fixture_type_t *fixture_type_frozendict = &fixture_type_frozendict_struct;
-fixture_type_t *fixture_type_dict = &fixture_type_dict_struct;
-fixture_type_t *fixture_type_frozendict_dirty = &fixture_type_frozendict_dirty_struct;
-fixture_type_t *fixture_type_dict_dirty = &fixture_type_dict_dirty_struct;
 fixture_type_t *fixture_type_function = &fixture_type_function_struct;
 
-#define FIXTURE_TYPES_ALL_LEN 24  // Verified in initialize_fixture_types.
+static void initialize_fixture_type_function(void)
+{
+    fixture_type_function->yp_type = yp_t_function;
+}
+
+
 static fixture_type_t *fixture_types_all_types[] = {&fixture_type_type_struct,
         &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
         &fixture_type_intstore_struct, &fixture_type_float_struct, &fixture_type_floatstore_struct,
@@ -1949,6 +2446,7 @@ DEFINE_FIXTURE_TYPES(sequence, not_sequence);
 DEFINE_FIXTURE_TYPES(string, not_string);
 DEFINE_FIXTURE_TYPES(setlike, not_setlike);
 DEFINE_FIXTURE_TYPES(mapping, not_mapping);
+DEFINE_FIXTURE_TYPES(callable, not_callable);
 #undef DEFINE_FIXTURE_TYPES
 DEFINE_FIXTURE_TYPES_ARRAYS(immutable_not_str);
 static int fixture_type_is_immutable_not_str(fixture_type_t *type)
@@ -1979,44 +2477,6 @@ static void fill_fixture_types_arrays(fixture_types_t *fixture_types, char **par
 
 static void initialize_fixture_types(void)
 {
-    // These need to be initialized at runtime because they may be imported from a DLL.
-    fixture_type_type->type = yp_t_type;
-    fixture_type_NoneType->type = yp_t_NoneType;
-    fixture_type_NoneType->falsy = yp_None;
-    fixture_type_bool->type = yp_t_bool;
-    fixture_type_bool->falsy = yp_False;
-    fixture_type_int->type = yp_t_int;
-    fixture_type_int->falsy = yp_i_zero;
-    fixture_type_intstore->type = yp_t_intstore;
-    fixture_type_float->type = yp_t_float;
-    // TODO Falsy immortal for float?
-    fixture_type_floatstore->type = yp_t_floatstore;
-    fixture_type_iter->type = yp_t_iter;
-    fixture_type_range->type = yp_t_range;
-    fixture_type_range->falsy = yp_range_empty;
-    fixture_type_bytes->type = yp_t_bytes;
-    fixture_type_bytes->falsy = yp_bytes_empty;
-    fixture_type_bytearray->type = yp_t_bytearray;
-    fixture_type_str->type = yp_t_str;
-    fixture_type_str->falsy = yp_str_empty;
-    fixture_type_chrarray->type = yp_t_chrarray;
-    fixture_type_tuple->type = yp_t_tuple;
-    fixture_type_tuple->falsy = yp_tuple_empty;
-    fixture_type_list->type = yp_t_list;
-    fixture_type_frozenset->type = yp_t_frozenset;
-    fixture_type_frozenset->falsy = yp_frozenset_empty;
-    fixture_type_set->type = yp_t_set;
-    fixture_type_frozenset_dirty->type = yp_t_frozenset;
-    fixture_type_frozenset_dirty->falsy = yp_frozenset_empty;
-    fixture_type_set_dirty->type = yp_t_set;
-    fixture_type_frozendict->type = yp_t_frozendict;
-    fixture_type_frozendict->falsy = yp_frozendict_empty;
-    fixture_type_dict->type = yp_t_dict;
-    fixture_type_frozendict_dirty->type = yp_t_frozendict;
-    fixture_type_frozendict_dirty->falsy = yp_frozendict_empty;
-    fixture_type_dict_dirty->type = yp_t_dict;
-    fixture_type_function->type = yp_t_function;
-
     // The fixture_types_* and param_values_types_* arrays above were sized based on
     // FIXTURE_TYPES_ALL_LEN, so make sure that value is correct.
     if (yp_lengthof_array(fixture_types_all_types) != FIXTURE_TYPES_ALL_LEN + 1) {
@@ -2048,6 +2508,7 @@ static void initialize_fixture_types(void)
     FILL_FIXTURE_TYPES_ARRAYS(string);
     FILL_FIXTURE_TYPES_ARRAYS(setlike);
     FILL_FIXTURE_TYPES_ARRAYS(mapping);
+    FILL_FIXTURE_TYPES_ARRAYS(callable);
     FILL_FIXTURE_TYPES_ARRAYS(immutable);
     FILL_FIXTURE_TYPES_ARRAYS(not_numeric);
     FILL_FIXTURE_TYPES_ARRAYS(not_iterable);
@@ -2056,9 +2517,37 @@ static void initialize_fixture_types(void)
     FILL_FIXTURE_TYPES_ARRAYS(not_string);
     FILL_FIXTURE_TYPES_ARRAYS(not_setlike);
     FILL_FIXTURE_TYPES_ARRAYS(not_mapping);
+    FILL_FIXTURE_TYPES_ARRAYS(not_callable);
     FILL_FIXTURE_TYPES_ARRAYS(immutable_not_str);
     FILL_FIXTURE_TYPES_ARRAYS(immutable_paired);
 #undef FILL_FIXTURE_TYPES_ARRAYS
+
+    // Some fixture_type_t initialization needs to happen at runtime, as it references DLL pointers.
+    // This happens after FILL_FIXTURE_TYPES_ARRAYS as some of these reference these arrays.
+    initialize_fixture_type_type();
+    initialize_fixture_type_NoneType();
+    initialize_fixture_type_bool();
+    initialize_fixture_type_int();
+    initialize_fixture_type_float();
+    initialize_fixture_type_iter();
+    initialize_fixture_type_range();
+    initialize_fixture_type_bytes();
+    initialize_fixture_type_str();
+    initialize_fixture_type_tuple();
+    initialize_fixture_type_frozenset();
+    initialize_fixture_type_frozendict();
+    initialize_fixture_type_function();
+}
+
+extern int are_friend_types(fixture_type_t *type, fixture_type_t *other)
+{
+    return type->yp_type == other->yp_type || type->yp_type == other->pair->yp_type;
+}
+
+extern int types_are_comparable(fixture_type_t *type, fixture_type_t *other)
+{
+    if (type->is_numeric && other->is_numeric) return TRUE;
+    return are_friend_types(type, other);
 }
 
 // TODO We could speed this up with a frozendict or somesuch.
@@ -2067,7 +2556,7 @@ extern fixture_type_t *fixture_type_from_object(ypObject *object)
     fixture_type_t **fixture_type;
     ypObject        *type = yp_type(object);
     for (fixture_type = fixture_types_all->types; (*fixture_type) != NULL; fixture_type++) {
-        if ((*fixture_type)->type == type) break;
+        if ((*fixture_type)->yp_type == type) break;
     }
     yp_decref(type);
     assert_not_null(*fixture_type);
@@ -2102,17 +2591,28 @@ extern yp_ssize_t yp_lenC_not_raises(ypObject *container)
     return result;
 }
 
+extern yp_int_t yp_asintC_not_raises(ypObject *number)
+{
+    yp_int_t result;
+    assert_not_raises_exc(result = yp_asintC(number, &exc));
+    return result;
+}
+
 
 #define MALLOC_TRACKER_MAX_LEN 4000
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {
+    // Simulate "out of memory" after this many allocations. Set to negative to disable.
+    int        oom;
     yp_ssize_t len;
     void      *mallocs[MALLOC_TRACKER_MAX_LEN];
-} malloc_tracker = {0};
+} malloc_tracker = {-1, 0};
 
 static void malloc_tracker_fixture_setup(void)
 {
+    // Disable simulated OOM states unless the test specifically configures this.
+    malloc_tracker.oom = -1;
     // We only track allocations made during the test, to verify they have been freed by the end.
     malloc_tracker.len = 0;
 }
@@ -2151,18 +2651,39 @@ static void malloc_tracker_pop(void *p)
     }
 }
 
+extern void malloc_tracker_oom_after(int successful)
+{
+    munit_assert_int(successful, >=, 0);
+    malloc_tracker.oom = successful;
+}
+
+extern void malloc_tracker_oom_disable(void) { malloc_tracker.oom = -1; }
+
+// Called before we actually allocate memory. Returns true iff we should simulate an OOM condition.
+// Otherwise, updates the OOM counter, which will possibly cause the next allocation to fail.
+static int malloc_tracker_oom_fail_alloc(void)
+{
+    if (malloc_tracker.oom == 0) return TRUE;
+    if (malloc_tracker.oom > 0) malloc_tracker.oom--;
+    return FALSE;
+}
+
 extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
-    void *p = yp_mem_default_malloc(actual, size);
-    if (p != NULL) malloc_tracker_push(p);
+    void *p;
+    if (malloc_tracker_oom_fail_alloc()) return NULL;
+    assert_not_null(p = yp_mem_default_malloc(actual, size));
+    malloc_tracker_push(p);
     return p;
 }
 
 extern void *malloc_tracker_malloc_resize(
         yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
-    void *newP = yp_mem_default_malloc_resize(actual, p, size, extra);
-    if (newP != NULL && newP != p) malloc_tracker_push(newP);
+    void *newP;
+    if (malloc_tracker_oom_fail_alloc()) return NULL;
+    assert_not_null(newP = yp_mem_default_malloc_resize(actual, p, size, extra));
+    if (newP != p) malloc_tracker_push(newP);
     return newP;
 }
 

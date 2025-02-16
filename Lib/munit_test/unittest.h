@@ -81,6 +81,13 @@ extern "C" {
     19,18,17,16,15,14,13,12,11,10, \
      9, 8, 7, 6, 5, 4, 3, 2, 1, 0
 
+/*
+import string
+for i in range(1, 35):
+    args = ", ".join(string.ascii_letters[:i])
+    body = ", ".join("#" + l for l in string.ascii_letters[:i])
+    print(f"#define _STRINGIFY{i}({args}) {body}")
+*/
 #define _STRINGIFY1(a) #a
 #define _STRINGIFY2(a, b) #a, #b
 #define _STRINGIFY3(a, b, c) #a, #b, #c
@@ -114,7 +121,13 @@ extern "C" {
 #define _STRINGIFY31(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E
 #define _STRINGIFY32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F
 #define _STRINGIFY33(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F, G) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F, #G
+#define _STRINGIFY34(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F, G, H) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F, #G, #H
 
+/*
+for i in range(1, 35):
+    body = ", ".join("x" for _ in range(i))
+    print(f"#define _COMMA_REPEAT{i}(x) {body}")
+*/
 #define _COMMA_REPEAT1(x) x
 #define _COMMA_REPEAT2(x) x, x
 #define _COMMA_REPEAT3(x) x, x, x
@@ -148,6 +161,7 @@ extern "C" {
 #define _COMMA_REPEAT31(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 #define _COMMA_REPEAT32(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 #define _COMMA_REPEAT33(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT34(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 // clang-format on
 
 // Variadic macro tricks.
@@ -199,9 +213,6 @@ extern "C" {
     }
 
 
-// FIXME A suite of tests to ensure these assertions are working. They can be
-// MUNIT_TEST_OPTION_TODO, which will fail if they pass.
-
 // A different take on munit_assert_type_full that allows for formatting in the strings for a and b.
 // a and b may be evaluated multiple times (assign to a variable first).
 #define _assert_typeC(a, op, b, val_pri, a_fmt, b_fmt, ...)                                 \
@@ -227,7 +238,7 @@ extern "C" {
 #define assert_ssizeC(a, op, b) munit_assert_type(yp_ssize_t, PRIssize, a, op, b)
 #define assert_hashC(a, op, b) munit_assert_type(yp_hash_t, PRIssize, a, op, b)
 
-// FIXME A better error message to list the exception name.
+// TODO A better error message to list the exception name.
 #define _assert_not_exception(obj, obj_fmt, ...)                                          \
     do {                                                                                  \
         if (yp_isexceptionC(obj)) {                                                       \
@@ -313,6 +324,7 @@ extern "C" {
 // exception argument. Example:
 //
 //      assert_isexception_exc(yp_lenC(yp_SyntaxError, &exc), yp_SyntaxError);
+//
 // TODO nohtyP does not currently make a distinction between returning and raising an exception, so
 // this is currently an alias to assert_raises_exc.
 #define assert_isexception_exc assert_raises_exc
@@ -372,8 +384,8 @@ extern "C" {
     do {                                                                                     \
         T _ypmt_TYPEC_a;                                                                     \
         T _ypmt_TYPEC_b;                                                                     \
-        _assert_not_raises_exc(_ypmt_TYPEC_a = (a_statement); _ypmt_TYPEC_b = (b_statement), \
-                               a_fmt " " #op " " b_fmt, __VA_ARGS__);                        \
+        _assert_not_raises_exc(_ypmt_TYPEC_a = (a_statement);                                \
+                _ypmt_TYPEC_b = (b_statement), a_fmt " " #op " " b_fmt, __VA_ARGS__);        \
         _assert_typeC(_ypmt_TYPEC_a, op, _ypmt_TYPEC_b, val_pri, a_fmt, b_fmt, __VA_ARGS__); \
     } while (0)
 
@@ -623,7 +635,7 @@ extern int _assert_setlike_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
         _assert_setlike(_ypmt_SET_obj, _ypmt_SET_items, "%s", _ypmt_SET_item_strs, #obj); \
     } while (0)
 
-extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t n,
+extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_t k,
         ypObject **items, ypObject **actual_key, ypObject **actual_value, yp_ssize_t *items_i);
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
@@ -725,16 +737,17 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
     } while (0)
 
 
-#define _faulty_iter_test_raises(setup, iter_name, iter_expression, statement, tear_down,         \
-        test_name, exc_suffix, expected, statement_str)                                           \
-    do {                                                                                          \
-        ypObject *iter_name;                                                                      \
-        UNPACK    setup;                                                                          \
-        iter_name = iter_expression;                                                              \
-        _assert_raises##exc_suffix(                                                               \
-                statement, 1, expected, "%s /*" test_name "*/", "yp_SyntaxError", statement_str); \
-        yp_decref(iter_name);                                                                     \
-        UNPACK tear_down;                                                                         \
+#define _faulty_iter_test_raises(setup, iter_name, iter_expression, statement, tear_down,        \
+        test_name, exc_suffix, expected, statement_str)                                          \
+    do {                                                                                         \
+        ypObject *_ypmt_FLT_ITR_expected[] = {expected};                                         \
+        ypObject *iter_name;                                                                     \
+        UNPACK    setup;                                                                         \
+        iter_name = iter_expression;                                                             \
+        _assert_raises##exc_suffix(statement, 1, _ypmt_FLT_ITR_expected, "%s /*" test_name "*/", \
+                "%s", statement_str, #expected);                                                 \
+        yp_decref(iter_name);                                                                    \
+        UNPACK tear_down;                                                                        \
     } while (0)
 
 // XXX Unfortunately, we don't have a way to inject test_name into the assertion statement.
@@ -751,36 +764,48 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
     } while (0)
 
 // XXX yp_SyntaxError is chosen as nohtyP.c neither raises nor catches it.
-#define _faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down,      \
-        exc_suffix, statement_str)                                                                \
-    do {                                                                                          \
-        yp_ssize_t _ypmt_FLT_ITR_len = yp_lenC_not_raises(iter_supplier);                         \
-        ypObject  *_ypmt_FLT_ITR_expected[] = {yp_SyntaxError};                                   \
-        if (_ypmt_FLT_ITR_len < 2) {                                                              \
-            munit_error("iter_supplier must contain at least two entries");                       \
-        }                                                                                         \
-        /* x is an iterator that fails at the start. */                                           \
-        _faulty_iter_test_raises(setup, iter_name,                                                \
-                new_faulty_iter(iter_supplier, 0, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,  \
-                tear_down, "fail_start", exc_suffix, _ypmt_FLT_ITR_expected, statement_str);      \
-        /* x is an iterator that fails mid-way. */                                                \
-        _faulty_iter_test_raises(setup, iter_name,                                                \
-                new_faulty_iter(iter_supplier, 1, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,  \
-                tear_down, "fail_mid", exc_suffix, _ypmt_FLT_ITR_expected, statement_str);        \
-        /* x is an iterator with a too-small length_hint. */                                      \
-        _faulty_iter_test_succeeds(setup, iter_name,                                              \
-                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, 1),         \
-                statement, assertion, tear_down, "hint_small", exc_suffix, statement_str);        \
-        /* x is an iterator with a too-large length_hint. */                                      \
-        _faulty_iter_test_succeeds(setup, iter_name,                                              \
-                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,             \
-                        _ypmt_FLT_ITR_len + 100),                                                 \
-                statement, assertion, tear_down, "hint_large", exc_suffix, statement_str);        \
-        /* x is an iterator with the maximum length_hint. FIXME enable. */                        \
-        /*_faulty_iter_test_succeeds(setup, iter_name,                                            \
-                new_faulty_iter(                                                                  \
-                        iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, yp_SSIZE_T_MAX),    \
-                statement, assertion, tear_down, "hint_max", exc_suffix, statement_str);       */ \
+// XXX The tests with yp_GeneratorExit are to ensure it's not treated like yp_StopIteration.
+#define _faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down,       \
+        exc_suffix, statement_str)                                                                 \
+    do {                                                                                           \
+        yp_ssize_t _ypmt_FLT_ITR_len = yp_lenC_not_raises(iter_supplier);                          \
+        if (_ypmt_FLT_ITR_len < 2) {                                                               \
+            munit_error("iter_supplier must contain at least two entries");                        \
+        }                                                                                          \
+        /* x is yp_StopIteration; it should not be confused with "exhausted". */                   \
+        _faulty_iter_test_raises(setup, iter_name, yp_StopIteration, statement, tear_down,         \
+                "exc_passthrough", exc_suffix, yp_StopIteration, statement_str);                   \
+        /* x is an iterator that fails at the start. */                                            \
+        _faulty_iter_test_raises(setup, iter_name,                                                 \
+                new_faulty_iter(iter_supplier, 0, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,   \
+                tear_down, "fail_start", exc_suffix, yp_SyntaxError, statement_str);               \
+        /* x is an iterator that fails mid-way. */                                                 \
+        _faulty_iter_test_raises(setup, iter_name,                                                 \
+                new_faulty_iter(iter_supplier, 1, yp_SyntaxError, _ypmt_FLT_ITR_len), statement,   \
+                tear_down, "fail_mid", exc_suffix, yp_SyntaxError, statement_str);                 \
+        /* x is an iterator that raises yp_GeneratorExit at the start. */                          \
+        _faulty_iter_test_raises(setup, iter_name,                                                 \
+                new_faulty_iter(iter_supplier, 0, yp_GeneratorExit, _ypmt_FLT_ITR_len), statement, \
+                tear_down, "fail_start", exc_suffix, yp_GeneratorExit, statement_str);             \
+        /* x is an iterator that raises yp_GeneratorExit when exhausted. */                        \
+        _faulty_iter_test_raises(setup, iter_name,                                                 \
+                new_faulty_iter(                                                                   \
+                        iter_supplier, _ypmt_FLT_ITR_len, yp_GeneratorExit, _ypmt_FLT_ITR_len),    \
+                statement, tear_down, "fail_end", exc_suffix, yp_GeneratorExit, statement_str);    \
+        /* x is an iterator with a too-small length_hint. */                                       \
+        _faulty_iter_test_succeeds(setup, iter_name,                                               \
+                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, 1),          \
+                statement, assertion, tear_down, "hint_small", exc_suffix, statement_str);         \
+        /* x is an iterator with a too-large length_hint. */                                       \
+        _faulty_iter_test_succeeds(setup, iter_name,                                               \
+                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,              \
+                        _ypmt_FLT_ITR_len + 100),                                                  \
+                statement, assertion, tear_down, "hint_large", exc_suffix, statement_str);         \
+        /* x is an iterator with the maximum length_hint. FIXME enable. */                         \
+        /*_faulty_iter_test_succeeds(setup, iter_name,                                             \
+                new_faulty_iter(                                                                   \
+                        iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, yp_SSIZE_T_MAX),     \
+                statement, assertion, tear_down, "hint_max", exc_suffix, statement_str);       */  \
     } while (0)
 
 // Executes a series of tests using a "faulty iterator" that either raises an exception during
@@ -834,10 +859,27 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
     } while (0)
 
 
+// Declares a variable name of type ypObject * and initializes it with a new reference to a function
+// object. The parameters argument must be surrounded by parentheses.
+// XXX Older compilers reject an empty parameters argument; use define_function2 instead.
+#define define_function(name, code, parameters)                                                     \
+    yp_parameter_decl_t _##name##_parameters[] = {UNPACK parameters};                               \
+    yp_function_decl_t  _##name##_declaration = {                                                   \
+            (code), 0, yp_lengthof_array(_##name##_parameters), _##name##_parameters, NULL, NULL}; \
+    ypObject *name = yp_functionC(&_##name##_declaration)
+
+// Equivalent to define_function(name, code, ()).
+#define define_function2(name, code)                                             \
+    yp_function_decl_t _##name##_declaration = {(code), 0, 0, NULL, NULL, NULL}; \
+    ypObject          *name = yp_functionC(&_##name##_declaration)
+
+
 // Pretty-prints the object to f, followed by a newline.
 extern void pprint(FILE *f, ypObject *obj);
 
 
+typedef struct _fixture_type_t fixture_type_t;
+typedef struct _peer_type_t    peer_type_t;
 typedef ypObject *(*objobjfunc)(ypObject *);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
@@ -850,16 +892,16 @@ typedef void (*rand_objs_func)(uniqueness_t *, yp_ssize_t, ypObject **);
 // objects). Any methods or arguments here that don't apply to a given type will fail the test. May
 // also be used to describe special-purpose objects (i.e. fixture_type_set_dirty is a set containing
 // deleted items).
-typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
-    char           *name;   // The name of the type (i.e. int, bytearray, dict).
-    ypObject       *type;   // The type object (i.e. yp_t_float, yp_t_list).
-    ypObject       *falsy;  // The falsy/empty immortal for this type, or NULL. (Only immutables.)
-    fixture_type_t *pair;   // The other type in this object pair, or points back to this type.
+    char           *name;     // The name of the type (i.e. int, bytearray, dict).
+    ypObject       *yp_type;  // The type object (i.e. yp_t_float, yp_t_list).
+    ypObject       *falsy;    // The falsy immortal for this type, or NULL. (Only immutables.)
+    fixture_type_t *pair;     // The other type in this object pair, or points back to this type.
 
-    rand_obj_supplier_func _new_rand;  // Call via rand_obj/etc.
+    rand_obj_supplier_func _new_rand;  // Internal: used by rand_obj/etc.
 
-    objobjfunc new_;  // The object converter, aka the single-argument constructor.
+    objobjfunc   new_;   // The object converter, aka the single-argument constructor.
+    peer_type_t *peers;  // An array of "peer types" (see peer_type_t). Null-terminated.
 
     // Functions for iterables, where rand_items returns objects that can be accepted by newN and
     // subsequently yielded by yp_iter. (For mappings, newN creates an object with the given keys
@@ -868,9 +910,14 @@ typedef struct _fixture_type_t {
     rand_objs_func rand_items;  // Fills an array with n random objects.
 
     // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
-    // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys).
+    // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys). newK is
+    // also supported for collections that can store key/value pairs (i.e. iter, tuple, and list).
     objvarargfunc  newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
     rand_objs_func rand_values;  // Fills an array with n random objects for values.
+
+    // Similar to rand_items, except the objects returned all support ordered comparisons with each
+    // other, and the items are returned in ascending order (i.e. i[0] < i[1] < ...).
+    rand_objs_func rand_ordered_items;
 
     // Flags to describe the properties of the type.
     int is_mutable;
@@ -882,10 +929,29 @@ typedef struct _fixture_type_t {
     int is_setlike;
     int is_mapping;
     int is_callable;
-    int is_patterned;            // i.e. range doesn't store values, it stores a pattern
-    int original_object_return;  // A collection that *always* returns the object that was stored
-    int hashable_items_only;     // A collection that *requires* items to be hashable
+    int is_patterned;            // i.e. range doesn't store values, it stores a pattern.
+    int original_object_return;  // A collection that *always* returns the object that was stored.
+    int hashable_items_only;     // A collection that *requires* items to be hashable.
 } fixture_type_t;
+
+// A "peer type" is one that is similar to "self", such that it is possible under certain conditions
+// to convert between the two types, to compare instances of the two types, etc. For example, int
+// and float are peers: you can convert one to the other and compare them. As another example, tuple
+// is a peer to all iterable types: you can convert any iterable to a tuple, although comparisons
+// are not necessarily supported.
+//
+// Because one of the types may have restrictions on the values it can have or contain, each peer
+// type includes information on how to build compatible objects. For example, it is possible to
+// convert a tuple to a str, but only if the items are chrs. As another example, a float can be
+// losslessly converted to an int, but only if the float has an integral value.
+//
+// Note that pairs, and the types themselves, are all considered peers, and are all included in
+// fixture_type_t.peers. For example, a tuple can be converted to both a list and a tuple.
+typedef struct _peer_type_t {
+    fixture_type_t *type;         // The peer type.
+    rand_objs_func  rand_items;   // As per fixture_type_t.rand_items; NULL if not supported.
+    rand_objs_func  rand_values;  // As per fixture_type_t.rand_values; NULL if not supported.
+} peer_type_t;
 
 // TODO Versions of each of these that build as the mutable type and then freezes, to test that
 // the freezing process still yields a viable object.
@@ -935,6 +1001,7 @@ extern fixture_types_t *fixture_types_sequence;
 extern fixture_types_t *fixture_types_string;
 extern fixture_types_t *fixture_types_setlike;
 extern fixture_types_t *fixture_types_mapping;
+extern fixture_types_t *fixture_types_callable;
 extern fixture_types_t *fixture_types_immutable;
 extern fixture_types_t *fixture_types_not_numeric;
 extern fixture_types_t *fixture_types_not_iterable;
@@ -943,6 +1010,7 @@ extern fixture_types_t *fixture_types_not_sequence;
 extern fixture_types_t *fixture_types_not_string;
 extern fixture_types_t *fixture_types_not_setlike;
 extern fixture_types_t *fixture_types_not_mapping;
+extern fixture_types_t *fixture_types_not_callable;
 extern fixture_types_t *fixture_types_immutable_not_str;
 extern fixture_types_t *fixture_types_immutable_paired;
 
@@ -957,6 +1025,7 @@ extern char *param_values_types_sequence[];
 extern char *param_values_types_string[];
 extern char *param_values_types_setlike[];
 extern char *param_values_types_mapping[];
+extern char *param_values_types_callable[];
 extern char *param_values_types_immutable[];
 extern char *param_values_types_not_numeric[];
 extern char *param_values_types_not_iterable[];
@@ -965,8 +1034,17 @@ extern char *param_values_types_not_sequence[];
 extern char *param_values_types_not_string[];
 extern char *param_values_types_not_setlike[];
 extern char *param_values_types_not_mapping[];
+extern char *param_values_types_not_callable[];
 extern char *param_values_types_immutable_not_str[];
 extern char *param_values_types_immutable_paired[];
+
+
+// Returns true iff type supports optimizations with other. Generally, types only support
+// optimizations with their pairs.
+extern int are_friend_types(fixture_type_t *type, fixture_type_t *other);
+
+// Returns true iff type supports ordered comparisons (lt/le/ge/gt) with other.
+extern int types_are_comparable(fixture_type_t *type, fixture_type_t *other);
 
 // Returns the test fixture type that corresponds with the type of the object. object cannot be
 // invalidated or an exception.
@@ -1019,14 +1097,22 @@ extern hashability_pair_t rand_obj_any_hashability_pair(uniqueness_t *uq);
 // Returns a random object of any non-iterable type.
 extern ypObject *rand_obj_any_not_iterable(uniqueness_t *uq);
 
+// Returns a random object of any non-callable type.
+extern ypObject *rand_obj_any_not_callable(uniqueness_t *uq);
+
 // Returns a random object of the given type. uq must be NULL for fixture_type_NoneType and
 // fixture_type_bool, as there are too few values for these types to guarantee uniqueness.
 extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type);
 
-// Returns an object of the given type containing the n (key, value) pairs as 2-tuples. The object
-// is constructed by calling type->new_ with a list of the pairs.
-extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...);
-extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args);
+// Returns an iter yielding the n items in order.
+extern ypObject *new_iterN(int n, ...);
+extern ypObject *new_iterNV(int n, va_list args);
+
+// Returns an object of the given outer type containing the k (key, value) pairs of the given inner
+// type. The pairs are constructed by calling inner->newN, while the object is constructed by
+// calling outer->new_ with a list of the pairs.
+extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int k, ...);
+extern ypObject *new_itemsKV(fixture_type_t *outer, fixture_type_t *inner, int k, va_list args);
 
 // Returns an iterator that yields values from supplier (an iterable) until n values have been
 // yielded, after which the given exception is raised. The iterator is initialized with the given
@@ -1059,6 +1145,20 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 
 // yp_lenC, asserting an exception is not raised.
 yp_ssize_t yp_lenC_not_raises(ypObject *container);
+
+// yp_asintC, asserting an exception is not raised.
+// TODO Most tests should probably be using the "index" version of this, without rounding.
+yp_int_t yp_asintC_not_raises(ypObject *number);
+
+
+// Simulate an out-of-memory condition after the given number of successful allocations. If
+// successful is zero, the next allocation will fail. All allocations will fail once the OOM counter
+// reaches zero, until it is reset by malloc_tracker_oom_after or malloc_tracker_oom_disable.
+extern void malloc_tracker_oom_after(int successful);
+
+// Allow all subsequent allocations to succeed. This can be called at any time, regardless of the
+// status of the OOM counter. The OOM counter is automatically disabled at the start of each test.
+extern void malloc_tracker_oom_disable(void);
 
 
 extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size);
@@ -1094,10 +1194,14 @@ SUITE_OF_TESTS_DECLS(test_exception);
 SUITE_OF_TESTS_DECLS(test_frozendict);
 SUITE_OF_TESTS_DECLS(test_frozenset);
 SUITE_OF_TESTS_DECLS(test_function);
+SUITE_OF_TESTS_DECLS(test_iter);
+SUITE_OF_TESTS_DECLS(test_range);
+SUITE_OF_TESTS_DECLS(test_tuple);
 
 SUITE_OF_SUITES_DECLS(test_protocols);
 SUITE_OF_TESTS_DECLS(test_all);
 SUITE_OF_TESTS_DECLS(test_collection);
+SUITE_OF_TESTS_DECLS(test_comparable);
 SUITE_OF_TESTS_DECLS(test_iterable);
 SUITE_OF_TESTS_DECLS(test_mapping);
 SUITE_OF_TESTS_DECLS(test_sequence);

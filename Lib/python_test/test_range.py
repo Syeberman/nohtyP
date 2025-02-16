@@ -706,6 +706,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotEqual(yp_range(2**200, 2**201, 2**100),
                             yp_range(2**200, 2**201 + 1, 2**100))
 
+    @yp_unittest.skip("nohtyP supports relative comparisons on ranges")
     def test_comparison_relative(self):
         # Order comparisons are not implemented for ranges.
         with self.assertRaises(TypeError):
