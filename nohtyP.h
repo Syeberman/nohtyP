@@ -979,6 +979,8 @@ ypAPI ypObject *yp_isalnum(ypObject *s);
 // defined in the Unicode Standard.
 ypAPI ypObject *yp_isalpha(ypObject *s);
 
+// FIXME str.isascii()
+
 // Returns the immortal yp_True if all characters in s are decimal characters and there is at least
 // one character, otherwise yp_False. Decimal characters are those from general category "Nd".
 ypAPI ypObject *yp_isdecimal(ypObject *s);

@@ -919,6 +919,9 @@ typedef struct _fixture_type_t {
     // other, and the items are returned in ascending order (i.e. i[0] < i[1] < ...).
     rand_objs_func rand_ordered_items;
 
+    // Functions for strings (bytes, str, etc.).
+    objvarargfunc fromordsCN;  // Creates a string from the yp_int_t ordinal values.
+
     // Flags to describe the properties of the type.
     int is_mutable;
     int is_numeric;

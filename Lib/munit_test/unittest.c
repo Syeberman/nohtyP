@@ -530,6 +530,20 @@ extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int k,
 }
 
 
+// Takes a va_list of yp_int_t values, converts each value using fromordC, and appends them to
+// string.
+static void fromordsCNV_helper(
+        ypObject *string, ypObject *(*fromordC)(yp_int_t), int n, va_list args)
+{
+    for (/*n already set*/; n > 0; n--) {
+        ypObject *item;
+        assert_not_raises(item = fromordC(va_arg(args, yp_int_t)));
+        assert_not_raises_exc(yp_append(string, item, &exc));
+        yp_decref(item);
+    }
+}
+
+
 typedef struct _rand_iter_state_t {
     yp_ssize_t               n;
     rand_obj_supplier_func   supplier;
@@ -629,6 +643,8 @@ static fixture_type_t fixture_type_type_struct = {
 
         rand_objs_func_error,  // rand_ordered_items
 
+        objvarargfunc_error,  // fromordsCN
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         FALSE,  // is_iterable
@@ -672,6 +688,8 @@ static fixture_type_t fixture_type_NoneType_struct = {
         rand_objs_func_error,  // rand_values
 
         rand_objs_func_error,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -725,6 +743,8 @@ static fixture_type_t fixture_type_bool_struct = {
         rand_objs_func_error,  // rand_values
 
         rand_objs_func_error,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -781,6 +801,8 @@ static fixture_type_t fixture_type_int_struct = {
 
         rand_objs_func_error,  // rand_ordered_items
 
+        objvarargfunc_error,  // fromordsCN
+
         FALSE,  // is_mutable
         TRUE,   // is_numeric
         FALSE,  // is_iterable
@@ -822,6 +844,8 @@ static fixture_type_t fixture_type_intstore_struct = {
         rand_objs_func_error,  // rand_values
 
         rand_objs_func_error,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -873,6 +897,8 @@ static fixture_type_t fixture_type_float_struct = {
 
         rand_objs_func_error,  // rand_ordered_items
 
+        objvarargfunc_error,  // fromordsCN
+
         FALSE,  // is_mutable
         TRUE,   // is_numeric
         FALSE,  // is_iterable
@@ -914,6 +940,8 @@ static fixture_type_t fixture_type_floatstore_struct = {
         rand_objs_func_error,  // rand_values
 
         rand_objs_func_error,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -999,6 +1027,8 @@ static fixture_type_t fixture_type_iter_struct = {
         rand_objs_any,  // rand_values
 
         rand_objs_any_ordered,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1152,6 +1182,8 @@ static fixture_type_t fixture_type_range_struct = {
 
         rand_ordered_items_range,  // rand_ordered_items
 
+        objvarargfunc_error,  // fromordsCN
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1207,6 +1239,19 @@ static ypObject *newN_bytes(int n, ...)
     return result;
 }
 
+static ypObject *fromordsCN_bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    assert_not_raises(result = yp_bytearray0());
+    va_start(args, n);
+    fromordsCNV_helper(result, yp_intC, n, args);
+    va_end(args);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_bytes);
+    return result;
+}
+
 // TODO _Could_ support range here, for ints in range(256) that follow a pattern.
 static peer_type_t peers_bytes[] = {{&fixture_type_iter_struct, rand_objs_byte},
         {&fixture_type_bytes_struct, rand_objs_byte},
@@ -1239,6 +1284,8 @@ static fixture_type_t fixture_type_bytes_struct = {
         rand_objs_func_error,  // rand_values
 
         rand_objs_byte_ordered,  // rand_ordered_items
+
+        fromordsCN_bytes,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1288,6 +1335,17 @@ static ypObject *newN_bytearray(int n, ...)
     return result;
 }
 
+static ypObject *fromordsCN_bytearray(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    assert_not_raises(result = yp_bytearray0());
+    va_start(args, n);
+    fromordsCNV_helper(result, yp_intC, n, args);
+    va_end(args);
+    return result;
+}
+
 static fixture_type_t fixture_type_bytearray_struct = {
         "bytearray",                 // name
         NULL,                        // type (initialized at runtime)
@@ -1306,6 +1364,8 @@ static fixture_type_t fixture_type_bytearray_struct = {
         rand_objs_func_error,  // rand_values
 
         rand_objs_byte_ordered,  // rand_ordered_items
+
+        fromordsCN_bytearray,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1365,6 +1425,19 @@ static ypObject *newN_str(int n, ...)
     return result;
 }
 
+static ypObject *fromordsCN_str(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray0());
+    va_start(args, n);
+    fromordsCNV_helper(result, yp_chrC, n, args);
+    va_end(args);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_str);
+    return result;
+}
+
 static peer_type_t peers_str[] = {{&fixture_type_iter_struct, rand_objs_chr},
         {&fixture_type_str_struct, rand_objs_chr}, {&fixture_type_chrarray_struct, rand_objs_chr},
         {&fixture_type_tuple_struct, rand_objs_chr}, {&fixture_type_list_struct, rand_objs_chr},
@@ -1394,6 +1467,8 @@ static fixture_type_t fixture_type_str_struct = {
         rand_objs_func_error,  // rand_values
 
         rand_objs_chr_ordered,  // rand_ordered_items
+
+        fromordsCN_str,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1446,6 +1521,17 @@ static ypObject *newN_chrarray(int n, ...)
     return result;
 }
 
+static ypObject *fromordsCN_chrarray(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray0());
+    va_start(args, n);
+    fromordsCNV_helper(result, yp_chrC, n, args);
+    va_end(args);
+    return result;
+}
+
 static fixture_type_t fixture_type_chrarray_struct = {
         "chrarray",                // name
         NULL,                      // type (initialized at runtime)
@@ -1464,6 +1550,8 @@ static fixture_type_t fixture_type_chrarray_struct = {
         rand_objs_func_error,  // rand_values
 
         rand_objs_chr_ordered,  // rand_ordered_items
+
+        fromordsCN_chrarray,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1534,6 +1622,8 @@ static fixture_type_t fixture_type_tuple_struct = {
 
         rand_objs_any_ordered,  // rand_ordered_items
 
+        objvarargfunc_error,  // fromordsCN
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1594,6 +1684,8 @@ static fixture_type_t fixture_type_list_struct = {
         rand_objs_any,  // rand_values
 
         rand_objs_any_ordered,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1667,6 +1759,8 @@ static fixture_type_t fixture_type_frozenset_struct = {
 
         rand_objs_any_hashable_ordered,  // rand_ordered_items
 
+        objvarargfunc_error,  // fromordsCN
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1728,6 +1822,8 @@ static fixture_type_t fixture_type_set_struct = {
         rand_objs_any_hashable,  // rand_values
 
         rand_objs_any_hashable_ordered,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1832,6 +1928,8 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
 
         rand_objs_any_hashable_ordered,  // rand_ordered_items
 
+        objvarargfunc_error,  // fromordsCN
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -1907,6 +2005,8 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         rand_objs_any_hashable,  // rand_values
 
         rand_objs_any_hashable_ordered,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -2042,6 +2142,8 @@ static fixture_type_t fixture_type_frozendict_struct = {
 
         rand_objs_any_hashable_ordered,  // rand_ordered_items
 
+        objvarargfunc_error,  // fromordsCN
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -2110,6 +2212,8 @@ static fixture_type_t fixture_type_dict_struct = {
         rand_objs_any,  // rand_values
 
         rand_objs_any_hashable_ordered,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -2218,6 +2322,8 @@ static fixture_type_t fixture_type_frozendict_dirty_struct = {
 
         rand_objs_any_hashable_ordered,  // rand_ordered_items
 
+        objvarargfunc_error,  // fromordsCN
+
         FALSE,  // is_mutable
         FALSE,  // is_numeric
         TRUE,   // is_iterable
@@ -2293,6 +2399,8 @@ static fixture_type_t fixture_type_dict_dirty_struct = {
         rand_objs_any,    // rand_values
 
         rand_objs_any_hashable_ordered,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -2387,6 +2495,8 @@ static fixture_type_t fixture_type_function_struct = {
         rand_objs_func_error,  // rand_values
 
         rand_objs_func_error,  // rand_ordered_items
+
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
