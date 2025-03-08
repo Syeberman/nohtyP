@@ -271,7 +271,7 @@ ypAPI ypObject *yp_chrarray_frombytesC4(
         yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors);
 
 // Equivalent to yp_str3(yp_bytesC(len, source), yp_s_utf_8, yp_s_strict). Note that in Python,
-// omitting encoding and errors would normally return the string representation of the bytes object
+// omitting encoding and errors would normally return the text representation of the bytes object
 // ("b'Zoot!'"), however this constructor decodes it ("Zoot!").
 ypAPI ypObject *yp_str_frombytesC2(yp_ssize_t len, const yp_uint8_t *source);
 ypAPI ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source);
@@ -281,9 +281,9 @@ ypAPI ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source
 ypAPI ypObject *yp_str3(ypObject *source, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_chrarray3(ypObject *source, ypObject *encoding, ypObject *errors);
 
-// Returns a new reference to the "informal" or nicely-printable string representation of object, as
-// a str/chrarray. As in Python, passing a bytes object to this constructor returns the string
-// representation ("b'Zoot!'"); to decode the bytes, use yp_str3.
+// Returns a new reference to the "informal" or nicely-printable representation of object, as a
+// str/chrarray. As in Python, passing a bytes object to this constructor returns the representation
+// ("b'Zoot!'"); to decode the bytes, use yp_str3.
 ypAPI ypObject *yp_str(ypObject *object);
 ypAPI ypObject *yp_chrarray(ypObject *object);
 
@@ -931,7 +931,7 @@ ypAPI ypObject *const yp_frozendict_empty;
  * String Operations
  */
 
-// These methods are supported by bytes and str (and their mutable counterparts, of course).
+// These methods are supported by binary strings (bytes/bytearray) and text strings (str/chrarray).
 // Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return ints for
 // these types, and will only accept ints for yp_setindexC. The individual elements of strs and
 // chrarrays are single-character strs. Using bytes/bytearray arguments on a str/chrarray method, or
@@ -944,6 +944,7 @@ ypAPI ypObject *const yp_frozendict_empty;
 // Unlike Python, the arguments start/end (yp_startswithC4 et al) and i/j (yp_findC5 et al) are
 // always treated as in slice notation. Python behaves peculiarly when end<start in certain edge
 // cases involving empty strings (compare "foo"[5:0].startswith("") to "foo".startswith("", 5, 0)).
+// FIXME Remove this start/end stuff?
 
 // Immortal strs representing common encodings, for convience with yp_str_frombytesC4 et al.
 ypAPI ypObject *const yp_s_ascii;     // "ascii"
@@ -979,7 +980,9 @@ ypAPI ypObject *yp_isalnum(ypObject *s);
 // defined in the Unicode Standard.
 ypAPI ypObject *yp_isalpha(ypObject *s);
 
-// FIXME str.isascii()
+// Returns the immortal yp_True if all characters in s are ascii or the string is empty, otherwise
+// yp_False.
+ypAPI ypObject *yp_isascii(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are decimal characters and there is at least
 // one character, otherwise yp_False. Decimal characters are those from general category "Nd".
@@ -1006,7 +1009,7 @@ ypAPI ypObject *yp_isnumeric(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are printable or s is empty, otherwise
 // yp_False. Nonprintable characters are those characters defined in the Unicode character database
-// as "Other" or "Separator", excepting space (0x20) which is considered printable.
+// as "Other" or "Separator", excepting the ascii space (0x20) which is considered printable.
 ypAPI ypObject *yp_isprintable(ypObject *s);
 
 // Returns the immortal yp_True if there are only whitespace characters in s and there is at least
@@ -1022,13 +1025,18 @@ ypAPI ypObject *yp_isupper(ypObject *s);
 
 // Returns the immortal yp_True if s[start:end] starts with the specified prefix, otherwise
 // yp_False. prefix can also be a tuple of prefix strings for which to look. If a prefix string is
-// empty, returns yp_True. yp_startswith considers the entire string (as if start is 0 and end is
-// yp_SLICE_LAST).
+// empty, returns yp_True.
+// FIXME Remove these start/end variants? If this was useful isupper/etc would have them. What would
+// be better is a general-purpose string slice solution.
 ypAPI ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end);
+
+// Equivalent to yp_startswithC4(s, prefix, 0, yp_SLICE_LAST).
 ypAPI ypObject *yp_startswith(ypObject *s, ypObject *prefix);
 
 // Similar to yp_startswithC4, except looks for the given suffix(es) at the end of s[start:end].
 ypAPI ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end);
+
+// Equivalent to yp_endswith(s, prefix, 0, yp_SLICE_LAST).
 ypAPI ypObject *yp_endswith(ypObject *s, ypObject *suffix);
 
 // Returns a new reference to a lowercased copy of s. The lowercasing algorithm is described in
@@ -1045,49 +1053,64 @@ ypAPI ypObject *yp_casefold(ypObject *s);
 
 // Returns a new reference to a copy of s with uppercase characters converted to lowercase and vice
 // versa.
+// FIXME Do we need this?
 ypAPI ypObject *yp_swapcase(ypObject *s);
 
 // Returns a new reference to a copy of s with its first character capitalized and the rest
 // lowercased.
+// FIXME Do we need this?
 ypAPI ypObject *yp_capitalize(ypObject *s);
 
 // Returns a new reference to s left-justified in a string of length width. Padding is done using
-// the specified ord_fillchar for yp_ljustC3, or a space for yp_ljustC. A copy of s is returned if
-// width is less than or equal to its length.
+// the specified ord_fillchar. A copy of s is returned if width is less than or equal to its length.
 ypAPI ypObject *yp_ljustC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar);
+
+// Equivalent to yp_ljustC3(s, width, 0x20) (pads using the ascii space).
 ypAPI ypObject *yp_ljustC(ypObject *s, yp_ssize_t width);
 
 // Similar to yp_ljustC3, except s is right-justified.
 ypAPI ypObject *yp_rjustC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar);
+
+// Equivalent to yp_rjustC3(s, width, 0x20) (pads using the ascii space).
 ypAPI ypObject *yp_rjustC(ypObject *s, yp_ssize_t width);
 
 // Similar to yp_ljustC3, except s is centered.
 ypAPI ypObject *yp_centerC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar);
+
+// Equivalent to yp_centerC3(s, width, 0x20) (pads using the ascii space).
 ypAPI ypObject *yp_centerC(ypObject *s, yp_ssize_t width);
 
-// Returns a new reference to s where all tab characters are replaced by one or more spaces,
-// depending on the current column and the given tabsize. Newline and return characters reset the
-// column to zero; all other characters increment the column by one regardless of how the character
-// is represented when printed. The Python-equivalent "default" for tabsize is 8.
+// Returns a new reference to s where all tab characters are replaced by one or more ascii spaces
+// (0x20), depending on the current column and the given tabsize. Newline and return characters
+// reset the column to zero; all other characters increment the column by one regardless of how the
+// character is represented when printed. The Python-equivalent "default" for tabsize is 8.
 ypAPI ypObject *yp_expandtabsC(ypObject *s, yp_ssize_t tabsize);
 
-// Returns a new reference to a copy of s with count occurrences of substring oldsub replaced by
-// newsub. For yp_replace, or if count is -1, all occurrences are replaced.
+// Returns a new reference to a copy of s with count occurrences of the substring oldsub replaced by
+// newsub. If count is -1, all occurrences are replaced.
 ypAPI ypObject *yp_replaceC4(ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count);
+
+// Equivalent to yp_replaceC4(s, oldsub, newsub, -1).
 ypAPI ypObject *yp_replace(ypObject *s, ypObject *oldsub, ypObject *newsub);
 
 // Returns a new reference to a copy of s with leading characters removed. The chars argument is a
-// string specifying the set of characters to be removed; for yp_lstrip, or if chars is yp_None,
-// this defaults to removing whitespace.
+// string specifying the set of characters to be removed; if chars is yp_None, whitespace characters
+// are removed.
 ypAPI ypObject *yp_lstrip2(ypObject *s, ypObject *chars);
+
+// Equivalent to yp_lstrip2(s, yp_None).
 ypAPI ypObject *yp_lstrip(ypObject *s);
 
 // Similar to yp_lstrip2, except trailing characters are removed.
 ypAPI ypObject *yp_rstrip2(ypObject *s, ypObject *chars);
+
+// Equivalent to yp_rstrip2(s, yp_None).
 ypAPI ypObject *yp_rstrip(ypObject *s);
 
 // Similar to yp_lstrip2, except both leading and trailing characters are removed.
 ypAPI ypObject *yp_strip2(ypObject *s, ypObject *chars);
+
+// Equivalent to yp_strip2(s, yp_None).
 ypAPI ypObject *yp_strip(ypObject *s);
 
 // Returns a new reference to the concatenation of the strings in iterable, using s as the separator
@@ -1110,26 +1133,28 @@ ypAPI void yp_partition(
 ypAPI void yp_rpartition(
         ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2);
 
-// Returns a new reference to a list of words in the string, using sep as the delimiter string. For
-// yp_splitC3, only performs the leftmost splits up to maxsplit; for yp_split2, or if maxsplit is
-// -1, there is no limit on the number of splits made. If sep is yp_None this behaves as yp_split,
-// otherwise consecutive delimiters are not grouped together and are deemed to delimit empty
-// strings.
+// Returns a new reference to a list of words in the string, using sep as the delimiter string. Only
+// performs the leftmost splits up to maxsplit; if maxsplit is -1, there is no limit on the number
+// of splits made.
 //
-// Ex: yp_split2("1,,2", ",") returns ["1", "", "2"]
+// The splitting algorithm used depends on sep. If sep is yp_None, runs of consecutive whitespace
+// are regarded as a single separator, and the result will contain no empty strings. Otherwise,
+// consecutive delimiters are not grouped together and are deemed to delimit empty strings.
+//
+//      Ex: yp_split3(" 1  2   3  ", yp_None, -1) returns ["1", "2", "3"]
+//      Ex: yp_split3(" 1  2   3  ", " ", -1) returns ["", "1", "", "2", "", "", "3", "", ""]
+//      Ex: yp_split3("1,,2,3", ",", 2) returns ["1", "", "2,3"]
 ypAPI ypObject *yp_splitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
+
+// Equivalent to yp_splitC3(s, sep, -1);
 ypAPI ypObject *yp_split2(ypObject *s, ypObject *sep);
 
-// Similar to yp_splitC3, except a different splitting algorithm is used. Runs of consecutive
-// whitespace are regarded as a single separator and the result will contain no empty strings at the
-// start or end if the string has leading or trailing whitespace.
-//
-// Ex: yp_split(" 1  2   3  ") returns ["1", "2", "3"]
+// Equivalent to yp_splitC3(s, yp_None, -1);
 ypAPI ypObject *yp_split(ypObject *s);
 
 // Similar to yp_splitC3, except only performs the rightmost splits up to maxsplit.
 //
-// Ex: yp_rsplitC3("  1  2   3  ", yp_None, 1) returns ["  1  2", "3"]
+//      Ex: yp_rsplitC3("1,,2,3", ",", 2) returns ["1,", "2", "3"]
 ypAPI ypObject *yp_rsplitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
 
 // Returns a new reference to a list of lines in the string, breaking at line boundaries. Python's
@@ -1155,7 +1180,7 @@ ypAPI ypObject *const yp_str_empty;
 
 
 /*
- * String Formatting Operations
+ * Text String Formatting Operations
  */
 
 // The syntax of format strings can be found in Python's documentation:
@@ -1868,6 +1893,59 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
  * Initialization Parameters
  */
 
+// Bit flags used in yp_character_database_t.
+#define yp_ALNUM_ALPHA (1 << 0)
+#define yp_ALNUM_DECIMAL (1 << 1)
+#define yp_ALNUM_DIGIT (1 << 2)
+#define yp_ALNUM_NUMERIC (1 << 3)
+#define yp_CASED_LOWER (1 << 0)
+#define yp_CASED_TITLE (1 << 1)
+#define yp_CASED_UPPER (1 << 2)
+
+// Interface for a character database. Used by yp_initialize_parameters_t to add full Unicode
+// support to text strings.
+// XXX Offsets will not change between versions: members from this struct will never be deleted,
+// only deprecated.
+// FIXME Do something similar with malloc.
+typedef struct _yp_character_database_t {
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_character_database_t)
+
+    // The largest character this database supports. The methods below will not be called with
+    // larger characters; instead, yp_SystemLimitationError will be raised.
+    // FIXME Assertions that the methods are not called with larger characters.
+    yp_uint32_t max_char;
+
+    // Returns a combination of the yp_ALNUM_* flags if c is alphanumeric, and 0 if it's not.
+    // FIXME Return an int, or something more specific? If int, the flags should be signed.
+    int (*isalnum)(yp_uint32_t c);
+
+    // Returns a combination of the yp_CASED_* flags if c is cased, and 0 if it's not.
+    int (*iscased)(yp_uint32_t c);
+
+    // Returns true (non-zero) if c is printable, and false if it's not.
+    int (*isprintable)(yp_uint32_t c);
+
+    // Returns true (non-zero) if c is whitespace, and false if it's not.
+    int (*isspace)(yp_uint32_t c);
+
+    // Returns true (non-zero) if c is a line break, and false if it's not.
+    int (*islinebreak)(yp_uint32_t c);
+
+    // Writes the lowercase form of c to converted and returns the number of characters written. If
+    // c is not cased it is written to converted unchanged. len is the allocated length of
+    // converted; if converted is not large enough -1 is returned.
+    yp_ssize_t (*tolower)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
+
+    // Similar to tolower, except converts to titlecase.
+    yp_ssize_t (*totitle)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
+
+    // Similar to tolower, except converts to uppercase.
+    yp_ssize_t (*toupper)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
+
+    // Returns the numeric value as a double if c is numeric, and -1.0 if it's not.
+    // FIXME double (*tonumeric)(yp_uint32_t c);
+} yp_character_database_t;
+
 // yp_initialize accepts a number of parameters to customize nohtyP behaviour.
 // XXX Offsets will not change between versions: members from this struct will never be deleted,
 // only deprecated.
@@ -1903,6 +1981,11 @@ typedef struct _yp_initialize_parameters_t {
 
     // Frees memory returned by yp_malloc and yp_malloc_resize. May abort on error.
     void (*yp_free)(void *p);
+
+    // Configures an external character database for text strings (str/chrarray). nohtyP has
+    // built-in support for all latin-1 characters; to enable full Unicode support, an external
+    // character database is required.
+    yp_character_database_t *text_character_database;
 
     // Setting everything_immortal to true forces all allocated objects to be immortal, effectively
     // disabling yp_incref and yp_decref. When false, the default and recommended option, objects

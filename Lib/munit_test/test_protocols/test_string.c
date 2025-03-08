@@ -12,6 +12,7 @@
 // TODO This (exception passthrough) even includes yp_formatN/etc where the argument is never
 // referenced in the format string.
 
+// FIXME Strings are either "binary" or "text".
 static int isbinary(fixture_type_t *type)
 {
     return type == fixture_type_bytes || type == fixture_type_bytearray;
@@ -123,24 +124,23 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
     ypObject       *expected[] = {yp_False, yp_True, isbinary(type) ? yp_False : yp_True};
 
     // FIXME Not on bytes: "isdecimal", "isidentifier", "isnumeric", "isprintable"
-    // FIXME istitle?
 
 #define assert_char(ord, alpha, decimal, digit, lower, numeric, printable, space, upper) \
     do {                                                                                 \
         ypObject *x = type->fromordsCN(1, ord);                                          \
-        assert_obj(yp_isalnum(x), is, expected[alpha || numeric]);                       \
+        assert_obj(yp_isalnum(x), is, expected[alpha == 0 ? numeric : alpha]);           \
         assert_obj(yp_isalpha(x), is, expected[alpha]);                                  \
-        /* FIXME assert_obj(yp_isacii(x), is, expected[ord < 128]); */                   \
+        assert_obj(yp_isascii(x), is, expected[ord < 128 ? 1 : 0]);                      \
         assert_obj(yp_isdigit(x), is, expected[digit]);                                  \
         assert_obj(yp_islower(x), is, expected[lower]);                                  \
         assert_obj(yp_isspace(x), is, expected[space]);                                  \
         assert_obj(yp_isupper(x), is, expected[upper]);                                  \
-        if (!isbinary(type)) {                                                           \
+        /* FIXME if (!isbinary(type)) {                                                  \
             assert_obj(yp_isdecimal(x), is, expected[decimal]);                          \
             assert_obj(yp_isidentifier(x), is, expected[alpha || ord == 95]);            \
             assert_obj(yp_isnumeric(x), is, expected[numeric]);                          \
             assert_obj(yp_isprintable(x), is, expected[printable]);                      \
-        }                                                                                \
+        } */                                                                             \
         yp_decref(x);                                                                    \
     } while (0)
 

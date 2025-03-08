@@ -842,6 +842,7 @@ class c_yp_initialize_parameters_t(Structure):
         ("yp_malloc", c_yp_malloc_func_t),
         ("yp_malloc_resize", c_yp_malloc_resize_func_t),
         ("yp_free", c_yp_free_func_t),
+        ("text_character_database", c_void_p), # FIXME
         ("everything_immortal", c_int),
     ]
 
@@ -874,6 +875,7 @@ _yp_initparams = c_yp_initialize_parameters_t(
     yp_malloc=_yp_mem_default_malloc,
     yp_malloc_resize=_yp_mem_default_malloc_resize,
     yp_free=yp_free_hook,
+    text_character_database=None, # FIXME
     everything_immortal=False
 )
 _yp_initialize(_yp_initparams)

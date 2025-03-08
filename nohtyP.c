@@ -1160,8 +1160,13 @@ static yp_hash_t yp_HashSet_fini(yp_HashSet_state_t *state)
     }
 }
 
+// Maximum code point of ascii.
+#define ypStringLib_MAX_ASCII (0x7Fu)
 
-// Maximum code point of Unicode 6.0: 0x10FFFF (1,114,111)
+// Maximum code point of latin-1.
+#define ypStringLib_MAX_LATIN_1 (0xFFu)
+
+// Maximum code point of Unicode 6.0: 0x10FFFF (1,114,111).
 #define ypStringLib_MAX_UNICODE (0x10FFFFu)
 
 /* This Unicode character will be used as replacement character during
@@ -1448,10 +1453,10 @@ ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
 
 
 /*************************************************************************************************
- * Locale-independent ctype.h-like macros
- * XXX This entire section is adapted from Python's pyctype.c and pyctype.h
+ * Character databases for ASCII binary and latin-1 text characters.
  *************************************************************************************************/
-#pragma region ctype_like
+#pragma region character_databases
+
 // clang-format off
 
 #define _yp_CTF_LOWER  0x01
@@ -1688,7 +1693,217 @@ const yp_uint8_t _yp_ctype_toupper[256] = {
 };
 
 // clang-format on
-#pragma endregion ctype_like
+
+
+static int yp_chardata_binary_isalnum(yp_uint32_t c)
+{
+    int mask = 0;
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (c > ypStringLib_MAX_ASCII) return 0;
+    if (yp_ISALPHA(c)) mask |= yp_ALNUM_ALPHA;
+    // FIXME if (yp_ISDECIMAL(c)) mask |= yp_ALNUM_DECIMAL;
+    if (yp_ISDIGIT(c)) mask |= yp_ALNUM_DIGIT;
+    // FIXME if (yp_ISNUMERIC(c)) mask |= yp_ALNUM_NUMERIC;
+    return mask;
+}
+
+static int yp_chardata_binary_iscased(yp_uint32_t c)
+{
+    int mask = 0;
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (c > ypStringLib_MAX_ASCII) return 0;
+    if (yp_ISLOWER(c)) mask |= yp_CASED_LOWER;
+    // FIXME if (yp_ISTITLE(c)) mask |= yp_CASED_TITLE;
+    if (yp_ISUPPER(c)) mask |= yp_CASED_UPPER;
+    return mask;
+}
+
+static int yp_chardata_binary_isprintable(yp_uint32_t c)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    return c >= ' ' && c < ypStringLib_MAX_ASCII;
+}
+
+static int yp_chardata_binary_isspace(yp_uint32_t c)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    switch (c) {
+    case 0x09u:  // '\t'
+    case 0x0Au:  // '\n'
+    case 0x0Bu:
+    case 0x0Cu:
+    case 0x0Du:  // '\r'
+    case 0x20u:  // ' '
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+static int yp_chardata_binary_islinebreak(yp_uint32_t c)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    switch (c) {
+    case 0x0Au:  // '\n'
+    case 0x0Du:  // '\r'
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+static yp_ssize_t yp_chardata_binary_tolower(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (len < 1) return -1;
+    converted[0] = c < ypStringLib_MAX_ASCII ? yp_TOLOWER(c) : c;
+    return 1;
+}
+
+static yp_ssize_t yp_chardata_binary_toupper(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (len < 1) return -1;
+    converted[0] = c < ypStringLib_MAX_ASCII ? yp_TOUPPER(c) : c;
+    return 1;
+}
+
+// The binary character database applies to all single-byte characters, but only applies meaning
+// to the ascii characters.
+static yp_character_database_t yp_chardata_binary = {
+        yp_sizeof(yp_character_database_t),  // sizeof_struct
+        ypStringLib_MAX_LATIN_1,             // max_char
+        yp_chardata_binary_isalnum,          // isalnum
+        yp_chardata_binary_iscased,          // iscased
+        yp_chardata_binary_isprintable,      // isprintable
+        yp_chardata_binary_isspace,          // isspace
+        yp_chardata_binary_islinebreak,      // islinebreak
+        yp_chardata_binary_tolower,          // tolower
+        yp_chardata_binary_toupper,          // totitle
+        yp_chardata_binary_toupper,          // toupper
+};
+
+
+static int yp_chardata_latin_1_isalnum(yp_uint32_t c)
+{
+    int mask = 0;
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (yp_ISALPHA(c)) mask |= yp_ALNUM_ALPHA;
+    // FIXME if (yp_ISDECIMAL(c)) mask |= yp_ALNUM_DECIMAL;
+    if (yp_ISDIGIT(c)) mask |= yp_ALNUM_DIGIT;
+    // FIXME if (yp_ISNUMERIC(c)) mask |= yp_ALNUM_NUMERIC;
+    return mask;
+}
+
+static int yp_chardata_latin_1_iscased(yp_uint32_t c)
+{
+    int mask = 0;
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (yp_ISLOWER(c)) mask |= yp_CASED_LOWER;
+    // FIXME if (yp_ISTITLE(c)) mask |= yp_CASED_TITLE;
+    if (yp_ISUPPER(c)) mask |= yp_CASED_UPPER;
+    return mask;
+}
+
+static int yp_chardata_latin_1_isprintable(yp_uint32_t c)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    // FIXME This will need to be masked.
+    return c >= ' ' && c < ypStringLib_MAX_ASCII;
+}
+
+static int yp_chardata_latin_1_isspace(yp_uint32_t c)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    switch (c) {
+    case 0x09u:  // '\t'
+    case 0x0Au:  // '\n'
+    case 0x0Bu:
+    case 0x0Cu:
+    case 0x0Du:  // '\r'
+    case 0x1Cu:
+    case 0x1Du:
+    case 0x1Eu:
+    case 0x1Fu:
+    case 0x20u:  // ' '
+    case 0x85u:
+    case 0xA0u:
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+static int yp_chardata_latin_1_islinebreak(yp_uint32_t c)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    switch (c) {
+    case 0x0Au:  // '\n'
+    case 0x0Bu:
+    case 0x0Cu:
+    case 0x0Du:  // '\r'
+    case 0x1Cu:
+    case 0x1Du:
+    case 0x1Eu:
+    case 0x85u:
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+static yp_ssize_t yp_chardata_latin_1_tolower(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (len < 1) return -1;
+    converted[0] = c < ypStringLib_MAX_ASCII ? yp_TOLOWER(c) : c;
+    return 1;
+}
+
+static yp_ssize_t yp_chardata_latin_1_totitle(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (c == 0xDFu) {  // 'ß'
+        if (len < 2) return -1;
+        converted[0] = 'S';
+        converted[1] = 's';
+        return 2;
+    } else {
+        if (len < 1) return -1;
+        converted[0] = yp_TOUPPER(c);
+        return 1;
+    }
+}
+
+static yp_ssize_t yp_chardata_latin_1_toupper(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (c == 0xDFu) {  // 'ß'
+        if (len < 2) return -1;
+        converted[0] = 'S';
+        converted[1] = 'S';
+        return 2;
+    } else {
+        if (len < 1) return -1;
+        converted[0] = yp_TOUPPER(c);
+        return 1;
+    }
+}
+
+static yp_character_database_t yp_chardata_latin_1 = {
+        yp_sizeof(yp_character_database_t),  // sizeof_struct
+        ypStringLib_MAX_LATIN_1,             // max_char
+        yp_chardata_latin_1_isalnum,         // isalnum
+        yp_chardata_latin_1_iscased,         // iscased
+        yp_chardata_latin_1_isprintable,     // isprintable
+        yp_chardata_latin_1_isspace,         // isspace
+        yp_chardata_latin_1_islinebreak,     // islinebreak
+        yp_chardata_latin_1_tolower,         // tolower
+        yp_chardata_latin_1_totitle,         // totitle
+        yp_chardata_latin_1_toupper,         // toupper
+};
+
+#pragma endregion character_databases
 
 
 /*************************************************************************************************
@@ -8312,6 +8527,65 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
     return yp_None;
 }
 
+static ypObject *_ypStringLib_classify_alnum(
+        ypObject *s, yp_character_database_t *chardata, yp_uint8_t mask)
+{
+    void                      *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    yp_ssize_t                 i;
+
+    if (s_len < 1) return yp_False;
+
+    for (i = 0; i < s_len; i++) {
+        yp_uint32_t c = s_enc->getindexX(s_data, i);
+        if (c > chardata->max_char) return yp_SystemLimitationError;
+        if (!(chardata->isalnum(c) & mask)) return yp_False;
+    }
+    return yp_True;
+}
+
+static ypObject *_ypStringLib_classify_cased(
+        ypObject *s, yp_character_database_t *chardata, yp_uint8_t mask)
+{
+    void                      *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    int                        has_cased_char = FALSE;
+    yp_ssize_t                 i;
+
+    if (s_len < 1) return yp_False;
+
+    for (i = 0; i < s_len; i++) {
+        int         iscased;
+        yp_uint32_t c = s_enc->getindexX(s_data, i);
+        if (c > chardata->max_char) return yp_SystemLimitationError;
+
+        // The "cased" classifiers skip over non-cased characters.
+        iscased = chardata->iscased(c);
+        if (!iscased) continue;
+        if (!(iscased & mask)) return yp_False;
+        has_cased_char = TRUE;
+    }
+    return ypBool_FROM_C(has_cased_char);
+}
+
+static ypObject *_ypStringLib_classify_space(ypObject *s, yp_character_database_t *chardata)
+{
+    void                      *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    yp_ssize_t                 i;
+
+    if (s_len < 1) return yp_False;
+
+    for (i = 0; i < s_len; i++) {
+        yp_uint32_t c = s_enc->getindexX(s_data, i);
+        if (c > chardata->max_char) return yp_SystemLimitationError;
+        if (!chardata->isspace(c)) return yp_False;
+    }
+    return yp_True;
+}
 
 // There are some efficiencies we can exploit if iterable/x is a fellow string object
 // TODO Is this really a scenario for which we should be optimizing? How typical is ''.join('')?
@@ -8689,6 +8963,22 @@ final_loop:
         ++p;
     }
     return p - start;
+}
+
+static ypObject *ypStringLib_classify_ascii(ypObject *s)
+{
+    void                      *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    yp_ssize_t                 ascii_len;
+
+    if (s_len < 1) return yp_True;
+
+    // Because we always use the smallest possible encoding, larger encodings cannot be ascii.
+    if (s_enc->elemsize > 1) return yp_False;
+
+    ascii_len = ypStringLib_count_ascii_bytes(s_data, ((yp_uint8_t *)s_data) + s_len);
+    return ypBool_FROM_C(ascii_len >= s_len);
 }
 
 // Returns true iff the byte is a valid utf-8 continuation character (i.e. 10xxxxxx)
@@ -10243,26 +10533,6 @@ static ypObject *bytes_count(
     return yp_None;
 }
 
-static ypObject *bytes_isalnum(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_isalpha(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_isdecimal(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_isdigit(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_isidentifier(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_islower(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_isnumeric(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_isprintable(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_isspace(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_isupper(ypObject *b) { return yp_NotImplementedError; }
-
 static ypObject *_bytes_tailmatch(
         ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
@@ -10293,7 +10563,7 @@ static ypObject *_bytes_tailmatch(
 static ypObject *_bytes_startswith_or_endswith(
         ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
-    // FIXME Also support lists?  Python requires a tuple here...
+    // FIXME FIXME Also support lists?  Python requires a tuple here...
     if (ypObject_TYPE_CODE(x) == ypTuple_CODE) {
         yp_ssize_t i;
         for (i = 0; i < ypTuple_LEN(x); i++) {
@@ -11245,26 +11515,6 @@ static ypObject *str_len(ypObject *s, yp_ssize_t *len)
     return yp_None;
 }
 
-static ypObject *str_isalnum(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_isalpha(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_isdecimal(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_isdigit(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_isidentifier(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_islower(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_isnumeric(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_isprintable(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_isspace(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_isupper(ypObject *s) { return yp_NotImplementedError; }
-
 static ypObject *_str_tailmatch(
         ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
@@ -11973,8 +12223,8 @@ static const ypStringLib_encinfo ypStringLib_encs[4] = {
         }};
 
 // Assume these are most-likely to be run against str/chrarrays, so put that check first
-// TODO Rethink where we split off to a type-specific function, and where we call a generic
-// ypStringLib
+// FIXME Rethink where we split off to a type-specific function, and where we call a generic
+// ypStringLib.
 #define _ypStringLib_REDIRECT1(ob, meth, args)     \
     do {                                           \
         int ob_pair = ypObject_TYPE_PAIR_CODE(ob); \
@@ -11988,25 +12238,106 @@ static const ypStringLib_encinfo ypStringLib_encs[4] = {
     } while (0)
 
 
-ypObject *yp_isalnum(ypObject *s) { _ypStringLib_REDIRECT1(s, isalnum, (s)); }
+ypObject *yp_isalnum(ypObject *s)
+{
+    const int mask = yp_ALNUM_ALPHA | yp_ALNUM_DECIMAL | yp_ALNUM_DIGIT | yp_ALNUM_NUMERIC;
+    int       s_pair = ypObject_TYPE_PAIR_CODE(s);
+    // FIXME Store the chardata pointer in s_enc.
+    if (s_pair == ypStr_CODE) {
+        return _ypStringLib_classify_alnum(s, &yp_chardata_latin_1, mask);
+    } else if (s_pair == ypBytes_CODE) {
+        return _ypStringLib_classify_alnum(s, &yp_chardata_binary, mask);
+    } else {
+        return_yp_METHOD_ERR(s);
+    }
+}
 
-ypObject *yp_isalpha(ypObject *s) { _ypStringLib_REDIRECT1(s, isalpha, (s)); }
+ypObject *yp_isalpha(ypObject *s)
+{
+    const int mask = yp_ALNUM_ALPHA;
+    int       s_pair = ypObject_TYPE_PAIR_CODE(s);
+    if (s_pair == ypStr_CODE) {
+        return _ypStringLib_classify_alnum(s, &yp_chardata_latin_1, mask);
+    } else if (s_pair == ypBytes_CODE) {
+        return _ypStringLib_classify_alnum(s, &yp_chardata_binary, mask);
+    } else {
+        return_yp_METHOD_ERR(s);
+    }
+}
 
-ypObject *yp_isdecimal(ypObject *s) { _ypStringLib_REDIRECT1(s, isdecimal, (s)); }
+ypObject *yp_isascii(ypObject *s)
+{
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return ypStringLib_classify_ascii(s);
+}
 
-ypObject *yp_isdigit(ypObject *s) { _ypStringLib_REDIRECT1(s, isdigit, (s)); }
+ypObject *yp_isdecimal(ypObject *s)
+{
+    const int mask = yp_ALNUM_DECIMAL;
+    int       s_pair = ypObject_TYPE_PAIR_CODE(s);
+    if (s_pair == ypStr_CODE) {
+        return _ypStringLib_classify_alnum(s, &yp_chardata_latin_1, mask);
+    } else if (s_pair == ypBytes_CODE) {
+        return _ypStringLib_classify_alnum(s, &yp_chardata_binary, mask);
+    } else {
+        return_yp_METHOD_ERR(s);
+    }
+}
 
-ypObject *yp_isidentifier(ypObject *s) { _ypStringLib_REDIRECT1(s, isidentifier, (s)); }
+ypObject *yp_isdigit(ypObject *s)
+{
+    const int mask = yp_ALNUM_DECIMAL | yp_ALNUM_DIGIT;
+    int       s_pair = ypObject_TYPE_PAIR_CODE(s);
+    if (s_pair == ypStr_CODE) {
+        return _ypStringLib_classify_alnum(s, &yp_chardata_latin_1, mask);
+    } else if (s_pair == ypBytes_CODE) {
+        return _ypStringLib_classify_alnum(s, &yp_chardata_binary, mask);
+    } else {
+        return_yp_METHOD_ERR(s);
+    }
+}
 
-ypObject *yp_islower(ypObject *s) { _ypStringLib_REDIRECT1(s, islower, (s)); }
+ypObject *yp_isidentifier(ypObject *s) { return yp_NotImplementedError; }
 
-ypObject *yp_isnumeric(ypObject *s) { _ypStringLib_REDIRECT1(s, isnumeric, (s)); }
+ypObject *yp_islower(ypObject *s)
+{
+    int s_pair = ypObject_TYPE_PAIR_CODE(s);
+    if (s_pair == ypStr_CODE) {
+        return _ypStringLib_classify_cased(s, &yp_chardata_latin_1, yp_CASED_LOWER);
+    } else if (s_pair == ypBytes_CODE) {
+        return _ypStringLib_classify_cased(s, &yp_chardata_binary, yp_CASED_LOWER);
+    } else {
+        return_yp_METHOD_ERR(s);
+    }
+}
 
-ypObject *yp_isprintable(ypObject *s) { _ypStringLib_REDIRECT1(s, isprintable, (s)); }
+ypObject *yp_isnumeric(ypObject *s) { return yp_NotImplementedError; }
 
-ypObject *yp_isspace(ypObject *s) { _ypStringLib_REDIRECT1(s, isspace, (s)); }
+ypObject *yp_isprintable(ypObject *s) { return yp_NotImplementedError; }
 
-ypObject *yp_isupper(ypObject *s) { _ypStringLib_REDIRECT1(s, isupper, (s)); }
+ypObject *yp_isspace(ypObject *s)
+{
+    int s_pair = ypObject_TYPE_PAIR_CODE(s);
+    if (s_pair == ypStr_CODE) {
+        return _ypStringLib_classify_space(s, &yp_chardata_latin_1);
+    } else if (s_pair == ypBytes_CODE) {
+        return _ypStringLib_classify_space(s, &yp_chardata_binary);
+    } else {
+        return_yp_METHOD_ERR(s);
+    }
+}
+
+ypObject *yp_isupper(ypObject *s)
+{
+    int s_pair = ypObject_TYPE_PAIR_CODE(s);
+    if (s_pair == ypStr_CODE) {
+        return _ypStringLib_classify_cased(s, &yp_chardata_latin_1, yp_CASED_UPPER);
+    } else if (s_pair == ypBytes_CODE) {
+        return _ypStringLib_classify_cased(s, &yp_chardata_binary, yp_CASED_UPPER);
+    } else {
+        return_yp_METHOD_ERR(s);
+    }
+}
 
 ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
 {
@@ -12098,7 +12429,7 @@ ypObject *yp_join(ypObject *s, ypObject *iterable)
     ypQuickSeq_state          state;
     ypObject                 *result;
 
-    if (!ypStringLib_TYPE_CHECK(s)) return_yp_BAD_TYPE(s);
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
     if (ypStringLib_TYPE_CHECK(iterable)) {
         if (ypObject_TYPE_PAIR_CODE(s) != ypObject_TYPE_PAIR_CODE(iterable)) return yp_TypeError;
         return _ypStringLib_join_fromstring(s, iterable);
@@ -21089,6 +21420,7 @@ static const yp_initialize_parameters_t _default_initialize = {
         yp_mem_default_malloc,                  // yp_malloc
         yp_mem_default_malloc_resize,           // yp_malloc_resize
         yp_mem_default_free,                    // yp_free
+        NULL,                                   // text_character_database FIXME
         FALSE,                                  // everything_immortal
 };
 
