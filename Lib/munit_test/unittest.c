@@ -2782,7 +2782,7 @@ extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
     if (malloc_tracker_oom_fail_alloc()) return NULL;
-    assert_not_null(p = yp_mem_default_malloc(actual, size));
+    assert_not_null(p = yp_mem_default_allocator->malloc(actual, size));
     malloc_tracker_push(p);
     return p;
 }
@@ -2792,14 +2792,14 @@ extern void *malloc_tracker_malloc_resize(
 {
     void *newP;
     if (malloc_tracker_oom_fail_alloc()) return NULL;
-    assert_not_null(newP = yp_mem_default_malloc_resize(actual, p, size, extra));
+    assert_not_null(newP = yp_mem_default_allocator->malloc_resize(actual, p, size, extra));
     if (newP != p) malloc_tracker_push(newP);
     return newP;
 }
 
 extern void malloc_tracker_free(void *p)
 {
-    yp_mem_default_free(p);
+    yp_mem_default_allocator->free(p);
     if (p != NULL) malloc_tracker_pop(p);
 }
 

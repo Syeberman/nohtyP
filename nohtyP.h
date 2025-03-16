@@ -1893,6 +1893,39 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
  * Initialization Parameters
  */
 
+typedef struct _yp_memory_allocator_t {
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_memory_allocator_t)
+
+    // Allocates at least size bytes of memory, setting *actual to the actual amount of memory
+    // allocated, and returning the pointer to the buffer. On error, returns NULL, and *actual is
+    // undefined. This must succeed when size==0; the behaviour is undefined when size<0.
+    // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
+    void *(*malloc)(yp_ssize_t *actual, yp_ssize_t size);
+
+    // Resizes the given buffer in-place if possible, otherwise allocates a new buffer. There are
+    // three possible scenarios:
+    //
+    // - On error, returns NULL, p is not freed, and *actual is undefined
+    // - On successful in-place resize, returns p, and *actual is the amount of memory now allocated
+    //   by p
+    // - Otherwise, returns a pointer to the new buffer, p is not freed, and *actual is the amount
+    //   of memory allocated to the new buffer; nohtyP will then copy the data and call free(p)
+    //
+    // The resized/new buffer will be at least size bytes; extra is a hint as to how much the buffer
+    // should be over-allocated, which may be ignored. This must succeed when size==0 or extra==0;
+    // the behaviour is undefined when size<0 or extra<0.
+    // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
+    // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
+    void *(*malloc_resize)(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
+
+    // Frees memory returned by malloc and malloc_resize. May abort on error.
+    void (*free)(void *p);
+
+} yp_memory_allocator_t;
+
+// The default memory allocation APIs, exposed to allow them to be called by custom hooks.
+ypAPI const yp_memory_allocator_t *const yp_mem_default_allocator;
+
 // Bit flags used in yp_character_database_t.
 #define yp_ALNUM_ALPHA (1 << 0)
 #define yp_ALNUM_DECIMAL (1 << 1)
@@ -1906,7 +1939,6 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
 // support to text strings.
 // XXX Offsets will not change between versions: members from this struct will never be deleted,
 // only deprecated.
-// FIXME Do something similar with malloc.
 typedef struct _yp_character_database_t {
     yp_ssize_t sizeof_struct;  // Set to sizeof(yp_character_database_t)
 
@@ -1942,8 +1974,6 @@ typedef struct _yp_character_database_t {
     // Similar to tolower, except converts to uppercase.
     yp_ssize_t (*toupper)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
 
-    // Returns the numeric value as a double if c is numeric, and -1.0 if it's not.
-    // FIXME double (*tonumeric)(yp_uint32_t c);
 } yp_character_database_t;
 
 // yp_initialize accepts a number of parameters to customize nohtyP behaviour.
@@ -1952,40 +1982,15 @@ typedef struct _yp_character_database_t {
 typedef struct _yp_initialize_parameters_t {
     yp_ssize_t sizeof_struct;  // Set to sizeof(yp_initialize_parameters_t)
 
-    // yp_malloc, yp_malloc_resize, and yp_free allow you to specify a custom memory allocation API.
-    // It is recommended to set these to NULL to use nohtyP's defaults. Any functions you supply
-    // should behave exactly as documented, and you are encouraged to run the full suite of tests
-    // with your API. (See yp_mem_default_malloc et al in nohtyP.c for examples.)
+    // Configures a custom memory allocator. Set to NULL to use nohtyP's defaults. Any functions you
+    // supply should behave exactly as documented, and you are encouraged to run the full suite of
+    // tests with your API. (See yp_mem_default_malloc et al in nohtyP.c for examples.)
+    const yp_memory_allocator_t *allocator;
 
-    // Allocates at least size bytes of memory, setting *actual to the actual amount of memory
-    // allocated, and returning the pointer to the buffer. On error, returns NULL, and *actual is
-    // undefined. This must succeed when size==0; the behaviour is undefined when size<0.
-    // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
-    void *(*yp_malloc)(yp_ssize_t *actual, yp_ssize_t size);
-
-    // Resizes the given buffer in-place if possible, otherwise allocates a new buffer. There are
-    // three possible scenarios:
-    //
-    // - On error, returns NULL, p is not freed, and *actual is undefined
-    // - On successful in-place resize, returns p, and *actual is the amount of memory now allocated
-    //   by p
-    // - Otherwise, returns a pointer to the new buffer, p is not freed, and *actual is the amount
-    //   of memory allocated to the new buffer; nohtyP will then copy the data and call yp_free(p)
-    //
-    // The resized/new buffer will be at least size bytes; extra is a hint as to how much the buffer
-    // should be over-allocated, which may be ignored. This must succeed when size==0 or extra==0;
-    // the behaviour is undefined when size<0 or extra<0.
-    // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
-    // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
-    void *(*yp_malloc_resize)(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
-
-    // Frees memory returned by yp_malloc and yp_malloc_resize. May abort on error.
-    void (*yp_free)(void *p);
-
-    // Configures an external character database for text strings (str/chrarray). nohtyP has
-    // built-in support for all latin-1 characters; to enable full Unicode support, an external
-    // character database is required.
-    yp_character_database_t *text_character_database;
+    // Configures an external character database for text strings (str/chrarray). Set to NULL to use
+    // nohtyP's defaults, which supports only the latin-1 characters. To enable full Unicode
+    // support, an external character database is required.
+    const yp_character_database_t *text_character_database;
 
     // Setting everything_immortal to true forces all allocated objects to be immortal, effectively
     // disabling yp_incref and yp_decref. When false, the default and recommended option, objects
@@ -1993,15 +1998,10 @@ typedef struct _yp_initialize_parameters_t {
     // considerable amounts of memory, but if the number of objects allocated by your program is
     // bounded you may notice a small performance improvement.
     // XXX Use this option carefully, and profile to ensure it actually provides a benefit!
+    // FIXME Remove.
     int everything_immortal;
 
 } yp_initialize_parameters_t;
-
-// The default memory allocation APIs, exposed to allow them to be called by custom hooks.
-ypAPI void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
-ypAPI void *yp_mem_default_malloc_resize(
-        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
-ypAPI void yp_mem_default_free(void *p);
 
 
 /*

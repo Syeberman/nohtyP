@@ -800,11 +800,17 @@ static ypObject *Immutable_freezefunc(ypObject *x)
 #define yp_IS_EXCEPTION_C(x) (ypObject_TYPE_PAIR_CODE(x) == ypBaseException_CODE)
 int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 
-// sizeof and offsetof as yp_ssize_t, and sizeof a structure member
-// FIXME Does casting to signed hide errors? Would the compiler warn about too-large sizes?
+// sizeof and offsetof as yp_ssize_t.
 #define yp_sizeof(x) ((yp_ssize_t)sizeof(x))
 #define yp_offsetof(structType, member) ((yp_ssize_t)offsetof(structType, member))
+
+// Size of a member of a structure.
 #define yp_sizeof_member(structType, member) yp_sizeof(((structType *)0)->member)
+
+// The offset of the end of a member of a structure. Used to ensure that a chunk of memory
+// completely contains the given member.
+#define yp_offsetof_end(structType, member) \
+    (yp_offsetof(structType, member) + yp_sizeof_member(structType, member))
 
 // Length of an array. Only call for arrays of fixed size that haven't been coerced to pointers.
 #define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof((x)[0]))
@@ -1770,7 +1776,7 @@ static yp_ssize_t yp_chardata_binary_toupper(yp_uint32_t c, yp_ssize_t len, yp_u
 
 // The binary character database applies to all single-byte characters, but only applies meaning
 // to the ascii characters.
-static yp_character_database_t yp_chardata_binary = {
+static const yp_character_database_t yp_chardata_binary = {
         yp_sizeof(yp_character_database_t),  // sizeof_struct
         ypStringLib_MAX_LATIN_1,             // max_char
         yp_chardata_binary_isalnum,          // isalnum
@@ -1890,7 +1896,7 @@ static yp_ssize_t yp_chardata_latin_1_toupper(yp_uint32_t c, yp_ssize_t len, yp_
     }
 }
 
-static yp_character_database_t yp_chardata_latin_1 = {
+static const yp_character_database_t yp_chardata_latin_1 = {
         yp_sizeof(yp_character_database_t),  // sizeof_struct
         ypStringLib_MAX_LATIN_1,             // max_char
         yp_chardata_latin_1_isalnum,         // isalnum
@@ -1947,7 +1953,7 @@ static void (*yp_free)(void *p) = _dummy_yp_free;
 #include <malloc.h>
 // TODO Be consistent: should output pointers come first, or last, in all the functions? (What
 // is our nohtyP style guide for function signatures?)
-void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
+static void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -1959,7 +1965,8 @@ void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_DEBUG("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
-void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
+static void *yp_mem_default_malloc_resize(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newp;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -1978,7 +1985,7 @@ void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size,
     yp_DEBUG("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
-void yp_mem_default_free(void *p)
+static void yp_mem_default_free(void *p)
 {
     yp_DEBUG("free: %p", p);
     free(p);
@@ -1999,7 +2006,7 @@ static yp_ssize_t _default_yp_malloc_good_size(yp_ssize_t size)
     if (diff > 0) size += _yp_DEFAULT_MALLOC_ROUNDTO - diff;
     return size;
 }
-void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
+static void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -2009,7 +2016,8 @@ void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_DEBUG("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
-void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
+static void *yp_mem_default_malloc_resize(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newp;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -2022,7 +2030,7 @@ void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size,
     yp_DEBUG("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
-void yp_mem_default_free(void *p)
+static void yp_mem_default_free(void *p)
 {
     yp_DEBUG("free: %p", p);
     free(p);
@@ -6984,7 +6992,8 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, yp
 //      - ob_len < ob_alloclen <= ypStringLib_ALLOCLEN_MAX (except for immortals where alloclen<0)
 
 #define ypStringLib_ENC_CODE(s) (((ypObject *)(s))->ob_type_flags)
-#define ypStringLib_ENC(s) (&(ypStringLib_encs[ypStringLib_ENC_CODE(s)]))
+#define ypStringLib_ENC_FROM_CODE(code) ((const ypStringLib_encinfo *)&(ypStringLib_encs[code]))
+#define ypStringLib_ENC(s) (ypStringLib_ENC_FROM_CODE(ypStringLib_ENC_CODE(s)))
 #define ypStringLib_DATA(s) (((ypObject *)s)->ob_data)
 #define ypStringLib_LEN ypObject_LEN
 #define ypStringLib_SET_LEN ypObject_SET_LEN
@@ -7075,23 +7084,24 @@ typedef void (*ypStringLib_setindexXfunc)(void *dest, yp_ssize_t dest_i, yp_uint
 // vice-versa.
 // XXX max_char may be larger than ypStringLib_MAX_UNICODE
 typedef struct {
-    yp_uint8_t                code;       // The ypStringLib_ENC_CODE_* value of the encoding
-    yp_uint8_t                sizeshift;  // len<<sizeshift gives the size in bytes
-    yp_ssize_t                elemsize;   // The size (in bytes) of one character
-    yp_uint32_t               max_char;   // Largest character value that encoding can store
-    ypObject                 *name;       // Immortal str of the encoding name (ie yp_s_latin_1)
-    ypStringLib_getindexXfunc getindexX;  // Gets the ordinal at src[src_i]
-    ypStringLib_setindexXfunc setindexX;  // Sets dest[dest_i] to value
+    yp_uint8_t                     code;       // The ypStringLib_ENC_CODE_* value of the encoding
+    yp_uint8_t                     sizeshift;  // len<<sizeshift gives the size in bytes
+    yp_ssize_t                     elemsize;   // The size (in bytes) of one character
+    yp_uint32_t                    max_char;   // Largest character value that encoding can store
+    ypObject                      *name;  // Immortal str of the encoding name (ie yp_s_latin_1)
+    ypStringLib_getindexXfunc      getindexX;  // Gets the ordinal at src[src_i]
+    ypStringLib_setindexXfunc      setindexX;  // Sets dest[dest_i] to value
+    const yp_character_database_t *chardata;   // Character classifiers and converters
 } ypStringLib_encinfo;
-static const ypStringLib_encinfo        ypStringLib_encs[4];
+static ypStringLib_encinfo              ypStringLib_encs[4];
 static const ypStringLib_encinfo *const ypStringLib_enc_bytes =
-        &(ypStringLib_encs[ypStringLib_ENC_CODE_BYTES]);
+        ypStringLib_ENC_FROM_CODE(ypStringLib_ENC_CODE_BYTES);
 static const ypStringLib_encinfo *const ypStringLib_enc_latin_1 =
-        &(ypStringLib_encs[ypStringLib_ENC_CODE_LATIN_1]);
+        ypStringLib_ENC_FROM_CODE(ypStringLib_ENC_CODE_LATIN_1);
 static const ypStringLib_encinfo *const ypStringLib_enc_ucs_2 =
-        &(ypStringLib_encs[ypStringLib_ENC_CODE_UCS_2]);
+        ypStringLib_ENC_FROM_CODE(ypStringLib_ENC_CODE_UCS_2);
 static const ypStringLib_encinfo *const ypStringLib_enc_ucs_4 =
-        &(ypStringLib_encs[ypStringLib_ENC_CODE_UCS_4]);
+        ypStringLib_ENC_FROM_CODE(ypStringLib_ENC_CODE_UCS_4);
 
 
 // Getters, setters, and copiers for our three internal encodings
@@ -7995,7 +8005,7 @@ static ypObject *ypStringLib_concat_fromstring(ypObject *s, ypObject *x)
     newS_len = ypStringLib_LEN(s) + ypStringLib_LEN(x);
     // TODO Some places take the max code, some places look explicitly at elemsize. Be consistent!
     newS_enc_code = MAX(ypStringLib_ENC_CODE(s), ypStringLib_ENC_CODE(x));
-    newS_enc = &(ypStringLib_encs[newS_enc_code]);
+    newS_enc = ypStringLib_ENC_FROM_CODE(newS_enc_code);
     newS = _ypStringLib_new(ypObject_TYPE_CODE(s), newS_len, /*alloclen_fixed=*/TRUE, newS_enc);
     if (yp_isexceptionC(newS)) return newS;
 
@@ -8527,13 +8537,13 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
     return yp_None;
 }
 
-static ypObject *_ypStringLib_classify_alnum(
-        ypObject *s, yp_character_database_t *chardata, yp_uint8_t mask)
+static ypObject *ypStringLib_isalnum(ypObject *s, yp_uint8_t mask)
 {
-    void                      *s_data = ypStringLib_DATA(s);
-    yp_ssize_t                 s_len = ypStringLib_LEN(s);
-    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
-    yp_ssize_t                 i;
+    void                          *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                     s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo     *s_enc = ypStringLib_ENC(s);
+    const yp_character_database_t *chardata = s_enc->chardata;
+    yp_ssize_t                     i;
 
     if (s_len < 1) return yp_False;
 
@@ -8545,14 +8555,14 @@ static ypObject *_ypStringLib_classify_alnum(
     return yp_True;
 }
 
-static ypObject *_ypStringLib_classify_cased(
-        ypObject *s, yp_character_database_t *chardata, yp_uint8_t mask)
+static ypObject *_ypStringLib_iscased(ypObject *s, yp_uint8_t mask)
 {
-    void                      *s_data = ypStringLib_DATA(s);
-    yp_ssize_t                 s_len = ypStringLib_LEN(s);
-    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
-    int                        has_cased_char = FALSE;
-    yp_ssize_t                 i;
+    void                          *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                     s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo     *s_enc = ypStringLib_ENC(s);
+    const yp_character_database_t *chardata = s_enc->chardata;
+    int                            has_cased_char = FALSE;
+    yp_ssize_t                     i;
 
     if (s_len < 1) return yp_False;
 
@@ -8570,12 +8580,13 @@ static ypObject *_ypStringLib_classify_cased(
     return ypBool_FROM_C(has_cased_char);
 }
 
-static ypObject *_ypStringLib_classify_space(ypObject *s, yp_character_database_t *chardata)
+static ypObject *ypStringLib_isspace(ypObject *s)
 {
-    void                      *s_data = ypStringLib_DATA(s);
-    yp_ssize_t                 s_len = ypStringLib_LEN(s);
-    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
-    yp_ssize_t                 i;
+    void                          *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                     s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo     *s_enc = ypStringLib_ENC(s);
+    const yp_character_database_t *chardata = s_enc->chardata;
+    yp_ssize_t                     i;
 
     if (s_len < 1) return yp_False;
 
@@ -8619,7 +8630,7 @@ static ypObject *_ypStringLib_join_fromstring(ypObject *s, ypObject *x)
     result_enc_code = MAX(ypStringLib_ENC_CODE(s), ypStringLib_ENC_CODE(x));
 
     // Now we can create the result object...
-    result_enc = &(ypStringLib_encs[result_enc_code]);
+    result_enc = ypStringLib_ENC_FROM_CODE(result_enc_code);
     result = _ypStringLib_new(
             ypObject_TYPE_CODE(s), result_len, /*alloclen_fixed=*/TRUE, result_enc);
     if (yp_isexceptionC(result)) return result;
@@ -8741,7 +8752,7 @@ static ypObject *ypStringLib_join(
     if (result_len < 1) return ypStringLib_new_empty(ypObject_TYPE_CODE(s));
 
     // Now we can create the result object and populate it
-    result_enc = &(ypStringLib_encs[result_enc_code]);
+    result_enc = ypStringLib_ENC_FROM_CODE(result_enc_code);
     result = _ypStringLib_new(
             ypObject_TYPE_CODE(s), result_len, /*alloclen_fixed=*/TRUE, result_enc);
     if (yp_isexceptionC(result)) return result;
@@ -8965,7 +8976,7 @@ final_loop:
     return p - start;
 }
 
-static ypObject *ypStringLib_classify_ascii(ypObject *s)
+static ypObject *ypStringLib_isascii(ypObject *s)
 {
     void                      *s_data = ypStringLib_DATA(s);
     yp_ssize_t                 s_len = ypStringLib_LEN(s);
@@ -12183,7 +12194,7 @@ ypObject *yp_chrC(yp_int_t i) { return _yp_chrC(ypStr_CODE, i); }
 // methods, they are left out of the type's method table. This may change in the future.
 // TODO Since "this may change in the future", perhaps we should raise yp_MethodError instead.
 
-static const ypStringLib_encinfo ypStringLib_encs[4] = {
+static ypStringLib_encinfo ypStringLib_encs[4] = {
         // Indices are encoding codes; elements are constants and methods to work with encoding.
         {
                 ypStringLib_ENC_CODE_BYTES,   // code
@@ -12192,7 +12203,8 @@ static const ypStringLib_encinfo ypStringLib_encs[4] = {
                 0xFFu,                        // max_char
                 NULL,                         // name
                 ypStringLib_getindexX_1byte,  // getindexX
-                ypStringLib_setindexX_1byte   // setindexX
+                ypStringLib_setindexX_1byte,  // setindexX
+                &yp_chardata_binary,          // chardata
         },
         {
                 ypStringLib_ENC_CODE_LATIN_1,  // code
@@ -12201,7 +12213,8 @@ static const ypStringLib_encinfo ypStringLib_encs[4] = {
                 0xFFu,                         // max_char
                 yp_CONST_REF(yp_s_latin_1),    // name
                 ypStringLib_getindexX_1byte,   // getindexX
-                ypStringLib_setindexX_1byte    // setindexX
+                ypStringLib_setindexX_1byte,   // setindexX
+                &yp_chardata_latin_1,          // chardata (overwritten during init)
         },
         {
                 ypStringLib_ENC_CODE_UCS_2,    // code
@@ -12210,7 +12223,8 @@ static const ypStringLib_encinfo ypStringLib_encs[4] = {
                 0xFFFFu,                       // max_char
                 yp_CONST_REF(yp_s_ucs_2),      // name
                 ypStringLib_getindexX_2bytes,  // getindexX
-                ypStringLib_setindexX_2bytes   // setindexX
+                ypStringLib_setindexX_2bytes,  // setindexX
+                &yp_chardata_latin_1,          // chardata (overwritten during init)
         },
         {
                 ypStringLib_ENC_CODE_UCS_4,    // code
@@ -12219,7 +12233,8 @@ static const ypStringLib_encinfo ypStringLib_encs[4] = {
                 0xFFFFFFFFu,                   // max_char
                 yp_CONST_REF(yp_s_ucs_4),      // name
                 ypStringLib_getindexX_4bytes,  // getindexX
-                ypStringLib_setindexX_4bytes   // setindexX
+                ypStringLib_setindexX_4bytes,  // setindexX
+                &yp_chardata_latin_1,          // chardata (overwritten during init)
         }};
 
 // Assume these are most-likely to be run against str/chrarrays, so put that check first
@@ -12240,103 +12255,61 @@ static const ypStringLib_encinfo ypStringLib_encs[4] = {
 
 ypObject *yp_isalnum(ypObject *s)
 {
-    const int mask = yp_ALNUM_ALPHA | yp_ALNUM_DECIMAL | yp_ALNUM_DIGIT | yp_ALNUM_NUMERIC;
-    int       s_pair = ypObject_TYPE_PAIR_CODE(s);
-    // FIXME Store the chardata pointer in s_enc.
-    if (s_pair == ypStr_CODE) {
-        return _ypStringLib_classify_alnum(s, &yp_chardata_latin_1, mask);
-    } else if (s_pair == ypBytes_CODE) {
-        return _ypStringLib_classify_alnum(s, &yp_chardata_binary, mask);
-    } else {
-        return_yp_METHOD_ERR(s);
-    }
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return ypStringLib_isalnum(
+            s, yp_ALNUM_ALPHA | yp_ALNUM_DECIMAL | yp_ALNUM_DIGIT | yp_ALNUM_NUMERIC);
 }
 
 ypObject *yp_isalpha(ypObject *s)
 {
-    const int mask = yp_ALNUM_ALPHA;
-    int       s_pair = ypObject_TYPE_PAIR_CODE(s);
-    if (s_pair == ypStr_CODE) {
-        return _ypStringLib_classify_alnum(s, &yp_chardata_latin_1, mask);
-    } else if (s_pair == ypBytes_CODE) {
-        return _ypStringLib_classify_alnum(s, &yp_chardata_binary, mask);
-    } else {
-        return_yp_METHOD_ERR(s);
-    }
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return ypStringLib_isalnum(s, yp_ALNUM_ALPHA);
 }
 
 ypObject *yp_isascii(ypObject *s)
 {
     if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
-    return ypStringLib_classify_ascii(s);
+    return ypStringLib_isascii(s);
 }
 
 ypObject *yp_isdecimal(ypObject *s)
 {
-    const int mask = yp_ALNUM_DECIMAL;
-    int       s_pair = ypObject_TYPE_PAIR_CODE(s);
-    if (s_pair == ypStr_CODE) {
-        return _ypStringLib_classify_alnum(s, &yp_chardata_latin_1, mask);
-    } else if (s_pair == ypBytes_CODE) {
-        return _ypStringLib_classify_alnum(s, &yp_chardata_binary, mask);
-    } else {
-        return_yp_METHOD_ERR(s);
-    }
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return ypStringLib_isalnum(s, yp_ALNUM_DECIMAL);
 }
 
 ypObject *yp_isdigit(ypObject *s)
 {
-    const int mask = yp_ALNUM_DECIMAL | yp_ALNUM_DIGIT;
-    int       s_pair = ypObject_TYPE_PAIR_CODE(s);
-    if (s_pair == ypStr_CODE) {
-        return _ypStringLib_classify_alnum(s, &yp_chardata_latin_1, mask);
-    } else if (s_pair == ypBytes_CODE) {
-        return _ypStringLib_classify_alnum(s, &yp_chardata_binary, mask);
-    } else {
-        return_yp_METHOD_ERR(s);
-    }
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return ypStringLib_isalnum(s, yp_ALNUM_DECIMAL | yp_ALNUM_DIGIT);
 }
 
 ypObject *yp_isidentifier(ypObject *s) { return yp_NotImplementedError; }
 
 ypObject *yp_islower(ypObject *s)
 {
-    int s_pair = ypObject_TYPE_PAIR_CODE(s);
-    if (s_pair == ypStr_CODE) {
-        return _ypStringLib_classify_cased(s, &yp_chardata_latin_1, yp_CASED_LOWER);
-    } else if (s_pair == ypBytes_CODE) {
-        return _ypStringLib_classify_cased(s, &yp_chardata_binary, yp_CASED_LOWER);
-    } else {
-        return_yp_METHOD_ERR(s);
-    }
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return _ypStringLib_iscased(s, yp_CASED_LOWER);
 }
 
-ypObject *yp_isnumeric(ypObject *s) { return yp_NotImplementedError; }
+ypObject *yp_isnumeric(ypObject *s)
+{
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return ypStringLib_isalnum(s, yp_ALNUM_DECIMAL | yp_ALNUM_DIGIT | yp_ALNUM_NUMERIC);
+}
 
 ypObject *yp_isprintable(ypObject *s) { return yp_NotImplementedError; }
 
 ypObject *yp_isspace(ypObject *s)
 {
-    int s_pair = ypObject_TYPE_PAIR_CODE(s);
-    if (s_pair == ypStr_CODE) {
-        return _ypStringLib_classify_space(s, &yp_chardata_latin_1);
-    } else if (s_pair == ypBytes_CODE) {
-        return _ypStringLib_classify_space(s, &yp_chardata_binary);
-    } else {
-        return_yp_METHOD_ERR(s);
-    }
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return ypStringLib_isspace(s);
 }
 
 ypObject *yp_isupper(ypObject *s)
 {
-    int s_pair = ypObject_TYPE_PAIR_CODE(s);
-    if (s_pair == ypStr_CODE) {
-        return _ypStringLib_classify_cased(s, &yp_chardata_latin_1, yp_CASED_UPPER);
-    } else if (s_pair == ypBytes_CODE) {
-        return _ypStringLib_classify_cased(s, &yp_chardata_binary, yp_CASED_UPPER);
-    } else {
-        return_yp_METHOD_ERR(s);
-    }
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return _ypStringLib_iscased(s, yp_CASED_UPPER);
 }
 
 ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
@@ -21414,48 +21387,59 @@ ypObject *const yp_t_function = (ypObject *)&ypFunction_Type;
  *************************************************************************************************/
 #pragma region initialization
 
+static const yp_memory_allocator_t init_alloc_defaults = {
+        yp_sizeof(yp_memory_allocator_t),  // sizeof_struct
+        yp_mem_default_malloc,          // yp_malloc
+        yp_mem_default_malloc_resize,   // yp_malloc_resize
+        yp_mem_default_free,            // yp_free
+};
+
+// The default memory allocation APIs, exposed to allow them to be called by custom hooks.
+const yp_memory_allocator_t *const yp_mem_default_allocator = &init_alloc_defaults;
+
 // TODO A script to ensure the comments on the line match the structure member
-static const yp_initialize_parameters_t _default_initialize = {
+static const yp_initialize_parameters_t init_defaults = {
         yp_sizeof(yp_initialize_parameters_t),  // sizeof_struct
-        yp_mem_default_malloc,                  // yp_malloc
-        yp_mem_default_malloc_resize,           // yp_malloc_resize
-        yp_mem_default_free,                    // yp_free
-        NULL,                                   // text_character_database FIXME
+        &init_alloc_defaults,                   // allocator
+        &yp_chardata_latin_1,                   // text_character_database
         FALSE,                                  // everything_immortal
 };
 
 // Helpful macro, for use only by yp_initialize and friends, to retrieve an argument from args.
 // Returns the default value if args is too small to hold the argument, or if the expression
 // "args->key default_cond" (ie "args->yp_malloc ==NULL") evaluates to true.
+#define _yp_INIT_ARG_END(args, key) \
+    (((yp_uint8_t *)&((args)->key)) - ((yp_uint8_t *)(args)) + yp_sizeof((args)->key))
 // clang-format off
-#define _yp_INIT_ARG_END(key) \
-    (yp_offsetof(yp_initialize_parameters_t, key) + yp_sizeof_member(yp_initialize_parameters_t, key))
-#define yp_INIT_ARG2(key, default_cond) \
-    ( args->sizeof_struct < _yp_INIT_ARG_END(key) ? \
-        _default_initialize.key : \
-      args->key default_cond ? \
-        _default_initialize.key : \
+#define yp_INIT_ARG(args,  defaults, key, default_cond) \
+    ( (args)->sizeof_struct < _yp_INIT_ARG_END(args, key) ? \
+        (defaults).key : \
+      (args)->key default_cond ? \
+        (defaults).key : \
       /* else */ \
-        args->key \
-    )
-#define yp_INIT_ARG1(key) \
-    ( args->sizeof_struct < _yp_INIT_ARG_END(key) ? \
-        _default_initialize.key : \
-      /* else */ \
-        args->key \
+        (args)->key \
     )
 // clang-format on
 
 // Called *exactly* *once* by yp_initialize to set up memory management. Further, setting
 // yp_malloc here helps ensure that yp_initialize is called before anything else in the library
 // (because otherwise all mallocs result in yp_MemoryError).
-static void _ypMem_initialize(const yp_initialize_parameters_t *args)
+static void ypMem_initialize(const yp_initialize_parameters_t *args)
 {
-    yp_malloc = yp_INIT_ARG2(yp_malloc, == NULL);
-    yp_malloc_resize = yp_INIT_ARG2(yp_malloc_resize, == NULL);
-    yp_free = yp_INIT_ARG2(yp_free, == NULL);
+    const yp_memory_allocator_t *args_allocator = yp_INIT_ARG(args, init_defaults, allocator, == NULL);
 
-    if (yp_INIT_ARG1(everything_immortal)) {
+    // We require all allocator methods to be set.
+    if (args_allocator->sizeof_struct < yp_sizeof(yp_memory_allocator_t)) {
+        yp_FATAL("yp_memory_allocator_t.sizeof_struct (%" PRIssize ") smaller than minimum (%" PRIssize
+                 ")",
+                args_allocator->sizeof_struct, yp_sizeof(yp_memory_allocator_t));
+    }
+
+    yp_malloc = args_allocator->malloc;
+    yp_malloc_resize = args_allocator->malloc_resize;
+    yp_free = args_allocator->free;
+
+    if (yp_INIT_ARG(args, init_defaults, everything_immortal, == 0)) {
         // All objects will be created immortal
         _ypMem_starting_refcnt = ypObject_REFCNT_IMMORTAL;
     } else {
@@ -21476,9 +21460,40 @@ static void _ypMem_initialize(const yp_initialize_parameters_t *args)
     // fraction of this.)
 }
 
+static void ypStringLib_initialize(const yp_initialize_parameters_t *args)
+{
+    static yp_character_database_t chardata = {0};  // Storage for our copy of the db.
+    const yp_character_database_t *args_chardata =
+            yp_INIT_ARG(args, init_defaults, text_character_database, == NULL);
+
+    // We require all character database methods to be set.
+    if (args_chardata->sizeof_struct < yp_sizeof(yp_character_database_t)) {
+        yp_FATAL("yp_character_database_t.sizeof_struct (%" PRIssize
+                 ") smaller than minimum (%" PRIssize ")",
+                args_chardata->sizeof_struct, yp_sizeof(yp_character_database_t));
+    }
+
+    chardata.max_char = args_chardata->max_char;
+    chardata.isalnum = args_chardata->isalnum;
+    chardata.iscased = args_chardata->iscased;
+    chardata.isprintable = args_chardata->isprintable;
+    chardata.isspace = args_chardata->isspace;
+    chardata.islinebreak = args_chardata->islinebreak;
+    chardata.tolower = args_chardata->tolower;
+    chardata.totitle = args_chardata->totitle;
+    chardata.toupper = args_chardata->toupper;
+
+    yp_ASSERT1(ypStringLib_encs[1].code == ypStringLib_ENC_CODE_LATIN_1);
+    ypStringLib_encs[1].chardata = &chardata;
+    yp_ASSERT1(ypStringLib_encs[2].code == ypStringLib_ENC_CODE_UCS_2);
+    ypStringLib_encs[2].chardata = &chardata;
+    yp_ASSERT1(ypStringLib_encs[3].code == ypStringLib_ENC_CODE_UCS_4);
+    ypStringLib_encs[3].chardata = &chardata;
+}
+
 // Called *exactly* *once* by yp_initialize to set up the codecs module. Errors are largely
 // ignored: calling code will fail gracefully later on.
-static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
+static void yp_codecs_initialize(const yp_initialize_parameters_t *args)
 {
     ypObject *exc = yp_None;
 
@@ -21553,16 +21568,17 @@ static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
 
 void yp_initialize(const yp_initialize_parameters_t *args)
 {
-    static int initialized = FALSE;
+    static int       initialized = FALSE;
+    const yp_ssize_t min_size = yp_offsetof_end(yp_initialize_parameters_t, everything_immortal);
 
     // Ensure sizeof_struct was initialized appropriately: the earliest version of this struct
     // contained everything_immortal, so sizeof_struct should be at least that size.
     // TODO Change everything_immortal to a field of bit flags: no sense wasting 32/64 bits on
     // a single boolean!
-    if (args != NULL && args->sizeof_struct < _yp_INIT_ARG_END(everything_immortal)) {
+    if (args != NULL && args->sizeof_struct < min_size) {
         yp_FATAL("yp_initialize_parameters_t.sizeof_struct (%" PRIssize
                  ") smaller than minimum (%" PRIssize ")",
-                args->sizeof_struct, _yp_INIT_ARG_END(everything_immortal));
+                args->sizeof_struct, min_size);
     }
 
     // yp_initialize can only be called once
@@ -21573,11 +21589,12 @@ void yp_initialize(const yp_initialize_parameters_t *args)
     initialized = TRUE;
 
     // The caller can pass NULL if it just wants the defaults
-    if (args == NULL) args = &_default_initialize;
+    if (args == NULL) args = &init_defaults;
 
     // Now initialize the modules one-by-one
-    _ypMem_initialize(args);
-    _yp_codecs_initialize(args);
+    ypMem_initialize(args);
+    ypStringLib_initialize(args);
+    yp_codecs_initialize(args);
 }
 
 #pragma endregion initialization
