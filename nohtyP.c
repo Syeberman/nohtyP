@@ -1463,31 +1463,17 @@ ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
  *************************************************************************************************/
 #pragma region character_databases
 
+// FIXME Perhaps combine some flags that are always together in latin-1
+#define _yp_CDF_LOWER (1u << 0)
+#define _yp_CDF_UPPER (1u << 1)
+#define _yp_CDF_DECIMAL (1u << 2)
+#define _yp_CDF_DIGIT (1u << 3)
+#define _yp_CDF_NUMERIC (1u << 4)
+#define _yp_CDF_PRINTABLE (1u << 5)
+
 // clang-format off
 
-#define _yp_CTF_LOWER  0x01
-#define _yp_CTF_UPPER  0x02
-#define _yp_CTF_ALPHA  (_yp_CTF_LOWER|_yp_CTF_UPPER)
-#define _yp_CTF_DIGIT  0x04
-#define _yp_CTF_ALNUM  (_yp_CTF_ALPHA|_yp_CTF_DIGIT)
-#define _yp_CTF_SPACE  0x08
-#define _yp_CTF_XDIGIT 0x10
-
-// Unlike their C counterparts, the following macros are meant only for yp_uint8_t values.
-#define yp_ISLOWER(c)  (_yp_ctype_table[c] & _yp_CTF_LOWER)
-#define yp_ISUPPER(c)  (_yp_ctype_table[c] & _yp_CTF_UPPER)
-#define yp_ISALPHA(c)  (_yp_ctype_table[c] & _yp_CTF_ALPHA)
-#define yp_ISDIGIT(c)  (_yp_ctype_table[c] & _yp_CTF_DIGIT)
-#define yp_ISXDIGIT(c) (_yp_ctype_table[c] & _yp_CTF_XDIGIT)
-#define yp_ISALNUM(c)  (_yp_ctype_table[c] & _yp_CTF_ALNUM)
-#define yp_ISSPACE(c)  (_yp_ctype_table[c] & _yp_CTF_SPACE)
-
-#define yp_TOLOWER(c) (_yp_ctype_tolower[c])
-#define yp_TOUPPER(c) (_yp_ctype_toupper[c])
-
-// XXX Adapted from Python's pyctype.c and pyctype.h
-// TODO In Python, this is a table of unsigned ints, which is unnecessarily large; contribute a fix
-const yp_uint8_t _yp_ctype_table[256] = {
+const yp_uint8_t _yp_chardata_table[256] = {
     0, // 0x0 '\x00'
     0, // 0x1 '\x01'
     0, // 0x2 '\x02'
@@ -1497,11 +1483,11 @@ const yp_uint8_t _yp_ctype_table[256] = {
     0, // 0x6 '\x06'
     0, // 0x7 '\x07'
     0, // 0x8 '\x08'
-    _yp_CTF_SPACE, // 0x9 '\t'
-    _yp_CTF_SPACE, // 0xa '\n'
-    _yp_CTF_SPACE, // 0xb '\v'
-    _yp_CTF_SPACE, // 0xc '\f'
-    _yp_CTF_SPACE, // 0xd '\r'
+    0, // 0x9 '\t'
+    0, // 0xa '\n'
+    0, // 0xb '\x0b'
+    0, // 0xc '\x0c'
+    0, // 0xd '\r'
     0, // 0xe '\x0e'
     0, // 0xf '\x0f'
     0, // 0x10 '\x10'
@@ -1520,114 +1506,234 @@ const yp_uint8_t _yp_ctype_table[256] = {
     0, // 0x1d '\x1d'
     0, // 0x1e '\x1e'
     0, // 0x1f '\x1f'
-    _yp_CTF_SPACE, // 0x20 ' '
-    0, // 0x21 '!'
-    0, // 0x22 '"'
-    0, // 0x23 '#'
-    0, // 0x24 '$'
-    0, // 0x25 '%'
-    0, // 0x26 '&'
-    0, // 0x27 "'"
-    0, // 0x28 '('
-    0, // 0x29 ')'
-    0, // 0x2a '*'
-    0, // 0x2b '+'
-    0, // 0x2c ','
-    0, // 0x2d '-'
-    0, // 0x2e '.'
-    0, // 0x2f '/'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x30 '0'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x31 '1'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x32 '2'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x33 '3'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x34 '4'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x35 '5'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x36 '6'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x37 '7'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x38 '8'
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x39 '9'
-    0, // 0x3a ':'
-    0, // 0x3b ';'
-    0, // 0x3c '<'
-    0, // 0x3d '='
-    0, // 0x3e '>'
-    0, // 0x3f '?'
-    0, // 0x40 '@'
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x41 'A'
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x42 'B'
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x43 'C'
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x44 'D'
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x45 'E'
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x46 'F'
-    _yp_CTF_UPPER, // 0x47 'G'
-    _yp_CTF_UPPER, // 0x48 'H'
-    _yp_CTF_UPPER, // 0x49 'I'
-    _yp_CTF_UPPER, // 0x4a 'J'
-    _yp_CTF_UPPER, // 0x4b 'K'
-    _yp_CTF_UPPER, // 0x4c 'L'
-    _yp_CTF_UPPER, // 0x4d 'M'
-    _yp_CTF_UPPER, // 0x4e 'N'
-    _yp_CTF_UPPER, // 0x4f 'O'
-    _yp_CTF_UPPER, // 0x50 'P'
-    _yp_CTF_UPPER, // 0x51 'Q'
-    _yp_CTF_UPPER, // 0x52 'R'
-    _yp_CTF_UPPER, // 0x53 'S'
-    _yp_CTF_UPPER, // 0x54 'T'
-    _yp_CTF_UPPER, // 0x55 'U'
-    _yp_CTF_UPPER, // 0x56 'V'
-    _yp_CTF_UPPER, // 0x57 'W'
-    _yp_CTF_UPPER, // 0x58 'X'
-    _yp_CTF_UPPER, // 0x59 'Y'
-    _yp_CTF_UPPER, // 0x5a 'Z'
-    0, // 0x5b '['
-    0, // 0x5c '\\'
-    0, // 0x5d ']'
-    0, // 0x5e '^'
-    0, // 0x5f '_'
-    0, // 0x60 '`'
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x61 'a'
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x62 'b'
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x63 'c'
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x64 'd'
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x65 'e'
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x66 'f'
-    _yp_CTF_LOWER, // 0x67 'g'
-    _yp_CTF_LOWER, // 0x68 'h'
-    _yp_CTF_LOWER, // 0x69 'i'
-    _yp_CTF_LOWER, // 0x6a 'j'
-    _yp_CTF_LOWER, // 0x6b 'k'
-    _yp_CTF_LOWER, // 0x6c 'l'
-    _yp_CTF_LOWER, // 0x6d 'm'
-    _yp_CTF_LOWER, // 0x6e 'n'
-    _yp_CTF_LOWER, // 0x6f 'o'
-    _yp_CTF_LOWER, // 0x70 'p'
-    _yp_CTF_LOWER, // 0x71 'q'
-    _yp_CTF_LOWER, // 0x72 'r'
-    _yp_CTF_LOWER, // 0x73 's'
-    _yp_CTF_LOWER, // 0x74 't'
-    _yp_CTF_LOWER, // 0x75 'u'
-    _yp_CTF_LOWER, // 0x76 'v'
-    _yp_CTF_LOWER, // 0x77 'w'
-    _yp_CTF_LOWER, // 0x78 'x'
-    _yp_CTF_LOWER, // 0x79 'y'
-    _yp_CTF_LOWER, // 0x7a 'z'
-    0, // 0x7b '{'
-    0, // 0x7c '|'
-    0, // 0x7d '}'
-    0, // 0x7e '~'
+    _yp_CDF_PRINTABLE, // 0x20 ' '
+    _yp_CDF_PRINTABLE, // 0x21 '!'
+    _yp_CDF_PRINTABLE, // 0x22 '"'
+    _yp_CDF_PRINTABLE, // 0x23 '#'
+    _yp_CDF_PRINTABLE, // 0x24 '$'
+    _yp_CDF_PRINTABLE, // 0x25 '%'
+    _yp_CDF_PRINTABLE, // 0x26 '&'
+    _yp_CDF_PRINTABLE, // 0x27 "'"
+    _yp_CDF_PRINTABLE, // 0x28 '('
+    _yp_CDF_PRINTABLE, // 0x29 ')'
+    _yp_CDF_PRINTABLE, // 0x2a '*'
+    _yp_CDF_PRINTABLE, // 0x2b '+'
+    _yp_CDF_PRINTABLE, // 0x2c ','
+    _yp_CDF_PRINTABLE, // 0x2d '-'
+    _yp_CDF_PRINTABLE, // 0x2e '.'
+    _yp_CDF_PRINTABLE, // 0x2f '/'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x30 '0'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x31 '1'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x32 '2'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x33 '3'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x34 '4'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x35 '5'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x36 '6'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x37 '7'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x38 '8'
+    _yp_CDF_DECIMAL|_yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0x39 '9'
+    _yp_CDF_PRINTABLE, // 0x3a ':'
+    _yp_CDF_PRINTABLE, // 0x3b ';'
+    _yp_CDF_PRINTABLE, // 0x3c '<'
+    _yp_CDF_PRINTABLE, // 0x3d '='
+    _yp_CDF_PRINTABLE, // 0x3e '>'
+    _yp_CDF_PRINTABLE, // 0x3f '?'
+    _yp_CDF_PRINTABLE, // 0x40 '@'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x41 'A'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x42 'B'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x43 'C'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x44 'D'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x45 'E'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x46 'F'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x47 'G'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x48 'H'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x49 'I'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x4a 'J'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x4b 'K'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x4c 'L'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x4d 'M'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x4e 'N'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x4f 'O'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x50 'P'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x51 'Q'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x52 'R'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x53 'S'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x54 'T'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x55 'U'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x56 'V'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x57 'W'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x58 'X'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x59 'Y'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0x5a 'Z'
+    _yp_CDF_PRINTABLE, // 0x5b '['
+    _yp_CDF_PRINTABLE, // 0x5c '\\'
+    _yp_CDF_PRINTABLE, // 0x5d ']'
+    _yp_CDF_PRINTABLE, // 0x5e '^'
+    _yp_CDF_PRINTABLE, // 0x5f '_'
+    _yp_CDF_PRINTABLE, // 0x60 '`'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x61 'a'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x62 'b'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x63 'c'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x64 'd'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x65 'e'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x66 'f'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x67 'g'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x68 'h'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x69 'i'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x6a 'j'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x6b 'k'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x6c 'l'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x6d 'm'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x6e 'n'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x6f 'o'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x70 'p'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x71 'q'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x72 'r'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x73 's'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x74 't'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x75 'u'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x76 'v'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x77 'w'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x78 'x'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x79 'y'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0x7a 'z'
+    _yp_CDF_PRINTABLE, // 0x7b '{'
+    _yp_CDF_PRINTABLE, // 0x7c '|'
+    _yp_CDF_PRINTABLE, // 0x7d '}'
+    _yp_CDF_PRINTABLE, // 0x7e '~'
     0, // 0x7f '\x7f'
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, // 0x80 '\x80'
+    0, // 0x81 '\x81'
+    0, // 0x82 '\x82'
+    0, // 0x83 '\x83'
+    0, // 0x84 '\x84'
+    0, // 0x85 '\x85'
+    0, // 0x86 '\x86'
+    0, // 0x87 '\x87'
+    0, // 0x88 '\x88'
+    0, // 0x89 '\x89'
+    0, // 0x8a '\x8a'
+    0, // 0x8b '\x8b'
+    0, // 0x8c '\x8c'
+    0, // 0x8d '\x8d'
+    0, // 0x8e '\x8e'
+    0, // 0x8f '\x8f'
+    0, // 0x90 '\x90'
+    0, // 0x91 '\x91'
+    0, // 0x92 '\x92'
+    0, // 0x93 '\x93'
+    0, // 0x94 '\x94'
+    0, // 0x95 '\x95'
+    0, // 0x96 '\x96'
+    0, // 0x97 '\x97'
+    0, // 0x98 '\x98'
+    0, // 0x99 '\x99'
+    0, // 0x9a '\x9a'
+    0, // 0x9b '\x9b'
+    0, // 0x9c '\x9c'
+    0, // 0x9d '\x9d'
+    0, // 0x9e '\x9e'
+    0, // 0x9f '\x9f'
+    0, // 0xa0 '\xa0'
+    _yp_CDF_PRINTABLE, // 0xa1 'í'
+    _yp_CDF_PRINTABLE, // 0xa2 'ó'
+    _yp_CDF_PRINTABLE, // 0xa3 'ú'
+    _yp_CDF_PRINTABLE, // 0xa4 'ñ'
+    _yp_CDF_PRINTABLE, // 0xa5 'Ñ'
+    _yp_CDF_PRINTABLE, // 0xa6 'ª'
+    _yp_CDF_PRINTABLE, // 0xa7 'º'
+    _yp_CDF_PRINTABLE, // 0xa8 '¿'
+    _yp_CDF_PRINTABLE, // 0xa9 '⌐'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xaa '¬'
+    _yp_CDF_PRINTABLE, // 0xab '½'
+    _yp_CDF_PRINTABLE, // 0xac '¼'
+    0, // 0xad '\xad'
+    _yp_CDF_PRINTABLE, // 0xae '«'
+    _yp_CDF_PRINTABLE, // 0xaf '»'
+    _yp_CDF_PRINTABLE, // 0xb0 '░'
+    _yp_CDF_PRINTABLE, // 0xb1 '▒'
+    _yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0xb2 '▓'
+    _yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0xb3 '│'
+    _yp_CDF_PRINTABLE, // 0xb4 '┤'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xb5 '╡'
+    _yp_CDF_PRINTABLE, // 0xb6 '╢'
+    _yp_CDF_PRINTABLE, // 0xb7 '╖'
+    _yp_CDF_PRINTABLE, // 0xb8 '╕'
+    _yp_CDF_DIGIT|_yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0xb9 '╣'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xba '║'
+    _yp_CDF_PRINTABLE, // 0xbb '╗'
+    _yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0xbc '╝'
+    _yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0xbd '╜'
+    _yp_CDF_NUMERIC|_yp_CDF_PRINTABLE, // 0xbe '╛'
+    _yp_CDF_PRINTABLE, // 0xbf '┐'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc0 '└'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc1 '┴'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc2 '┬'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc3 '├'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc4 '─'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc5 '┼'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc6 '╞'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc7 '╟'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc8 '╚'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xc9 '╔'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xca '╩'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xcb '╦'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xcc '╠'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xcd '═'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xce '╬'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xcf '╧'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xd0 '╨'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xd1 '╤'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xd2 '╥'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xd3 '╙'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xd4 '╘'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xd5 '╒'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xd6 '╓'
+    _yp_CDF_PRINTABLE, // 0xd7 '╫'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xd8 '╪'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xd9 '┘'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xda '┌'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xdb '█'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xdc '▄'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xdd '▌'
+    _yp_CDF_UPPER|_yp_CDF_PRINTABLE, // 0xde '▐'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xdf '▀'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe0 'α'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe1 'ß'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe2 'Γ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe3 'π'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe4 'Σ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe5 'σ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe6 'µ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe7 'τ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe8 'Φ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xe9 'Θ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xea 'Ω'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xeb 'δ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xec '∞'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xed 'φ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xee 'ε'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xef '∩'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xf0 '≡'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xf1 '±'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xf2 '≥'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xf3 '≤'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xf4 '⌠'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xf5 '⌡'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xf6 '÷'
+    _yp_CDF_PRINTABLE, // 0xf7 '≈'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xf8 '°'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xf9 '∙'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xfa '·'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xfb '√'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xfc 'ⁿ'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xfd '²'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xfe '■'
+    _yp_CDF_LOWER|_yp_CDF_PRINTABLE, // 0xff ' '
 };
 
 // XXX Adapted from Python's pyctype.c and pyctype.h
-const yp_uint8_t _yp_ctype_tolower[256] = {
+const yp_uint8_t _yp_chardata_tolower[256] = {
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -1663,7 +1769,7 @@ const yp_uint8_t _yp_ctype_tolower[256] = {
 };
 
 // XXX Adapted from Python's pyctype.c and pyctype.h
-const yp_uint8_t _yp_ctype_toupper[256] = {
+const yp_uint8_t _yp_chardata_toupper[256] = {
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -1703,31 +1809,40 @@ const yp_uint8_t _yp_ctype_toupper[256] = {
 
 static int yp_chardata_binary_isalnum(yp_uint32_t c)
 {
-    int mask = 0;
+    yp_uint8_t chardata;
+    int        mask = 0;
+
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
     if (c > ypStringLib_MAX_ASCII) return 0;
-    if (yp_ISALPHA(c)) mask |= yp_ALNUM_ALPHA;
-    // FIXME if (yp_ISDECIMAL(c)) mask |= yp_ALNUM_DECIMAL;
-    if (yp_ISDIGIT(c)) mask |= yp_ALNUM_DIGIT;
-    // FIXME if (yp_ISNUMERIC(c)) mask |= yp_ALNUM_NUMERIC;
+    chardata = _yp_chardata_table[c];
+
+    if (chardata & (_yp_CDF_LOWER | _yp_CDF_UPPER)) mask |= yp_ALNUM_ALPHA;
+    if (chardata & _yp_CDF_DECIMAL) mask |= yp_ALNUM_DECIMAL;
+    if (chardata & _yp_CDF_DIGIT) mask |= yp_ALNUM_DIGIT;
+    if (chardata & _yp_CDF_NUMERIC) mask |= yp_ALNUM_NUMERIC;
     return mask;
 }
 
 static int yp_chardata_binary_iscased(yp_uint32_t c)
 {
-    int mask = 0;
+    yp_uint8_t chardata;
+    int        mask = 0;
+
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
     if (c > ypStringLib_MAX_ASCII) return 0;
-    if (yp_ISLOWER(c)) mask |= yp_CASED_LOWER;
-    // FIXME if (yp_ISTITLE(c)) mask |= yp_CASED_TITLE;
-    if (yp_ISUPPER(c)) mask |= yp_CASED_UPPER;
+    chardata = _yp_chardata_table[c];
+
+    // In latin-1, everything uppercase is also titlecase.
+    if (chardata & _yp_CDF_LOWER) mask |= yp_CASED_LOWER;
+    if (chardata & _yp_CDF_UPPER) mask |= yp_CASED_TITLE | yp_CASED_UPPER;
     return mask;
 }
 
 static int yp_chardata_binary_isprintable(yp_uint32_t c)
 {
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
-    return c >= ' ' && c < ypStringLib_MAX_ASCII;
+    if (c > ypStringLib_MAX_ASCII) return FALSE;
+    return (_yp_chardata_table[c] & _yp_CDF_PRINTABLE) != 0;
 }
 
 static int yp_chardata_binary_isspace(yp_uint32_t c)
@@ -1762,7 +1877,7 @@ static yp_ssize_t yp_chardata_binary_tolower(yp_uint32_t c, yp_ssize_t len, yp_u
 {
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
     if (len < 1) return -1;
-    converted[0] = c < ypStringLib_MAX_ASCII ? yp_TOLOWER(c) : c;
+    converted[0] = c < ypStringLib_MAX_ASCII ? _yp_chardata_tolower[c] : c;
     return 1;
 }
 
@@ -1770,7 +1885,7 @@ static yp_ssize_t yp_chardata_binary_toupper(yp_uint32_t c, yp_ssize_t len, yp_u
 {
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
     if (len < 1) return -1;
-    converted[0] = c < ypStringLib_MAX_ASCII ? yp_TOUPPER(c) : c;
+    converted[0] = c < ypStringLib_MAX_ASCII ? _yp_chardata_toupper[c] : c;
     return 1;
 }
 
@@ -1792,30 +1907,40 @@ static const yp_character_database_t yp_chardata_binary = {
 
 static int yp_chardata_latin_1_isalnum(yp_uint32_t c)
 {
-    int mask = 0;
+    yp_uint8_t chardata;
+    int        mask = 0;
+
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
-    if (yp_ISALPHA(c)) mask |= yp_ALNUM_ALPHA;
-    // FIXME if (yp_ISDECIMAL(c)) mask |= yp_ALNUM_DECIMAL;
-    if (yp_ISDIGIT(c)) mask |= yp_ALNUM_DIGIT;
-    // FIXME if (yp_ISNUMERIC(c)) mask |= yp_ALNUM_NUMERIC;
+    if (c > ypStringLib_MAX_LATIN_1) return 0;
+    chardata = _yp_chardata_table[c];
+
+    if (chardata & (_yp_CDF_LOWER | _yp_CDF_UPPER)) mask |= yp_ALNUM_ALPHA;
+    if (chardata & _yp_CDF_DECIMAL) mask |= yp_ALNUM_DECIMAL;
+    if (chardata & _yp_CDF_DIGIT) mask |= yp_ALNUM_DIGIT;
+    if (chardata & _yp_CDF_NUMERIC) mask |= yp_ALNUM_NUMERIC;
     return mask;
 }
 
 static int yp_chardata_latin_1_iscased(yp_uint32_t c)
 {
-    int mask = 0;
+    yp_uint8_t chardata;
+    int        mask = 0;
+
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
-    if (yp_ISLOWER(c)) mask |= yp_CASED_LOWER;
-    // FIXME if (yp_ISTITLE(c)) mask |= yp_CASED_TITLE;
-    if (yp_ISUPPER(c)) mask |= yp_CASED_UPPER;
+    if (c > ypStringLib_MAX_LATIN_1) return 0;
+    chardata = _yp_chardata_table[c];
+
+    // In latin-1, everything uppercase is also titlecase.
+    if (chardata & _yp_CDF_LOWER) mask |= yp_CASED_LOWER;
+    if (chardata & _yp_CDF_UPPER) mask |= yp_CASED_TITLE | yp_CASED_UPPER;
     return mask;
 }
 
 static int yp_chardata_latin_1_isprintable(yp_uint32_t c)
 {
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
-    // FIXME This will need to be masked.
-    return c >= ' ' && c < ypStringLib_MAX_ASCII;
+    if (c > ypStringLib_MAX_LATIN_1) return FALSE;
+    return (_yp_chardata_table[c] & _yp_CDF_PRINTABLE) != 0;
 }
 
 static int yp_chardata_latin_1_isspace(yp_uint32_t c)
@@ -1862,7 +1987,7 @@ static yp_ssize_t yp_chardata_latin_1_tolower(yp_uint32_t c, yp_ssize_t len, yp_
 {
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
     if (len < 1) return -1;
-    converted[0] = c < ypStringLib_MAX_ASCII ? yp_TOLOWER(c) : c;
+    converted[0] = c < ypStringLib_MAX_LATIN_1 ? _yp_chardata_tolower[c] : c;
     return 1;
 }
 
@@ -1876,7 +2001,7 @@ static yp_ssize_t yp_chardata_latin_1_totitle(yp_uint32_t c, yp_ssize_t len, yp_
         return 2;
     } else {
         if (len < 1) return -1;
-        converted[0] = yp_TOUPPER(c);
+        converted[0] = c < ypStringLib_MAX_LATIN_1 ? _yp_chardata_toupper[c] : c;
         return 1;
     }
 }
@@ -1891,7 +2016,7 @@ static yp_ssize_t yp_chardata_latin_1_toupper(yp_uint32_t c, yp_ssize_t len, yp_
         return 2;
     } else {
         if (len < 1) return -1;
-        converted[0] = yp_TOUPPER(c);
+        converted[0] = c < ypStringLib_MAX_LATIN_1 ? _yp_chardata_toupper[c] : c;
         return 1;
     }
 }
@@ -4929,6 +5054,7 @@ static ypObject *_ypInt_new(yp_int_t value, int type)
 }
 
 // XXX Will fail if non-ascii bytes are passed in, so safe to call on latin-1 data
+// FIXME Replace with a general Unicode version.
 static ypObject *_ypInt_fromascii(
         ypObject *(*allocator)(yp_int_t), const yp_uint8_t *bytes, yp_int_t base)
 {
@@ -4944,7 +5070,7 @@ static ypObject *_ypInt_fromascii(
     // Skip leading whitespace
     while (1) {
         if (*bytes == '\0') return yp_ValueError;
-        if (!yp_ISSPACE(*bytes)) break;
+        if (!yp_chardata_binary_isspace(*bytes)) break;
         bytes++;
     }
 
@@ -4963,7 +5089,7 @@ static ypObject *_ypInt_fromascii(
     if (*bytes == '0') {
         // We can safely consume this leading zero in all cases, as it cannot change the value
         bytes++;
-        if (*bytes == '\0' || yp_ISSPACE(*bytes)) {
+        if (*bytes == '\0' || yp_chardata_binary_isspace(*bytes)) {
             // We've just parsed the string b"0", b"  0  ", etc; take a shortcut
             result = 0;
             goto endofdigits;
@@ -4980,7 +5106,7 @@ static ypObject *_ypInt_fromascii(
             // Leading zeroes are allowed if the value is zero, regardless of base (ie "00000");
             // once again, it's always safe to consume leading zeroes
             while (*bytes == '0') bytes++;
-            if (*bytes == '\0' || yp_ISSPACE(*bytes)) {
+            if (*bytes == '\0' || yp_chardata_binary_isspace(*bytes)) {
                 result = 0;
                 goto endofdigits;
             }
@@ -5022,7 +5148,7 @@ endofdigits:
     // Ensure there's only whitespace left in the string, and return the new integer
     while (1) {
         if (*bytes == '\0') break;
-        if (!yp_ISSPACE(*bytes)) return yp_ValueError;
+        if (!yp_chardata_binary_isspace(*bytes)) return yp_ValueError;
         bytes++;
     }
     return allocator(sign * result);
@@ -8580,6 +8706,24 @@ static ypObject *_ypStringLib_iscased(ypObject *s, yp_uint8_t mask)
     return ypBool_FROM_C(has_cased_char);
 }
 
+static ypObject *ypStringLib_isprintable(ypObject *s)
+{
+    void                          *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                     s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo     *s_enc = ypStringLib_ENC(s);
+    const yp_character_database_t *chardata = s_enc->chardata;
+    yp_ssize_t                     i;
+
+    if (s_len < 1) return yp_True;
+
+    for (i = 0; i < s_len; i++) {
+        yp_uint32_t c = s_enc->getindexX(s_data, i);
+        if (c > chardata->max_char) return yp_SystemLimitationError;
+        if (!chardata->isprintable(c)) return yp_False;
+    }
+    return yp_True;
+}
+
 static ypObject *ypStringLib_isspace(ypObject *s)
 {
     void                          *s_data = ypStringLib_DATA(s);
@@ -9806,7 +9950,9 @@ static ypObject *_yp_codecs_normalize_encoding_name(ypObject *encoding)
 {
     yp_uint8_t *data;
     yp_ssize_t  len;
-    yp_ssize_t  i;
+    int (*iscased)(yp_uint32_t);
+    yp_ssize_t i;
+    yp_ssize_t (*tolower)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
     ypObject   *norm;
     yp_uint8_t *norm_data;
 
@@ -9816,25 +9962,33 @@ static ypObject *_yp_codecs_normalize_encoding_name(ypObject *encoding)
     // encoding may already be normalized, in which case: do nothing
     data = ypStringLib_DATA(encoding);
     len = ypStringLib_LEN(encoding);
+    iscased = ypStringLib_ENC(encoding)->chardata->iscased;
     for (i = 0; i < len; i++) {
-        if (yp_ISUPPER(data[i])) goto convert;
+        if (!(iscased(data[i]) & yp_CASED_LOWER)) goto convert;
         if (data[i] == ' ' || data[i] == '_') goto convert;
-        // TODO Should we deny non-printable characters, '\t', etc?
+        // FIXME Should we deny non-printable characters, '\t', etc?
     }
     return yp_incref(encoding);
 
 convert:
     // OK, there's characters to convert, starting at i: create a new string to return
-    norm = _ypStr_new_latin_1(ypStr_CODE, len, /*alloclen_fixed=*/TRUE);
+    tolower = ypStringLib_ENC(encoding)->chardata->tolower;
+    norm = _ypStr_new_latin_1(ypStr_CODE, len, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(norm)) return norm;
     norm_data = ypStringLib_DATA(norm);
     yp_memcpy(norm_data, data, i);
     for (/*i already set*/; i < len; i++) {
-        yp_uint8_t ch = yp_TOLOWER(data[i]);
-        if (ch == ' ' || ch == '_') {
+        yp_uint32_t chs[3];
+        yp_ssize_t  chs_len = tolower(data[i], yp_lengthof_array(chs), chs);
+        if (chs_len != 1 || chs[0] > ypStringLib_MAX_LATIN_1) {
+            // tolower should only return single characters for latin-1.
+            // FIXME ...or use our built-in tolower directly? Or handle this case?
+            yp_decref(norm);
+            return yp_SystemError;
+        } else if (chs[0] == ' ' || chs[0] == '_') {
             norm_data[i] = '-';
         } else {
-            norm_data[i] = ch;
+            norm_data[i] = (yp_uint8_t)chs[0];
         }
     }
     norm_data[len] = 0;
@@ -12298,7 +12452,11 @@ ypObject *yp_isnumeric(ypObject *s)
     return ypStringLib_isalnum(s, yp_ALNUM_DECIMAL | yp_ALNUM_DIGIT | yp_ALNUM_NUMERIC);
 }
 
-ypObject *yp_isprintable(ypObject *s) { return yp_NotImplementedError; }
+ypObject *yp_isprintable(ypObject *s)
+{
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return ypStringLib_isprintable(s);
+}
 
 ypObject *yp_isspace(ypObject *s)
 {
@@ -21389,9 +21547,9 @@ ypObject *const yp_t_function = (ypObject *)&ypFunction_Type;
 
 static const yp_memory_allocator_t init_alloc_defaults = {
         yp_sizeof(yp_memory_allocator_t),  // sizeof_struct
-        yp_mem_default_malloc,          // yp_malloc
-        yp_mem_default_malloc_resize,   // yp_malloc_resize
-        yp_mem_default_free,            // yp_free
+        yp_mem_default_malloc,             // yp_malloc
+        yp_mem_default_malloc_resize,      // yp_malloc_resize
+        yp_mem_default_free,               // yp_free
 };
 
 // The default memory allocation APIs, exposed to allow them to be called by custom hooks.
@@ -21426,12 +21584,13 @@ static const yp_initialize_parameters_t init_defaults = {
 // (because otherwise all mallocs result in yp_MemoryError).
 static void ypMem_initialize(const yp_initialize_parameters_t *args)
 {
-    const yp_memory_allocator_t *args_allocator = yp_INIT_ARG(args, init_defaults, allocator, == NULL);
+    const yp_memory_allocator_t *args_allocator =
+            yp_INIT_ARG(args, init_defaults, allocator, == NULL);
 
     // We require all allocator methods to be set.
     if (args_allocator->sizeof_struct < yp_sizeof(yp_memory_allocator_t)) {
-        yp_FATAL("yp_memory_allocator_t.sizeof_struct (%" PRIssize ") smaller than minimum (%" PRIssize
-                 ")",
+        yp_FATAL("yp_memory_allocator_t.sizeof_struct (%" PRIssize
+                 ") smaller than minimum (%" PRIssize ")",
                 args_allocator->sizeof_struct, yp_sizeof(yp_memory_allocator_t));
     }
 

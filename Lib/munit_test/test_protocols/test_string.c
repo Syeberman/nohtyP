@@ -125,34 +125,34 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
 
     // FIXME Not on bytes: "isdecimal", "isidentifier", "isnumeric", "isprintable"
 
-#define assert_char(ord, alpha, decimal, digit, lower, numeric, printable, space, upper) \
-    do {                                                                                 \
-        ypObject *x = type->fromordsCN(1, ord);                                          \
-        assert_obj(yp_isalnum(x), is, expected[alpha == 0 ? numeric : alpha]);           \
-        assert_obj(yp_isalpha(x), is, expected[alpha]);                                  \
-        assert_obj(yp_isascii(x), is, expected[ord < 128 ? 1 : 0]);                      \
-        assert_obj(yp_isdigit(x), is, expected[digit]);                                  \
-        assert_obj(yp_islower(x), is, expected[lower]);                                  \
-        assert_obj(yp_isspace(x), is, expected[space]);                                  \
-        assert_obj(yp_isupper(x), is, expected[upper]);                                  \
-        /* FIXME if (!isbinary(type)) {                                                  \
-            assert_obj(yp_isdecimal(x), is, expected[decimal]);                          \
-            assert_obj(yp_isidentifier(x), is, expected[alpha || ord == 95]);            \
-            assert_obj(yp_isnumeric(x), is, expected[numeric]);                          \
-            assert_obj(yp_isprintable(x), is, expected[printable]);                      \
-        } */                                                                             \
-        yp_decref(x);                                                                    \
+#define assert_char(ord, alpha, decimal, digit, lower, numeric, printable, space, upper)  \
+    do {                                                                                  \
+        ypObject *x = type->fromordsCN(1, ord);                                           \
+        assert_obj(yp_isalnum(x), is, expected[alpha == 0 ? numeric : alpha]);            \
+        assert_obj(yp_isalpha(x), is, expected[alpha]);                                   \
+        assert_obj(yp_isascii(x), is, expected[ord < 128 ? 1 : 0]);                       \
+        assert_obj(yp_isdigit(x), is, expected[digit]);                                   \
+        assert_obj(yp_islower(x), is, expected[lower]);                                   \
+        assert_obj(yp_isspace(x), is, expected[space]);                                   \
+        assert_obj(yp_isupper(x), is, expected[upper]);                                   \
+        if (!isbinary(type)) {                                                            \
+            assert_obj(yp_isdecimal(x), is, expected[decimal]);                           \
+            /* FIXME assert_obj(yp_isidentifier(x), is, expected[alpha || ord == 95]); */ \
+            assert_obj(yp_isnumeric(x), is, expected[numeric]);                           \
+            assert_obj(yp_isprintable(x), is, expected[printable]);                       \
+        }                                                                                 \
+        yp_decref(x);                                                                     \
     } while (0)
 
     /*
     methods = "alpha, decimal, digit, lower, numeric, printable, space, upper"
-    def getexpected(x, m):
+    def get_expected(x, m):
         if not getattr(x, f"is{m}")(): return "0"
         if m == "space" and ("\x1c" <= x < "\x20"): return "2"
         return "1" if x < "\x7f" else "2"
     for i in range(256):
         x = chr(i)
-        expected = [getexpected(x, m) for m in methods.split(", ")]
+        expected = [get_expected(x, m) for m in methods.split(", ")]
         if i % 32 == 0: print(f"    // {methods}")
         print(f"    assert_char({i}, {", ".join(expected)});  // {x!r}")
     */
