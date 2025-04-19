@@ -530,14 +530,14 @@ extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int k,
 }
 
 
-// Takes a va_list of yp_int_t values, converts each value using fromordC, and appends them to
-// string.
+// Takes a va_list of int values, converts each value using fromordC, and appends them to string.
 static void fromordsCNV_helper(
         ypObject *string, ypObject *(*fromordC)(yp_int_t), int n, va_list args)
 {
     for (/*n already set*/; n > 0; n--) {
         ypObject *item;
-        assert_not_raises(item = fromordC(va_arg(args, yp_int_t)));
+        // Integer variable arguments are promoted to int by default; yp_int_t here causes errors.
+        assert_not_raises(item = fromordC(va_arg(args, int)));
         assert_not_raises_exc(yp_append(string, item, &exc));
         yp_decref(item);
     }

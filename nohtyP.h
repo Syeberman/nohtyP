@@ -985,7 +985,8 @@ ypAPI ypObject *yp_isalpha(ypObject *s);
 ypAPI ypObject *yp_isascii(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are decimal characters and there is at least
-// one character, otherwise yp_False. Decimal characters are those from general category "Nd".
+// one character, otherwise yp_False. Decimal characters are those from general category "Nd". Not
+// supported on binary strings (bytes/bytearray).
 ypAPI ypObject *yp_isdecimal(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are digits and there is at least one
@@ -994,7 +995,7 @@ ypAPI ypObject *yp_isdecimal(ypObject *s);
 ypAPI ypObject *yp_isdigit(ypObject *s);
 
 // Returns the immortal yp_True if s is a valid identifier according to the Python language
-// definition, otherwise yp_False.
+// definition, otherwise yp_False. Not supported on binary strings (bytes/bytearray).
 ypAPI ypObject *yp_isidentifier(ypObject *s);
 
 // Returns the immortal yp_True if all cased characters in s are lowercase and there is at least one
@@ -1004,12 +1005,13 @@ ypAPI ypObject *yp_islower(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are numeric characters and there is at least
 // one character, otherwise yp_False. Numeric characters are those that have the Unicode numeric
-// value property.
+// value property. Not supported on binary strings (bytes/bytearray).
 ypAPI ypObject *yp_isnumeric(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are printable or s is empty, otherwise
 // yp_False. Nonprintable characters are those characters defined in the Unicode character database
-// as "Other" or "Separator", excepting the ascii space (0x20) which is considered printable.
+// as "Other" or "Separator", excepting the ascii space (0x20) which is considered printable. Not
+// supported on binary strings (bytes/bytearray).
 ypAPI ypObject *yp_isprintable(ypObject *s);
 
 // Returns the immortal yp_True if there are only whitespace characters in s and there is at least
@@ -1944,7 +1946,6 @@ typedef struct _yp_character_database_t {
 
     // The largest character this database supports. The methods below will not be called with
     // larger characters; instead, yp_SystemLimitationError will be raised.
-    // FIXME Assertions that the methods are not called with larger characters.
     yp_uint32_t max_char;
 
     // Returns a combination of the yp_ALNUM_* flags if c is alphanumeric, and 0 if it's not.

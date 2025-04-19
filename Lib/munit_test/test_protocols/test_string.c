@@ -1,6 +1,21 @@
 
 #include "munit_test/unittest.h"
 
+#define O_a_GRAVE 0xE0        // 'à', "a with grave", a non-ascii latin-1 lowercase
+#define O_A_GRAVE 0xC0        // 'À', "A with grave", a non-ascii latin-1 uppercase
+#define O_SUPER1 0xb9         // '¹', "superscript 1", a non-ascii latin-1 non-decimal digit
+#define O_1OVER4 0xbc         // '¼', "fraction 1/4", a non-ascii latin-1 non-digit numeric
+#define O_BIG_LOWER 0x101     // 'ā', "a with macron", a non-latin-1 lowercase
+#define O_BIG_TITLE 0x1C5     // 'ǅ', "D with z with caron", a non-latin-1 titlecase
+#define O_BIG_UPPER 0x100     // 'Ā', "A with macron", a non-latin-1 uppercase
+#define O_BIG_DECIMAL 0x661   // '١', "Arabic-Indic 1", a non-latin-1 decimal
+#define O_BIG_DIGIT 0x2081    // '₁', "subscript 1", a non-latin-1 non-decimal digit
+#define O_BIG_NUMERIC 0x2153  // '⅓', "fraction 1/3", a non-latin-1 non-digit numeric
+
+// An array of all our test non-latin-1 characters, as ordinals.
+static int ords_non_latin_1[] = {
+        O_BIG_LOWER, O_BIG_TITLE, O_BIG_UPPER, O_BIG_DECIMAL, O_BIG_DIGIT, O_BIG_NUMERIC};
+
 // test_latin_1_classifiers is a bit too complex for GCC.
 #if defined(__GNUC__)
 #pragma GCC optimize("no-var-tracking")
@@ -29,7 +44,7 @@ static void _test_findC(fixture_type_t *type,
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[3];
-    ypObject     *string;
+    ypObject     *s;
     ypObject     *other_0_1;
     ypObject     *other_1_2;
     ypObject     *other_0_2;
@@ -37,7 +52,7 @@ static void _test_findC(fixture_type_t *type,
     ypObject     *empty = type->newN(0);
 
     obj_array_fill(items, uq, type->rand_items);
-    string = type->newN(N(items[0], items[1], items[2]));
+    s = type->newN(N(items[0], items[1], items[2]));
     // TODO Test against different "other" types (the other pair, really)
     other_0_1 = type->newN(N(items[0], items[1]));
     other_1_2 = type->newN(N(items[1], items[2]));
@@ -51,30 +66,29 @@ static void _test_findC(fixture_type_t *type,
         if (raises) assert_isexception(exc, yp_ValueError); \
     } while (0)
 
-    assert_ssizeC_exc(any_findC(string, other_0_1, &exc), ==, 0);            // Sub-string.
-    assert_ssizeC_exc(any_findC(string, other_1_2, &exc), ==, 1);            // Sub-string.
-    assert_not_found_exc(any_findC(string, other_0_2, &exc));                // Out-of-order.
-    assert_not_found_exc(any_findC(string, other_1_0, &exc));                // Out-of-order.
-    assert_ssizeC_exc(any_findC(string, empty, &exc), ==, forward ? 0 : 3);  // Empty.
-    assert_ssizeC_exc(any_findC(string, string, &exc), ==, 0);               // Self.
+    assert_ssizeC_exc(any_findC(s, other_0_1, &exc), ==, 0);            // Sub-string.
+    assert_ssizeC_exc(any_findC(s, other_1_2, &exc), ==, 1);            // Sub-string.
+    assert_not_found_exc(any_findC(s, other_0_2, &exc));                // Out-of-order.
+    assert_not_found_exc(any_findC(s, other_1_0, &exc));                // Out-of-order.
+    assert_ssizeC_exc(any_findC(s, empty, &exc), ==, forward ? 0 : 3);  // Empty.
+    assert_ssizeC_exc(any_findC(s, s, &exc), ==, 0);                    // Self.
 
-    assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 3, &exc), ==, 0);  // Total slice.
-    assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 2, &exc), ==, 0);  // Exact slice.
-    assert_not_found_exc(any_findC5(string, other_0_1, 0, 1, &exc));      // Too-small slice.
-    assert_not_found_exc(any_findC5(string, other_0_1, 0, 0, &exc));      // Empty slice.
+    assert_ssizeC_exc(any_findC5(s, other_0_1, 0, 3, &exc), ==, 0);  // Total slice.
+    assert_ssizeC_exc(any_findC5(s, other_0_1, 0, 2, &exc), ==, 0);  // Exact slice.
+    assert_not_found_exc(any_findC5(s, other_0_1, 0, 1, &exc));      // Too-small slice.
+    assert_not_found_exc(any_findC5(s, other_0_1, 0, 0, &exc));      // Empty slice.
 
-    assert_ssizeC_exc(any_findC5(string, other_1_2, 1, 3, &exc), ==, 1);  // Exact slice.
-    assert_not_found_exc(any_findC5(string, other_1_2, 1, 2, &exc));      // Too-small slice.
-    assert_not_found_exc(any_findC5(string, other_1_2, 1, 1, &exc));      // Empty slice.
+    assert_ssizeC_exc(any_findC5(s, other_1_2, 1, 3, &exc), ==, 1);  // Exact slice.
+    assert_not_found_exc(any_findC5(s, other_1_2, 1, 2, &exc));      // Too-small slice.
+    assert_not_found_exc(any_findC5(s, other_1_2, 1, 1, &exc));      // Empty slice.
 
-    assert_ssizeC_exc(any_findC5(string, empty, 0, 3, &exc), ==, forward ? 0 : 3);  // Empty, total.
-    assert_ssizeC_exc(
-            any_findC5(string, empty, 1, 2, &exc), ==, forward ? 1 : 2);  // Empty, partial.
-    assert_ssizeC_exc(any_findC5(string, empty, 2, 2, &exc), ==, 2);      // Empty, empty.
+    assert_ssizeC_exc(any_findC5(s, empty, 0, 3, &exc), ==, forward ? 0 : 3);  // Empty, total.
+    assert_ssizeC_exc(any_findC5(s, empty, 1, 2, &exc), ==, forward ? 1 : 2);  // Empty, partial.
+    assert_ssizeC_exc(any_findC5(s, empty, 2, 2, &exc), ==, 2);                // Empty, empty.
 
-    assert_ssizeC_exc(any_findC5(string, string, 0, 3, &exc), ==, 0);  // Self, exact.
-    assert_not_found_exc(any_findC5(string, string, 1, 2, &exc));      // Self, too-small.
-    assert_not_found_exc(any_findC5(string, string, 1, 1, &exc));      // Self, empty.
+    assert_ssizeC_exc(any_findC5(s, s, 0, 3, &exc), ==, 0);  // Self, exact.
+    assert_not_found_exc(any_findC5(s, s, 1, 2, &exc));      // Self, too-small.
+    assert_not_found_exc(any_findC5(s, s, 1, 1, &exc));      // Self, empty.
 
     // TODO That empty slice bug thing.
     // TODO !forward substrings?
@@ -83,7 +97,7 @@ static void _test_findC(fixture_type_t *type,
 #undef assert_not_found_exc
 
     obj_array_decref(items);
-    yp_decrefN(N(string, empty, other_0_1, other_1_2, other_0_2, other_1_0));
+    yp_decrefN(N(s, empty, other_0_1, other_1_2, other_0_2, other_1_0));
     uniqueness_dealloc(uq);
 }
 
@@ -115,6 +129,391 @@ static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixtur
 
 // TODO test_remove and test_discard, for substrings.
 
+static MunitResult test_isalnum(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic isalnum.
+    ead(s, type->fromordsCN(N('A', 'a', '1')), assert_obj(yp_isalnum(s), is, yp_True));
+    ead(s, type->fromordsCN(N('A', 'a', '1', O_A_GRAVE, O_a_GRAVE, O_SUPER1, O_1OVER4)),
+            assert_obj(yp_isalnum(s), is, isbinary(type) ? yp_False : yp_True));
+
+    // Non-alphanumeric.
+    ead(s, type->fromordsCN(N(' ', 'a')), assert_obj(yp_isalnum(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', '\t')), assert_obj(yp_isalnum(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', 'a', '!')), assert_obj(yp_isalnum(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', 'a', '\0', '1')), assert_obj(yp_isalnum(s), is, yp_False));
+
+    // Empty s.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isalnum(s), is, yp_False));
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_isalnum(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_isalpha(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic isalpha.
+    ead(s, type->fromordsCN(N('A', 'a')), assert_obj(yp_isalpha(s), is, yp_True));
+    ead(s, type->fromordsCN(N('A', 'a', O_A_GRAVE, O_a_GRAVE)),
+            assert_obj(yp_isalpha(s), is, isbinary(type) ? yp_False : yp_True));
+
+    // Non-letter.
+    ead(s, type->fromordsCN(N(' ', 'a')), assert_obj(yp_isalpha(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', '\t')), assert_obj(yp_isalpha(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', 'a', '!')), assert_obj(yp_isalpha(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', 'a', '\0', 'b')), assert_obj(yp_isalpha(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', 'a')), assert_obj(yp_isalpha(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', O_SUPER1)), assert_obj(yp_isalpha(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', 'a', O_1OVER4)), assert_obj(yp_isalpha(s), is, yp_False));
+
+    // Empty s.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isalpha(s), is, yp_False));
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_isalpha(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_isascii(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic isascii.
+    ead(s, type->fromordsCN(N('A', 'a', '1', ' ', '\t', '!', '\0', 0x7f)),
+            assert_obj(yp_isascii(s), is, yp_True));
+
+    // Non-ascii.
+    ead(s, type->fromordsCN(N(0x80, 'a')), assert_obj(yp_isascii(s), is, yp_False));
+    ead(s, type->fromordsCN(N(O_A_GRAVE, 'a')), assert_obj(yp_isascii(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', O_a_GRAVE)), assert_obj(yp_isascii(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', O_SUPER1)), assert_obj(yp_isascii(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', '\0', O_1OVER4)), assert_obj(yp_isascii(s), is, yp_False));
+
+    // Empty s.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isascii(s), is, yp_True));
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_obj(yp_isascii(s), is, yp_False));
+        }
+    }
+
+    // Optimization: isascii can check 8 bytes at once.
+    {
+        yp_ssize_t i;
+        for (i = 0; i < 9; i++) {
+            ypObject *ascii = type->fromordsCN(N(' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 0x7f, ' ',
+                    ' ', ' ', ' ', ' ', ' ', ' ', ' '));
+            ypObject *non_ascii = type->fromordsCN(N(' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 0x80,
+                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '));
+            ead(s, yp_getsliceC4(ascii, i, 9, 1), assert_obj(yp_isascii(s), is, yp_True));
+            ead(s, yp_getsliceC4(non_ascii, i, 9, 1), assert_obj(yp_isascii(s), is, yp_False));
+            ead(s, yp_getsliceC4(ascii, i, 9 + 8, 1), assert_obj(yp_isascii(s), is, yp_True));
+            ead(s, yp_getsliceC4(non_ascii, i, 9 + 8, 1), assert_obj(yp_isascii(s), is, yp_False));
+            yp_decrefN(N(non_ascii, ascii));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_isdecimal(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Binary strings don't support isdecimal.
+    if (isbinary(type)) {
+        ead(s, type->fromordsCN(N('1')), assert_raises(yp_isdecimal(s), yp_MethodError));
+        ead(s, type->fromordsCN(N(munit_rand_int_range(0x0, 0xff))),
+                assert_raises(yp_isdecimal(s), yp_MethodError));
+        goto tear_down;
+    }
+
+    // Basic isdecimal.
+    ead(s, type->fromordsCN(N('1')), assert_obj(yp_isdecimal(s), is, yp_True));
+
+    // Non-decimal.
+    ead(s, type->fromordsCN(N('A', '2')), assert_obj(yp_isdecimal(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', 'a')), assert_obj(yp_isdecimal(s), is, yp_False));
+    ead(s, type->fromordsCN(N(O_A_GRAVE, '2')), assert_obj(yp_isdecimal(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', O_a_GRAVE)), assert_obj(yp_isdecimal(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', O_SUPER1, '3')), assert_obj(yp_isdecimal(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '2', O_1OVER4)), assert_obj(yp_isdecimal(s), is, yp_False));
+    ead(s, type->fromordsCN(N(' ', '2')), assert_obj(yp_isdecimal(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '\t')), assert_obj(yp_isdecimal(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '2', '!')), assert_obj(yp_isdecimal(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '2', '\0', '3')), assert_obj(yp_isdecimal(s), is, yp_False));
+
+    // Empty s.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isdecimal(s), is, yp_False));
+
+    // Non-latin-1.
+    {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_isdecimal(s), yp_SystemLimitationError));
+        }
+    }
+
+tear_down:
+    return MUNIT_OK;
+}
+
+static MunitResult test_isdigit(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic isdigit.
+    ead(s, type->fromordsCN(N('1')), assert_obj(yp_isdigit(s), is, yp_True));
+    ead(s, type->fromordsCN(N('1', O_SUPER1)),
+            assert_obj(yp_isdigit(s), is, isbinary(type) ? yp_False : yp_True));
+
+    // Non-digit.
+    ead(s, type->fromordsCN(N('A', '2')), assert_obj(yp_isdigit(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', 'a')), assert_obj(yp_isdigit(s), is, yp_False));
+    ead(s, type->fromordsCN(N(O_A_GRAVE, '2')), assert_obj(yp_isdigit(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', O_a_GRAVE)), assert_obj(yp_isdigit(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '2', O_1OVER4)), assert_obj(yp_isdigit(s), is, yp_False));
+    ead(s, type->fromordsCN(N(' ', '2')), assert_obj(yp_isdigit(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '\t')), assert_obj(yp_isdigit(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '2', '!')), assert_obj(yp_isdigit(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '2', '\0', '3')), assert_obj(yp_isdigit(s), is, yp_False));
+
+    // Empty s.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isdigit(s), is, yp_False));
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_isdigit(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_isidentifier(const MunitParameter params[], fixture_t *fixture)
+{
+    // FIXME
+    return MUNIT_OK;
+}
+
+static MunitResult test_islower(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic islower.
+    ead(s, type->fromordsCN(N('a', 'b')), assert_obj(yp_islower(s), is, yp_True));
+    ead(s, type->fromordsCN(N('a', O_a_GRAVE)), assert_obj(yp_islower(s), is, yp_True));
+
+    // Non-lowercase cased characters. Non-ascii characters are non-cased in binary strings.
+    ead(s, type->fromordsCN(N('A', 'b')), assert_obj(yp_islower(s), is, yp_False));
+    ead(s, type->fromordsCN(N('a', O_A_GRAVE)),
+            assert_obj(yp_islower(s), is, isbinary(type) ? yp_True : yp_False));
+
+    // Non-cased characters are ignored.
+    ead(s, type->fromordsCN(N('a', '1', ' ', '\t', '!', '\0')),
+            assert_obj(yp_islower(s), is, yp_True));
+    ead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0', O_a_GRAVE, O_SUPER1, O_1OVER4, 'b')),
+            assert_obj(yp_islower(s), is, yp_True));
+
+    // No cased characters. Non-ascii characters are non-cased in binary strings.
+    ead(s, type->fromordsCN(0), assert_obj(yp_islower(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0')), assert_obj(yp_islower(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4)),
+            assert_obj(yp_islower(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', O_a_GRAVE)),
+            assert_obj(yp_islower(s), is, isbinary(type) ? yp_False : yp_True));
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_islower(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_isnumeric(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Binary strings don't support isnumeric.
+    if (isbinary(type)) {
+        ead(s, type->fromordsCN(N('1')), assert_raises(yp_isnumeric(s), yp_MethodError));
+        ead(s, type->fromordsCN(N(munit_rand_int_range(0x0, 0xff))),
+                assert_raises(yp_isnumeric(s), yp_MethodError));
+        goto tear_down;
+    }
+
+    // Basic isnumeric.
+    ead(s, type->fromordsCN(N('1', O_SUPER1, O_1OVER4)), assert_obj(yp_isnumeric(s), is, yp_True));
+
+    // Non-numeric.
+    ead(s, type->fromordsCN(N('A', '2')), assert_obj(yp_isnumeric(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', 'a')), assert_obj(yp_isnumeric(s), is, yp_False));
+    ead(s, type->fromordsCN(N(' ', '2')), assert_obj(yp_isnumeric(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '\t')), assert_obj(yp_isnumeric(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '2', '!')), assert_obj(yp_isnumeric(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', '2', '\0', '3')), assert_obj(yp_isnumeric(s), is, yp_False));
+
+    // Empty s.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isnumeric(s), is, yp_False));
+
+    // Non-latin-1.
+    {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_isnumeric(s), yp_SystemLimitationError));
+        }
+    }
+
+tear_down:
+    return MUNIT_OK;
+}
+
+static MunitResult test_isprintable(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Binary strings don't support isprintable.
+    if (isbinary(type)) {
+        ead(s, type->fromordsCN(N('A')), assert_raises(yp_isprintable(s), yp_MethodError));
+        ead(s, type->fromordsCN(N(munit_rand_int_range(0x0, 0xff))),
+                assert_raises(yp_isprintable(s), yp_MethodError));
+        goto tear_down;
+    }
+
+    // Basic isprintable.
+    ead(s, type->fromordsCN(N('A', 'a', '1', ' ', '!', O_A_GRAVE, O_a_GRAVE, O_SUPER1, O_1OVER4)),
+            assert_obj(yp_isprintable(s), is, yp_True));
+
+    // Non-printable.
+    ead(s, type->fromordsCN(N('A', '\t')), assert_obj(yp_isprintable(s), is, yp_False));
+    ead(s, type->fromordsCN(N(0x80, 'a')), assert_obj(yp_isprintable(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', 'a', '\0')), assert_obj(yp_isprintable(s), is, yp_False));
+
+    // Empty s.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isprintable(s), is, yp_True));
+
+    // Non-latin-1.
+    {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_isprintable(s), yp_SystemLimitationError));
+        }
+    }
+
+tear_down:
+    return MUNIT_OK;
+}
+
+static MunitResult test_isspace(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic isspace.
+    ead(s, type->fromordsCN(N('\t', '\n', 0x0b, 0x0c, '\r', ' ')),
+            assert_obj(yp_isspace(s), is, yp_True));
+    ead(s,
+            type->fromordsCN(
+                    N('\t', '\n', 0x0b, 0x0c, '\r', ' ', 0x1c, 0x1d, 0x1e, 0x1f, 0x85, 0xa0)),
+            assert_obj(yp_isspace(s), is, isbinary(type) ? yp_False : yp_True));
+
+    // Non-space.
+    ead(s, type->fromordsCN(N('A', '\n')), assert_obj(yp_isspace(s), is, yp_False));
+    ead(s, type->fromordsCN(N('\t', 'a')), assert_obj(yp_isspace(s), is, yp_False));
+    ead(s, type->fromordsCN(N('\t', '1', 0x0b)), assert_obj(yp_isspace(s), is, yp_False));
+    ead(s, type->fromordsCN(N(O_A_GRAVE, '\n')), assert_obj(yp_isspace(s), is, yp_False));
+    ead(s, type->fromordsCN(N('\t', O_a_GRAVE)), assert_obj(yp_isspace(s), is, yp_False));
+    ead(s, type->fromordsCN(N('\t', O_SUPER1, 0x0b)), assert_obj(yp_isspace(s), is, yp_False));
+    ead(s, type->fromordsCN(N('\t', '\n', O_1OVER4)), assert_obj(yp_isspace(s), is, yp_False));
+    ead(s, type->fromordsCN(N('\t', '\n', '!')), assert_obj(yp_isspace(s), is, yp_False));
+    ead(s, type->fromordsCN(N('\t', '\n', '\0', 0x0c)), assert_obj(yp_isspace(s), is, yp_False));
+
+    // Empty s.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isspace(s), is, yp_False));
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_isspace(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_isupper(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic isupper.
+    ead(s, type->fromordsCN(N('A', 'B')), assert_obj(yp_isupper(s), is, yp_True));
+    ead(s, type->fromordsCN(N('A', O_A_GRAVE)), assert_obj(yp_isupper(s), is, yp_True));
+
+    // Non-uppercase cased characters. Non-ascii characters are non-cased in binary strings.
+    ead(s, type->fromordsCN(N('a', 'B')), assert_obj(yp_isupper(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', O_a_GRAVE)),
+            assert_obj(yp_isupper(s), is, isbinary(type) ? yp_True : yp_False));
+
+    // Non-cased characters are ignored.
+    ead(s, type->fromordsCN(N('A', '1', ' ', '\t', '!', '\0')),
+            assert_obj(yp_isupper(s), is, yp_True));
+    ead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0', O_A_GRAVE, O_SUPER1, O_1OVER4, 'B')),
+            assert_obj(yp_isupper(s), is, yp_True));
+
+    // No cased characters. Non-ascii characters are non-cased in binary strings.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isupper(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0')), assert_obj(yp_isupper(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4)),
+            assert_obj(yp_isupper(s), is, yp_False));
+    ead(s, type->fromordsCN(N('1', O_A_GRAVE)),
+            assert_obj(yp_isupper(s), is, isbinary(type) ? yp_False : yp_True));
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_isupper(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
 // Tests for the string classifiers for the latin-1 characters. The full Unicode Character Database
 // is an optional feature of nohtyP, but the latin-1 characters are always supported, and mostly
 // share the same classifications between bytes and str.
@@ -127,21 +526,21 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
 
 #define assert_char(ord, alpha, decimal, digit, lower, numeric, printable, space, upper)  \
     do {                                                                                  \
-        ypObject *x = type->fromordsCN(1, ord);                                           \
-        assert_obj(yp_isalnum(x), is, expected[alpha == 0 ? numeric : alpha]);            \
-        assert_obj(yp_isalpha(x), is, expected[alpha]);                                   \
-        assert_obj(yp_isascii(x), is, expected[ord < 128 ? 1 : 0]);                       \
-        assert_obj(yp_isdigit(x), is, expected[digit]);                                   \
-        assert_obj(yp_islower(x), is, expected[lower]);                                   \
-        assert_obj(yp_isspace(x), is, expected[space]);                                   \
-        assert_obj(yp_isupper(x), is, expected[upper]);                                   \
+        ypObject *s = type->fromordsCN(1, ord);                                           \
+        assert_obj(yp_isalnum(s), is, expected[alpha == 0 ? numeric : alpha]);            \
+        assert_obj(yp_isalpha(s), is, expected[alpha]);                                   \
+        assert_obj(yp_isascii(s), is, expected[ord < 128 ? 1 : 0]);                       \
+        assert_obj(yp_isdigit(s), is, expected[digit]);                                   \
+        assert_obj(yp_islower(s), is, expected[lower]);                                   \
+        assert_obj(yp_isspace(s), is, expected[space]);                                   \
+        assert_obj(yp_isupper(s), is, expected[upper]);                                   \
         if (!isbinary(type)) {                                                            \
-            assert_obj(yp_isdecimal(x), is, expected[decimal]);                           \
-            /* FIXME assert_obj(yp_isidentifier(x), is, expected[alpha || ord == 95]); */ \
-            assert_obj(yp_isnumeric(x), is, expected[numeric]);                           \
-            assert_obj(yp_isprintable(x), is, expected[printable]);                       \
+            assert_obj(yp_isdecimal(s), is, expected[decimal]);                           \
+            /* FIXME assert_obj(yp_isidentifier(s), is, expected[alpha || ord == 95]); */ \
+            assert_obj(yp_isnumeric(s), is, expected[numeric]);                           \
+            assert_obj(yp_isprintable(s), is, expected[printable]);                       \
         }                                                                                 \
-        yp_decref(x);                                                                     \
+        yp_decref(s);                                                                     \
     } while (0)
 
     /*
@@ -432,8 +831,13 @@ static MunitParameterEnum test_string_params[] = {
 
 MunitTest test_string_tests[] = {TEST(test_findC, test_string_params),
         TEST(test_indexC, test_string_params), TEST(test_rfindC, test_string_params),
-        TEST(test_rindexC, test_string_params), TEST(test_latin_1_classifiers, test_string_params),
-        {NULL}};
+        TEST(test_rindexC, test_string_params), TEST(test_isalnum, test_string_params),
+        TEST(test_isalpha, test_string_params), TEST(test_isascii, test_string_params),
+        TEST(test_isdecimal, test_string_params), TEST(test_isdigit, test_string_params),
+        TEST(test_isidentifier, test_string_params), TEST(test_islower, test_string_params),
+        TEST(test_isnumeric, test_string_params), TEST(test_isprintable, test_string_params),
+        TEST(test_isspace, test_string_params), TEST(test_isupper, test_string_params),
+        TEST(test_latin_1_classifiers, test_string_params), {NULL}};
 
 
 extern void test_string_initialize(void) {}

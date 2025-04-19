@@ -920,7 +920,7 @@ typedef struct _fixture_type_t {
     rand_objs_func rand_ordered_items;
 
     // Functions for strings (bytes, str, etc.).
-    objvarargfunc fromordsCN;  // Creates a string from the yp_int_t ordinal values.
+    objvarargfunc fromordsCN;  // Creates a string from the int ordinal values.
 
     // Flags to describe the properties of the type.
     int is_mutable;
