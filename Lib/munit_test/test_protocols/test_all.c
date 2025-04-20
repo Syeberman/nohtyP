@@ -184,7 +184,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_raises(yp_isalpha(self), yp_MethodError);
         assert_raises(yp_isdecimal(self), yp_MethodError);
         assert_raises(yp_isdigit(self), yp_MethodError);
-        assert_raises(yp_isidentifier(self), yp_NotImplementedError);  // FIXME yp_MethodError
+        assert_raises(yp_isidentifier(self), yp_MethodError);
         assert_raises(yp_islower(self), yp_MethodError);
         assert_raises(yp_isnumeric(self), yp_MethodError);
         assert_raises(yp_isprintable(self), yp_MethodError);

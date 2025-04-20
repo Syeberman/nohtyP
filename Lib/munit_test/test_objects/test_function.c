@@ -314,13 +314,13 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
     // Invalid signatures.
     {
-        yp_ssize_t i;
-        // ypObject   *str_1 = yp_str_frombytesC2(-1, "1");
-        ypObject *str_star_a = yp_str_frombytesC2(-1, "*a");
-        // ypObject   *str_star_1 = yp_str_frombytesC2(-1, "*1");
-        ypObject *str_star_star = yp_str_frombytesC2(-1, "**");
-        ypObject *str_star_star_a = yp_str_frombytesC2(-1, "**a");
-        // ypObject   *str_star_star_1 = yp_str_frombytesC2(-1, "**1");
+        yp_ssize_t  i;
+        ypObject   *str_1 = yp_str_frombytesC2(-1, "1");
+        ypObject   *str_star_a = yp_str_frombytesC2(-1, "*a");
+        ypObject   *str_star_1 = yp_str_frombytesC2(-1, "*1");
+        ypObject   *str_star_star = yp_str_frombytesC2(-1, "**");
+        ypObject   *str_star_star_a = yp_str_frombytesC2(-1, "**a");
+        ypObject   *str_star_star_1 = yp_str_frombytesC2(-1, "**1");
         signature_t signatures[] = {
                 {1, {{str_slash}}},                           // / cannot be first
                 {2, {{str_star}, {str_slash}}},               // / cannot be after *
@@ -350,10 +350,10 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
                 // Non-identifiers
                 {1, {{str_empty}}},
-                // TODO Implement str_isidentifier: {1, {{str_1}}},
-                // TODO Implement str_isidentifier: {1, {{str_star_1}}},
+                {1, {{str_1}}},
+                {1, {{str_star_1}}},
                 {1, {{str_star_star}}},
-                // TODO Implement str_isidentifier: {1, {{str_star_star_1}}},
+                {1, {{str_star_star_1}}},
 
                 // Non-unique names
                 {2, {{str_a}, {str_a}}},
@@ -370,7 +370,8 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
             yp_function_decl_t decl = {None_code, 0, signature.n, signature.params, NULL, NULL};
             assert_raises(yp_functionC(&decl), yp_ParameterSyntaxError);
         }
-        yp_decrefN(N(str_star_a, str_star_star, str_star_star_a));
+        yp_decrefN(
+                N(str_star_star_1, str_star_star_a, str_star_star, str_star_1, str_star_a, str_1));
     }
 
     // Parameter names must be strs.

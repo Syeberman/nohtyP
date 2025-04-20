@@ -1936,6 +1936,8 @@ ypAPI const yp_memory_allocator_t *const yp_mem_default_allocator;
 #define yp_CASED_LOWER (1 << 0)
 #define yp_CASED_TITLE (1 << 1)
 #define yp_CASED_UPPER (1 << 2)
+#define yp_XID_START (1 << 0)
+#define yp_XID_CONTINUE (1 << 1)
 
 // Interface for a character database. Used by yp_initialize_parameters_t to add full Unicode
 // support to text strings.
@@ -1963,6 +1965,10 @@ typedef struct _yp_character_database_t {
 
     // Returns true (non-zero) if c is a line break, and false if it's not.
     int (*islinebreak)(yp_uint32_t c);
+
+    // Returns a combination of the yp_XID_* flags if c is valid in identifiers (as per Unicode's
+    // "Default Identifiers" definition), and 0 if it's not.
+    int (*isxid)(yp_uint32_t c);
 
     // Writes the lowercase form of c to converted and returns the number of characters written. If
     // c is not cased it is written to converted unchanged. len is the allocated length of

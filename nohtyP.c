@@ -1887,6 +1887,12 @@ static int yp_chardata_binary_islinebreak(yp_uint32_t c)
     }
 }
 
+static int yp_chardata_binary_isxid(yp_uint32_t c)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    return 0;
+}
+
 static yp_ssize_t yp_chardata_binary_tolower(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
 {
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
@@ -1913,6 +1919,7 @@ static const yp_character_database_t yp_chardata_binary = {
         yp_chardata_binary_isprintable,      // isprintable
         yp_chardata_binary_isspace,          // isspace
         yp_chardata_binary_islinebreak,      // islinebreak
+        yp_chardata_binary_isxid,            // isxid
         yp_chardata_binary_tolower,          // tolower
         yp_chardata_binary_toupper,          // totitle
         yp_chardata_binary_toupper,          // toupper
@@ -1997,6 +2004,22 @@ static int yp_chardata_latin_1_islinebreak(yp_uint32_t c)
     }
 }
 
+static int yp_chardata_latin_1_isxid(yp_uint32_t c)
+{
+    yp_uint8_t chardata;
+    int        mask = 0;
+
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    if (c > ypStringLib_MAX_LATIN_1) return 0;
+    chardata = _yp_chardata_table[c];
+
+    // The underscore is not in Unicode's XID_Start property, only XID_Continue. It's Python that
+    // allows identifiers to start with the underscore.
+    if (chardata & (_yp_CDF_LOWER | _yp_CDF_UPPER)) mask |= yp_XID_START | yp_XID_CONTINUE;
+    if (chardata & _yp_CDF_DECIMAL || c == '_' || c == 0xB7) mask |= yp_XID_CONTINUE;
+    return mask;
+}
+
 static yp_ssize_t yp_chardata_latin_1_tolower(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
 {
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
@@ -2043,6 +2066,7 @@ static const yp_character_database_t yp_chardata_latin_1 = {
         yp_chardata_latin_1_isprintable,     // isprintable
         yp_chardata_latin_1_isspace,         // isspace
         yp_chardata_latin_1_islinebreak,     // islinebreak
+        yp_chardata_latin_1_isxid,           // isxid
         yp_chardata_latin_1_tolower,         // tolower
         yp_chardata_latin_1_totitle,         // totitle
         yp_chardata_latin_1_toupper,         // toupper
@@ -8756,6 +8780,29 @@ static ypObject *ypStringLib_isspace(ypObject *s)
     return yp_True;
 }
 
+static ypObject *ypStringLib_isidentifier(ypObject *s)
+{
+    void                          *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                     s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo     *s_enc = ypStringLib_ENC(s);
+    const yp_character_database_t *chardata = s_enc->chardata;
+    yp_uint32_t                    c;
+    yp_ssize_t                     i;
+
+    if (s_len < 1) return yp_False;
+
+    c = s_enc->getindexX(s_data, 0);
+    if (c > chardata->max_char) return yp_SystemLimitationError;
+    if (!(chardata->isxid(c) & yp_XID_START) && c != '_') return yp_False;
+
+    for (i = 0; i < s_len; i++) {
+        c = s_enc->getindexX(s_data, i);
+        if (c > chardata->max_char) return yp_SystemLimitationError;
+        if (!(chardata->isxid(c) & yp_XID_CONTINUE)) return yp_False;
+    }
+    return yp_True;
+}
+
 // There are some efficiencies we can exploit if iterable/x is a fellow string object
 // TODO Is this really a scenario for which we should be optimizing? How typical is ''.join('')?
 static ypObject *_ypStringLib_join_fromstring(ypObject *s, ypObject *x)
@@ -12453,9 +12500,10 @@ ypObject *yp_isdigit(ypObject *s)
     return ypStringLib_isalnum(s, yp_ALNUM_DECIMAL | yp_ALNUM_DIGIT);
 }
 
-ypObject *yp_isidentifier(ypObject *s) {
-    // FIXME if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_METHOD_ERR(s);
-    return yp_NotImplementedError;
+ypObject *yp_isidentifier(ypObject *s)
+{
+    if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_METHOD_ERR(s);
+    return ypStringLib_isidentifier(s);
 }
 
 ypObject *yp_islower(ypObject *s)
@@ -19688,15 +19736,15 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
         }
 
         if (param_name != NULL) {
-            // TODO: Implement str_isidentifier, then enable this.
-            // result = str_isidentifier(param_name);
-            // if (result != yp_True) {
-            //     // Invalid: (1), (*1), (**1)
-            //     if (result == yp_False) result = yp_ParameterSyntaxError;
-            //     yp_ASSERT(yp_isexceptionC(result), "unexpected return from str_isidentifier");
-            //     yp_decref(param_name);
-            //     break;
-            // }
+            result = ypStringLib_isidentifier(param_name);
+            if (result != yp_True) {
+                // Invalid: (1), (*1), (**1)
+                if (result == yp_False) result = yp_ParameterSyntaxError;
+                yp_ASSERT(
+                        yp_isexceptionC(result), "unexpected return from ypStringLib_isidentifier");
+                yp_decref(param_name);
+                break;
+            }
 
             result = set_pushunique(param_names, param_name);
             if (result != yp_None) {
@@ -21656,6 +21704,7 @@ static void ypStringLib_initialize(const yp_initialize_parameters_t *args)
     chardata.isprintable = args_chardata->isprintable;
     chardata.isspace = args_chardata->isspace;
     chardata.islinebreak = args_chardata->islinebreak;
+    chardata.isxid = args_chardata->isxid;
     chardata.tolower = args_chardata->tolower;
     chardata.totitle = args_chardata->totitle;
     chardata.toupper = args_chardata->toupper;

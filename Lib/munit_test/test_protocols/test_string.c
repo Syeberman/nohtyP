@@ -318,7 +318,57 @@ static MunitResult test_isdigit(const MunitParameter params[], fixture_t *fixtur
 
 static MunitResult test_isidentifier(const MunitParameter params[], fixture_t *fixture)
 {
-    // FIXME
+    fixture_type_t *type = fixture->type;
+
+    // Binary strings don't support isidentifier.
+    if (isbinary(type)) {
+        ead(s, type->fromordsCN(N('A')), assert_raises(yp_isidentifier(s), yp_MethodError));
+        ead(s, type->fromordsCN(N(munit_rand_int_range(0x0, 0xff))),
+                assert_raises(yp_isidentifier(s), yp_MethodError));
+        goto tear_down;
+    }
+
+    // Basic isidentifier.
+    ead(s, type->fromordsCN(N('A', 'a', '1', '_', O_A_GRAVE, O_a_GRAVE, 0xb7)),
+            assert_obj(yp_isidentifier(s), is, yp_True));
+
+    // Unicode identifier rules apply, except underscore is allowed as the first character.
+    ead(s, type->fromordsCN(N('_', 'A', 'a', '1', O_A_GRAVE, O_a_GRAVE, 0xb7)),
+            assert_obj(yp_isidentifier(s), is, yp_True));
+
+    // Characters that are invalid at the start.
+    ead(s, type->fromordsCN(N('1', 'a')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N(0xb7, 'a')), assert_obj(yp_isidentifier(s), is, yp_False));
+
+    // Characters that are invalid anywhere.
+    ead(s, type->fromordsCN(N(' ', 'a')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', ' ', 'a')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N('\t', 'a')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', '\t')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N('!', 'A', 'a')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', 'a', '!')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N('\0', 'A', 'a')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', 'a', '\0', 'b')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N(O_SUPER1, 'a')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', O_SUPER1)), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N(O_1OVER4, 'A', 'a')), assert_obj(yp_isidentifier(s), is, yp_False));
+    ead(s, type->fromordsCN(N('A', 'a', O_1OVER4)), assert_obj(yp_isidentifier(s), is, yp_False));
+
+    // Empty s.
+    ead(s, type->fromordsCN(0), assert_obj(yp_isidentifier(s), is, yp_False));
+
+    // Non-latin-1.
+    {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_isidentifier(s), yp_SystemLimitationError));
+            ead(s, type->fromordsCN(N('A', ords_non_latin_1[i])),
+                    assert_raises(yp_isidentifier(s), yp_SystemLimitationError));
+        }
+    }
+
+tear_down:
     return MUNIT_OK;
 }
 
@@ -522,25 +572,27 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
     fixture_type_t *type = fixture->type;
     ypObject       *expected[] = {yp_False, yp_True, isbinary(type) ? yp_False : yp_True};
 
-    // FIXME Not on bytes: "isdecimal", "isidentifier", "isnumeric", "isprintable"
-
-#define assert_char(ord, alpha, decimal, digit, lower, numeric, printable, space, upper)  \
-    do {                                                                                  \
-        ypObject *s = type->fromordsCN(1, ord);                                           \
-        assert_obj(yp_isalnum(s), is, expected[alpha == 0 ? numeric : alpha]);            \
-        assert_obj(yp_isalpha(s), is, expected[alpha]);                                   \
-        assert_obj(yp_isascii(s), is, expected[ord < 128 ? 1 : 0]);                       \
-        assert_obj(yp_isdigit(s), is, expected[digit]);                                   \
-        assert_obj(yp_islower(s), is, expected[lower]);                                   \
-        assert_obj(yp_isspace(s), is, expected[space]);                                   \
-        assert_obj(yp_isupper(s), is, expected[upper]);                                   \
-        if (!isbinary(type)) {                                                            \
-            assert_obj(yp_isdecimal(s), is, expected[decimal]);                           \
-            /* FIXME assert_obj(yp_isidentifier(s), is, expected[alpha || ord == 95]); */ \
-            assert_obj(yp_isnumeric(s), is, expected[numeric]);                           \
-            assert_obj(yp_isprintable(s), is, expected[printable]);                       \
-        }                                                                                 \
-        yp_decref(s);                                                                     \
+#define assert_char(ord, alpha, decimal, digit, lower, numeric, printable, space, upper)         \
+    do {                                                                                         \
+        ypObject *s = type->fromordsCN(1, ord);                                                  \
+        ypObject *_s = type->fromordsCN(2, '_', ord);                                            \
+        assert_obj(yp_isalnum(s), is, expected[alpha == 0 ? numeric : alpha]);                   \
+        assert_obj(yp_isalpha(s), is, expected[alpha]);                                          \
+        assert_obj(yp_isascii(s), is, ord < 0x80 ? yp_True : yp_False);                          \
+        assert_obj(yp_isdigit(s), is, expected[digit]);                                          \
+        assert_obj(yp_islower(s), is, expected[lower]);                                          \
+        assert_obj(yp_isspace(s), is, expected[space]);                                          \
+        assert_obj(yp_isupper(s), is, expected[upper]);                                          \
+        if (!isbinary(type)) {                                                                   \
+            assert_obj(yp_isdecimal(s), is, expected[decimal]);                                  \
+            assert_obj(yp_isidentifier(s), is, (alpha != 0 || ord == '_') ? yp_True : yp_False); \
+            assert_obj(yp_isidentifier(_s), is,                                                  \
+                    (alpha != 0 || decimal != 0 || ord == '_' || ord == 0xb7) ? yp_True :        \
+                                                                                yp_False);       \
+            assert_obj(yp_isnumeric(s), is, expected[numeric]);                                  \
+            assert_obj(yp_isprintable(s), is, expected[printable]);                              \
+        }                                                                                        \
+        yp_decrefN(N(_s, s));                                                                    \
     } while (0)
 
     /*
