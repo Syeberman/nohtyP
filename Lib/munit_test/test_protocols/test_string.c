@@ -1,6 +1,7 @@
 
 #include "munit_test/unittest.h"
 
+
 #define O_a_GRAVE 0xE0        // 'à', "a with grave", a non-ascii latin-1 lowercase
 #define O_A_GRAVE 0xC0        // 'À', "A with grave", a non-ascii latin-1 uppercase
 #define O_SUPER1 0xb9         // '¹', "superscript 1", a non-ascii latin-1 non-decimal digit
@@ -27,6 +28,12 @@ static int ords_non_latin_1[] = {
 // TODO This (exception passthrough) even includes yp_formatN/etc where the argument is never
 // referenced in the format string.
 
+typedef struct _slice_args_t {
+    yp_ssize_t start;
+    yp_ssize_t stop;
+    yp_ssize_t step;
+} slice_args_t;
+
 // FIXME Strings are either "binary" or "text".
 static int isbinary(fixture_type_t *type)
 {
@@ -45,19 +52,19 @@ static void _test_findC(fixture_type_t *type,
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[3];
     ypObject     *s;
-    ypObject     *other_0_1;
-    ypObject     *other_1_2;
-    ypObject     *other_0_2;
-    ypObject     *other_1_0;
+    ypObject     *x_0_1;
+    ypObject     *x_1_2;
+    ypObject     *x_0_2;
+    ypObject     *x_1_0;
     ypObject     *empty = type->newN(0);
 
     obj_array_fill(items, uq, type->rand_items);
     s = type->newN(N(items[0], items[1], items[2]));
-    // TODO Test against different "other" types (the other pair, really)
-    other_0_1 = type->newN(N(items[0], items[1]));
-    other_1_2 = type->newN(N(items[1], items[2]));
-    other_0_2 = type->newN(N(items[0], items[2]));
-    other_1_0 = type->newN(N(items[1], items[0]));
+    // FIXME Test against different "other" types (the other pair, really)
+    x_0_1 = type->newN(N(items[0], items[1]));
+    x_1_2 = type->newN(N(items[1], items[2]));
+    x_0_2 = type->newN(N(items[0], items[2]));
+    x_1_0 = type->newN(N(items[1], items[0]));
 
 #define assert_not_found_exc(expression)                    \
     do {                                                    \
@@ -66,21 +73,21 @@ static void _test_findC(fixture_type_t *type,
         if (raises) assert_isexception(exc, yp_ValueError); \
     } while (0)
 
-    assert_ssizeC_exc(any_findC(s, other_0_1, &exc), ==, 0);            // Sub-string.
-    assert_ssizeC_exc(any_findC(s, other_1_2, &exc), ==, 1);            // Sub-string.
-    assert_not_found_exc(any_findC(s, other_0_2, &exc));                // Out-of-order.
-    assert_not_found_exc(any_findC(s, other_1_0, &exc));                // Out-of-order.
+    assert_ssizeC_exc(any_findC(s, x_0_1, &exc), ==, 0);                // Sub-string.
+    assert_ssizeC_exc(any_findC(s, x_1_2, &exc), ==, 1);                // Sub-string.
+    assert_not_found_exc(any_findC(s, x_0_2, &exc));                    // Out-of-order.
+    assert_not_found_exc(any_findC(s, x_1_0, &exc));                    // Out-of-order.
     assert_ssizeC_exc(any_findC(s, empty, &exc), ==, forward ? 0 : 3);  // Empty.
     assert_ssizeC_exc(any_findC(s, s, &exc), ==, 0);                    // Self.
 
-    assert_ssizeC_exc(any_findC5(s, other_0_1, 0, 3, &exc), ==, 0);  // Total slice.
-    assert_ssizeC_exc(any_findC5(s, other_0_1, 0, 2, &exc), ==, 0);  // Exact slice.
-    assert_not_found_exc(any_findC5(s, other_0_1, 0, 1, &exc));      // Too-small slice.
-    assert_not_found_exc(any_findC5(s, other_0_1, 0, 0, &exc));      // Empty slice.
+    assert_ssizeC_exc(any_findC5(s, x_0_1, 0, 3, &exc), ==, 0);  // Total slice.
+    assert_ssizeC_exc(any_findC5(s, x_0_1, 0, 2, &exc), ==, 0);  // Exact slice.
+    assert_not_found_exc(any_findC5(s, x_0_1, 0, 1, &exc));      // Too-small slice.
+    assert_not_found_exc(any_findC5(s, x_0_1, 0, 0, &exc));      // Empty slice.
 
-    assert_ssizeC_exc(any_findC5(s, other_1_2, 1, 3, &exc), ==, 1);  // Exact slice.
-    assert_not_found_exc(any_findC5(s, other_1_2, 1, 2, &exc));      // Too-small slice.
-    assert_not_found_exc(any_findC5(s, other_1_2, 1, 1, &exc));      // Empty slice.
+    assert_ssizeC_exc(any_findC5(s, x_1_2, 1, 3, &exc), ==, 1);  // Exact slice.
+    assert_not_found_exc(any_findC5(s, x_1_2, 1, 2, &exc));      // Too-small slice.
+    assert_not_found_exc(any_findC5(s, x_1_2, 1, 1, &exc));      // Empty slice.
 
     assert_ssizeC_exc(any_findC5(s, empty, 0, 3, &exc), ==, forward ? 0 : 3);  // Empty, total.
     assert_ssizeC_exc(any_findC5(s, empty, 1, 2, &exc), ==, forward ? 1 : 2);  // Empty, partial.
@@ -97,7 +104,7 @@ static void _test_findC(fixture_type_t *type,
 #undef assert_not_found_exc
 
     obj_array_decref(items);
-    yp_decrefN(N(s, empty, other_0_1, other_1_2, other_0_2, other_1_0));
+    yp_decrefN(N(s, empty, x_0_1, x_1_2, x_0_2, x_1_0));
     uniqueness_dealloc(uq);
 }
 
@@ -877,6 +884,208 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
     return MUNIT_OK;
 }
 
+static void _test_startswith(fixture_type_t *type, peer_type_t *peer)
+{
+    fixture_type_t *x_type = peer->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject       *items[6];
+    ypObject       *s;
+    ypObject       *empty = type->newN(0);
+    ypObject       *x_empty = x_type->newN(0);
+    ypObject       *x_0;
+    ypObject       *x_1;
+    ypObject       *x_1_2;
+    ypObject       *x_1_4;
+    ypObject       *x_2;
+    ypObject       *x_2_1;
+    ypObject       *x_2_3;
+    ypObject       *x_3;
+    obj_array_fill(items, uq, peer->rand_items);
+    s = type->newN(N(items[1], items[2], items[3]));
+    x_0 = x_type->newN(N(items[0]));
+    x_1 = x_type->newN(N(items[1]));
+    x_1_2 = x_type->newN(N(items[1], items[2]));
+    x_1_4 = x_type->newN(N(items[0], items[4]));
+    x_2 = x_type->newN(N(items[2]));
+    x_2_1 = x_type->newN(N(items[2], items[1]));
+    x_2_3 = x_type->newN(N(items[2], items[3]));
+    x_3 = x_type->newN(N(items[3]));
+
+    // FIXME Differing str encodings.
+    // FIXME Substring is duplicated in string? Maybe x_1_1?
+
+    // Basic startswith.
+    assert_obj(yp_startswith(s, x_1), is, yp_True);
+    assert_obj(yp_startswith(s, x_1_2), is, yp_True);
+
+    // Characters not in string.
+    assert_obj(yp_startswith(s, x_0), is, yp_False);
+    assert_obj(yp_startswith(s, x_1_4), is, yp_False);
+
+    // Characters not at start.
+    assert_obj(yp_startswith(s, x_2), is, yp_False);
+    assert_obj(yp_startswith(s, x_2_3), is, yp_False);
+
+    // Characters out-of-order.
+    assert_obj(yp_startswith(s, x_2_1), is, yp_False);
+
+    // Empty x.
+    assert_obj(yp_startswith(s, x_empty), is, yp_True);
+    assert_obj(yp_startswith(empty, x_empty), is, yp_True);
+
+    // Empty s.
+    assert_obj(yp_startswith(empty, x_1), is, yp_False);
+    assert_obj(yp_startswith(empty, x_1_2), is, yp_False);
+
+    // Basic slice.
+    assert_obj(yp_startswithC4(s, x_1, 0, 1), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1, 1, 2), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_1_2, 0, 1), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_1_2, 1, 2), is, yp_False);
+
+    // Negative indicies.
+    assert_obj(yp_startswithC4(s, x_1_2, -3, -1), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1_2, -1, 3), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_3, -3, -1), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_3, -1, 3), is, yp_True);
+
+    // Total slice.
+    assert_obj(yp_startswithC4(s, x_0, 0, 3), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_1, 0, 3), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1_2, 0, 3), is, yp_True);
+
+    // Total slice, negative indicies.
+    assert_obj(yp_startswithC4(s, x_0, -3, 3), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_1, -3, 3), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1_2, -3, 3), is, yp_True);
+
+    // Empty slices.
+    {
+        slice_args_t slices[] = {
+                // recall step is always 1 for startswith
+                {0, 0, 1},     // typical empty slice
+                {3, 99, 1},    // i>=len(s) (regardless of j)
+                {-99, -4, 1},  // j<-len(s) (regardless of i)
+                {2, 2, 1},     // i=j (regardless of k)
+                {1, 0, 1},     // i>j
+                {-1, -4, 1},   // reverse total slice...but k is always 1
+        };
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(slices); i++) {
+            slice_args_t args = slices[i];
+            assert_obj(yp_startswithC4(s, x_1, args.start, args.stop), is, yp_False);
+            assert_obj(yp_startswithC4(s, x_1_2, args.start, args.stop), is, yp_False);
+            // XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+            assert_obj(yp_startswithC4(s, x_empty, args.start, args.stop), is, yp_True);
+            assert_obj(yp_startswithC4(empty, x_empty, args.start, args.stop), is, yp_True);
+        }
+    }
+
+    // yp_SLICE_DEFAULT.
+    assert_obj(yp_startswithC4(s, x_1, yp_SLICE_DEFAULT, 1), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1, 0, yp_SLICE_DEFAULT), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_2, yp_SLICE_DEFAULT, 2), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_2, 1, yp_SLICE_DEFAULT), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_2, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_0, yp_SLICE_DEFAULT, 2), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_0, 0, yp_SLICE_DEFAULT), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_0, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT), is, yp_False);
+
+    // yp_SLICE_LAST.
+    assert_obj(yp_startswithC4(s, x_1, yp_SLICE_LAST, 2), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_1, 0, yp_SLICE_LAST), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1, yp_SLICE_LAST, yp_SLICE_LAST), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_2, yp_SLICE_LAST, 2), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_2, 1, yp_SLICE_LAST), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_2, yp_SLICE_LAST, yp_SLICE_LAST), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_0, yp_SLICE_LAST, 2), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_0, 0, yp_SLICE_LAST), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_0, yp_SLICE_LAST, yp_SLICE_LAST), is, yp_False);
+
+    // x is s.
+    assert_obj(yp_startswith(s, s), is, yp_True);
+    assert_obj(yp_startswithC4(s, s, 0, 1), is, yp_False);
+    assert_obj(yp_startswithC4(s, s, 0, 3), is, yp_True);
+
+    // x is a tuple of strings.
+    ead(x_tuple, yp_tupleN(N(x_0, x_1)), assert_obj(yp_startswith(s, x_tuple), is, yp_True));
+    ead(x_tuple, yp_tupleN(N(x_0, x_1_4)), assert_obj(yp_startswith(s, x_tuple), is, yp_False));
+    ead(x_tuple, yp_tupleN(N(x_1)), assert_obj(yp_startswithC4(s, x_tuple, 0, 3), is, yp_True));
+    ead(x_tuple, yp_tupleN(N(x_1)), assert_obj(yp_startswithC4(s, x_tuple, 1, 3), is, yp_False));
+
+    // x is an empty tuple.
+    ead(x_tuple, yp_tupleN(0), assert_obj(yp_startswith(s, x_tuple), is, yp_False));
+    ead(x_tuple, yp_tupleN(0), assert_obj(yp_startswith(empty, x_tuple), is, yp_False));
+    ead(x_tuple, yp_tupleN(0), assert_obj(yp_startswithC4(s, x_tuple, 0, 0), is, yp_False));
+
+    // Binary and text types cannot be mixed. FIXME Parameterize?
+    if (isbinary(type)) {
+        ead(x, rand_obj(uq, fixture_type_str), assert_raises(yp_startswith(s, x), yp_TypeError));
+        ead(x, rand_obj(uq, fixture_type_chrarray),
+                assert_raises(yp_startswith(s, x), yp_TypeError));
+    } else {
+        ead(x, rand_obj(uq, fixture_type_bytes), assert_raises(yp_startswith(s, x), yp_TypeError));
+        ead(x, rand_obj(uq, fixture_type_bytearray),
+                assert_raises(yp_startswith(s, x), yp_TypeError));
+    }
+
+    // x is an item. Supported on text as their items are strings.
+    if (isbinary(type)) {
+        assert_raises(yp_startswith(s, items[1]), yp_TypeError);
+    } else {
+        assert_obj(yp_startswith(s, items[1]), is, yp_True);
+    }
+
+    // x is a list, which is not supported. TODO Should it be?
+    ead(x, yp_listN(N(x_1)), assert_raises(yp_startswith(s, x), yp_TypeError));
+
+    // x is not an iterable.
+    assert_raises(yp_startswith(s, not_iterable), yp_TypeError);
+
+    // Optimization: early exit if x is a tuple with a match, even if x contains bad types.
+    // FIXME This is how Python behaves, but it can hide errors. Should we check remaining items?
+    // FIXME yp_isdisjoint has early exit; is there a counterexample? We should standardize.
+    ead(x_tuple, yp_tupleN(N(x_0, not_iterable)),
+            assert_raises(yp_startswith(s, x_tuple), yp_TypeError));
+    ead(x_tuple, yp_tupleN(N(x_1, not_iterable)),
+            assert_obj(yp_startswith(s, x_tuple), is, yp_True));
+
+    // Exception passthrough.
+    assert_raises(yp_startswith(s, yp_SyntaxError), yp_SyntaxError);
+    assert_raises(yp_startswithC4(s, yp_SyntaxError, 0, 1), yp_SyntaxError);
+    assert_raises(yp_startswithC4(s, yp_SyntaxError, 0, 0), yp_SyntaxError);
+    assert_raises(yp_startswith(empty, yp_SyntaxError), yp_SyntaxError);
+    assert_raises(yp_startswithC4(empty, yp_SyntaxError, 0, 1), yp_SyntaxError);
+    assert_raises(yp_startswithC4(empty, yp_SyntaxError, 0, 0), yp_SyntaxError);
+
+    assert_sequence(s, items[1], items[2], items[3]);  // s unchanged.
+
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+    yp_decrefN(N(not_iterable, s, empty, x_empty, x_0, x_1, x_1_2, x_1_4, x_2, x_2_1, x_2_3, x_3));
+}
+
+static MunitResult test_startswith(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    peer_type_t    *peer;
+
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (!peer->type->is_string) continue;  // Skip peers that are not strings.
+        _test_startswith(type, peer);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_endswith(const MunitParameter params[], fixture_t *fixture)
+{
+    // FIXME
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_string_params[] = {
         {param_key_type, param_values_types_string}, {NULL}};
@@ -889,7 +1098,8 @@ MunitTest test_string_tests[] = {TEST(test_findC, test_string_params),
         TEST(test_isidentifier, test_string_params), TEST(test_islower, test_string_params),
         TEST(test_isnumeric, test_string_params), TEST(test_isprintable, test_string_params),
         TEST(test_isspace, test_string_params), TEST(test_isupper, test_string_params),
-        TEST(test_latin_1_classifiers, test_string_params), {NULL}};
+        TEST(test_latin_1_classifiers, test_string_params),
+        TEST(test_startswith, test_string_params), TEST(test_endswith, test_string_params), {NULL}};
 
 
 extern void test_string_initialize(void) {}

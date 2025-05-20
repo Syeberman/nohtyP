@@ -10791,6 +10791,7 @@ static ypObject *_bytes_startswith_or_endswith(
         ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
     // FIXME FIXME Also support lists?  Python requires a tuple here...
+    // FIXME Find other places where ypObject_TYPE_CODE is used and decide if it should be the pair.
     if (ypObject_TYPE_CODE(x) == ypTuple_CODE) {
         yp_ssize_t i;
         for (i = 0; i < ypTuple_LEN(x); i++) {
