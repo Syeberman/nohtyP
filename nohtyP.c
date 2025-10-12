@@ -1184,7 +1184,10 @@ static yp_hash_t yp_HashSet_fini(yp_HashSet_state_t *state)
 
 // Macros to work with surrogates
 // XXX Adapted from Python's unicodeobject.h
-#define ypStringLib_IS_SURROGATE(ch) (0xD800 <= (ch) && (ch) <= 0xDFFF)
+#define ypStringLib_MIN_SURROGATE (0xD800u)
+#define ypStringLib_MAX_SURROGATE (0xDFFFu)
+#define ypStringLib_IS_SURROGATE(ch) \
+    (ypStringLib_MIN_SURROGATE <= (ch) && (ch) <= ypStringLib_MAX_SURROGATE)
 
 
 // TODO Make this configurable via yp_initialize, and/or dynamically
@@ -7473,7 +7476,7 @@ static void ypStringLib_elemcopy_maybedownconvert_getslice(int dest_sizeshift, v
         yp_ssize_t dest_i, int src_sizeshift, const void *src, yp_ssize_t src_i,
         yp_ssize_t src_step, yp_ssize_t slicelength)
 {
-    yp_ASSERT(dest_sizeshift >= src_sizeshift, "can't elemcopy to smaller encoding");
+    yp_ASSERT(dest_sizeshift <= src_sizeshift, "can't elemcopy to larger encoding");
     yp_ASSERT(dest != src, "cannot elemcopy inside an object; use ypStringLib_ELEMMOVE");
     yp_ASSERT(dest_i >= 0 && src_i >= 0 && slicelength >= 0, "indices/lengths must be >=0");
     ypSlice_ASSERT_ADJUSTED_INDICES(src_i, (yp_ssize_t)yp_SLICE_DEFAULT, src_step, slicelength);
@@ -7887,6 +7890,17 @@ static yp_UNUSED ypObject *_ypStr_new_ucs_4(int type, yp_ssize_t requiredLen, in
     return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_enc_ucs_4);
 }
 
+// Returns a (null-terminated) string of null characters of the given length.
+static ypObject *_ypStr_new_latin_1_fromnull(int type, yp_ssize_t len)
+{
+    ypObject *newS = _ypStringLib_new(type, len, /*alloclen_fixed=*/TRUE, ypStringLib_enc_latin_1);
+    if (yp_isexceptionC(newS)) return newS;
+    yp_memset(ypStringLib_DATA(newS), '\0', len + 1 /*+1 for extra null terminator*/);
+    ypStringLib_SET_LEN(newS, len);
+    ypStringLib_ASSERT_INVARIANTS(newS);
+    return newS;
+}
+
 // Returns an empty string of the given type, which may be one of the immortal immutables.
 static ypObject *ypStringLib_new_empty(int type)
 {
@@ -8077,7 +8091,7 @@ static ypObject *ypStringLib_extend_fromiterable(ypObject *s, ypObject *iterable
     mi = yp_miniiter(iterable, &mi_state);  // new ref
     if (yp_isexceptionC(mi)) return mi;
     result = _ypStringLib_extend_fromiter(s, mi, &mi_state);
-    ypStringLib_ENC(s)->setindexX(ypStringLib_DATA(s), ypStringLib_LEN(s), 0);
+    ypStringLib_ENC(s)->setindexX(ypStringLib_DATA(s), ypStringLib_LEN(s), '\0');
     yp_decref(mi);
     ypStringLib_ASSERT_INVARIANTS(s);
     return result;
@@ -8119,7 +8133,7 @@ static ypObject *ypStringLib_extend_fromstring(ypObject *s, ypObject *x)
         ypStringLib_elemcopy_maybeupconvert(newEnc->sizeshift, ypStringLib_DATA(s),
                 ypStringLib_LEN(s), x_enc->sizeshift, ypStringLib_DATA(x), 0, x_len);
     }
-    newEnc->setindexX(ypStringLib_DATA(s), newLen, 0);
+    newEnc->setindexX(ypStringLib_DATA(s), newLen, '\0');
 
     ypStringLib_SET_LEN(s, newLen);
     ypStringLib_ASSERT_INVARIANTS(s);
@@ -8195,7 +8209,7 @@ static ypObject *ypStringLib_clear(ypObject *s)
             "ypStringLib_clear didn't allocate inline!");
     yp_ASSERT(ypStringLib_ALLOCLEN(s) >= 1, "bytes/str inlinelen must be at least 1");
     ypStringLib_ENC_CODE(s) = newEnc->code;
-    newEnc->setindexX(ypStringLib_DATA(s), 0, 0);
+    newEnc->setindexX(ypStringLib_DATA(s), 0, '\0');
     ypStringLib_SET_LEN(s, 0);
     ypStringLib_ASSERT_INVARIANTS(s);
     return yp_None;
@@ -8221,7 +8235,7 @@ static ypObject *ypStringLib_repeat(ypObject *s, yp_ssize_t factor)
     ypStringLib_MEMCPY(s_enc->sizeshift, ypStringLib_DATA(newS), (yp_ssize_t)0, ypStringLib_DATA(s),
             (yp_ssize_t)0, s_len);
     _ypSequence_repeat_memcpy(ypStringLib_DATA(newS), factor, s_len << s_enc->sizeshift);
-    s_enc->setindexX(ypStringLib_DATA(newS), newLen, 0);
+    s_enc->setindexX(ypStringLib_DATA(newS), newLen, '\0');
     ypStringLib_SET_LEN(newS, newLen);
 
     ypStringLib_ASSERT_INVARIANTS(newS);
@@ -8694,7 +8708,7 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
     }
 
     _ypSequence_repeat_memcpy(ypStringLib_DATA(s), factor, s_len << s_enc->sizeshift);
-    s_enc->setindexX(ypStringLib_DATA(s), newLen, 0);
+    s_enc->setindexX(ypStringLib_DATA(s), newLen, '\0');
 
     ypStringLib_SET_LEN(s, newLen);
     ypStringLib_ASSERT_INVARIANTS(s);
@@ -8848,7 +8862,7 @@ static ypObject *_ypStringLib_join_fromstring(ypObject *s, ypObject *x)
     for (i = 0; i < x_len; i++) {
         result_enc->setindexX(result_data, i * (s_len + 1), x_enc->getindexX(x_data, i));
     }
-    result_enc->setindexX(result_data, result_len, 0);
+    result_enc->setindexX(result_data, result_len, '\0');
 
     ypStringLib_SET_LEN(result, result_len);
     ypStringLib_ASSERT_INVARIANTS(result);
@@ -8900,7 +8914,7 @@ static void _ypStringLib_join_elemcopy(
     }
 
     // Null-terminate and update the length
-    result_enc->setindexX(result_data, result_len, 0);
+    result_enc->setindexX(result_data, result_len, '\0');
     ypStringLib_SET_LEN(result, result_len);
 }
 
@@ -9469,7 +9483,7 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop(ypObject *dest, const yp_u
                     "_ypStringLib_decode_utf_8_inner_loop didn't end at the end...?");
             // TODO See how much wasted space is left here and if we should release some back to
             // the heap
-            ypStringLib_ENC(dest)->setindexX(ypStringLib_DATA(dest), ypStringLib_LEN(dest), 0);
+            ypStringLib_ENC(dest)->setindexX(ypStringLib_DATA(dest), ypStringLib_LEN(dest), '\0');
             ypStringLib_ASSERT_INVARIANTS(dest);
             return yp_None;
 
@@ -9531,19 +9545,6 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop(ypObject *dest, const yp_u
             if (yp_isexceptionC(result)) return result;
         }
     }
-}
-
-
-// Called on a null source. Returns a (null-terminated) string of null characters of the given
-// length.
-static ypObject *_ypStringLib_decode_utf_8_onnull(int type, yp_ssize_t len)
-{
-    ypObject *newS = _ypStr_new_latin_1(type, len, /*alloclen_fixed=*/TRUE);
-    if (yp_isexceptionC(newS)) return newS;
-    yp_memset(ypStringLib_DATA(newS), 0, len + 1 /*+1 for extra null terminator*/);
-    ypStringLib_SET_LEN(newS, len);
-    ypStringLib_ASSERT_INVARIANTS(newS);
-    return newS;
 }
 
 // Called when source starts with at least one ascii character. Returns the decoded string object.
@@ -9745,7 +9746,7 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8(
         if (type == ypStr_CODE) return yp_str_empty;
         return yp_chrarray0();
     } else if (source == NULL) {
-        return _ypStringLib_decode_utf_8_onnull(type, len);
+        return _ypStr_new_latin_1_fromnull(type, len);
     } else if (source[0] < 0x80u) {
         // We optimize for UTF-8 data that is completely, or at least starts with, ASCII: since
         // ASCII is equivalent to the first 128 ordinals in Unicode, we can memcpy.
@@ -9962,6 +9963,35 @@ static ypObject *ypStringLib_encode_utf_8(int type, ypObject *source, ypObject *
         return _ypStringLib_encode_utf_8_fromlatin_1(type, source);
     } else {
         return _ypStringLib_encode_utf_8(type, source, errors);
+    }
+}
+
+// Decodes the len bytes of latin-1 at source according to errors, and returns a new string of the
+// given type. If source is NULL it is considered as having all null bytes; len cannot be
+// negative or greater than ypStringLib_LEN_MAX.
+static ypObject *ypStringLib_decode_frombytesC_latin_1(
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *errors)
+{
+    yp_ASSERT(ypObject_TYPE_CODE_AS_FROZEN(type) == ypStr_CODE, "incorrect str type");
+    yp_ASSERT(len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before "
+                        "ypStringLib_decode_frombytesC_*)");
+    yp_ASSERT(len <= ypStringLib_LEN_MAX, "can't decode more than ypStringLib_LEN_MAX bytes");
+
+    // Handle the empty-string and string-of-nulls cases first
+    // FIXME Validate that this is proper latin-1 decoding
+    if (len < 1) {
+        if (type == ypStr_CODE) return yp_str_empty;
+        return yp_chrarray0();
+    } else if (source == NULL) {
+        return _ypStr_new_latin_1_fromnull(type, len);
+    } else {
+        ypObject *result = _ypStr_new_latin_1(type, len, /*alloclen_fixed=*/TRUE);
+        if (yp_isexceptionC(result)) return result;
+        ypStringLib_MEMCPY(0, ypStringLib_DATA(result), (yp_ssize_t)0, source, (yp_ssize_t)0, len);
+        ypStringLib_setindexX_1byte(ypStringLib_DATA(result), len, '\0');
+        ypStringLib_SET_LEN(result, len);
+        ypStringLib_ASSERT_INVARIANTS(result);
+        return result;
     }
 }
 
@@ -10225,11 +10255,11 @@ static void yp_codecs_backslashreplace_errors(
 // Returns true if the three bytes at x _could_ be a utf-8 encoded surrogate, or false if it
 // definitely is not
 // XXX x must contain at least three bytes
-#define _yp_codecs_UTF8_SURROGATE_PRECHECK(x) \
+#define _yp_codecs_UTF_8_SURROGATE_PRECHECK(x) \
     (((x)[0] & 0xf0u) == 0xe0u && ((x)[1] & 0xc0u) == 0x80u && ((x)[2] & 0xc0u) == 0x80u)
 // Decodes the utf-8 characters using the three bytes at x; PRECHECK must have returned true; the
 // resulting character may not actually be a surrogate
-#define _yp_codecs_UTF8_SURROGATE_DECODE(x) \
+#define _yp_codecs_UTF_8_SURROGATE_DECODE(x) \
     ((((x)[0] & 0x0fu) << 12) + (((x)[1] & 0x3fu) << 6) + ((x)[2] & 0x3fu))
 
 // TODO It'd be nice to share code with surrogatepass...
@@ -10315,8 +10345,8 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode(
         // Count the number of consecutive surrogates. Stop at the first non-surrogate, or at the
         // end of the buffer. All surrogates are 3 bytes long.
         for (i = params->start; params->source.data.len - i >= 3; i += 3) {
-            if (!_yp_codecs_UTF8_SURROGATE_PRECHECK(source_data + i)) break;
-            ch = _yp_codecs_UTF8_SURROGATE_DECODE(source_data + i);
+            if (!_yp_codecs_UTF_8_SURROGATE_PRECHECK(source_data + i)) break;
+            ch = _yp_codecs_UTF_8_SURROGATE_DECODE(source_data + i);
             if (!ypStringLib_IS_SURROGATE(ch)) break;
             repLen += 1;
         }
@@ -10331,9 +10361,9 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode(
         badEnd = params->start + (repLen * 3);
         outp = (yp_uint16_t *)ypStringLib_DATA(replacement);
         for (i = params->start; i < badEnd; i += 3) {
-            yp_ASSERT(_yp_codecs_UTF8_SURROGATE_PRECHECK(source_data + i),
+            yp_ASSERT(_yp_codecs_UTF_8_SURROGATE_PRECHECK(source_data + i),
                     "problem in loop above");  // paranoia
-            ch = _yp_codecs_UTF8_SURROGATE_DECODE(source_data + i);
+            ch = _yp_codecs_UTF_8_SURROGATE_DECODE(source_data + i);
             yp_ASSERT(ypStringLib_IS_SURROGATE(ch), "problem in loop above");  // more paranoia
             *outp++ = (yp_uint16_t)ch;
         }
@@ -11567,7 +11597,7 @@ static ypObject *chrarray_push(ypObject *s, ypObject *x)
 
     // TODO Overallocate?
     result = ypStringLib_push(s, x_asitem, x_enc, 0);
-    ypStr_ENC(s)->setindexX(ypStr_DATA(s), ypStr_LEN(s), 0);
+    ypStr_ENC(s)->setindexX(ypStr_DATA(s), ypStr_LEN(s), '\0');
 
     ypStr_ASSERT_INVARIANTS(s);
     return result;
@@ -11581,7 +11611,7 @@ static ypObject *chrarray_pop(ypObject *s)
     if (ypStr_LEN(s) < 1) return yp_IndexError;
     result = yp_chrC(s_enc->getindexX(ypStr_DATA(s), ypStr_LEN(s) - 1));
     ypStr_SET_LEN(s, ypStr_LEN(s) - 1);
-    s_enc->setindexX(ypStr_DATA(s), ypStr_LEN(s), 0);
+    s_enc->setindexX(ypStr_DATA(s), ypStr_LEN(s), '\0');
     ypStr_ASSERT_INVARIANTS(s);
     return result;
 }
@@ -11964,7 +11994,8 @@ static ypObject *str_dealloc(ypObject *s, void *memo)
     return yp_None;
 }
 
-static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, ypObject *errors);
+static ypObject *_ypStr_frombytes(
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors);
 static ypObject *_ypStr(int type, ypObject *object);
 static ypObject *_ypStr_func_new_code(int type, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -11978,7 +12009,8 @@ static ypObject *_ypStr_func_new_code(int type, yp_ssize_t n, ypObject *const *a
         ypObject *encoding = argarray[3] == yp_Arg_Missing ? yp_s_utf_8 : argarray[3];  // borrowed
         ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];   // borrowed
         if (ypObject_TYPE_PAIR_CODE(argarray[2]) != ypBytes_CODE) return_yp_BAD_TYPE(argarray[2]);
-        return _ypStr_decode(type, argarray[2], encoding, errors);
+        return _ypStr_frombytes(
+                type, ypBytes_LEN(argarray[2]), ypBytes_DATA(argarray[2]), encoding, errors);
     }
 }
 
@@ -12219,13 +12251,20 @@ static ypObject *_ypStr_frombytes(
 {
     ypObject *result;
 
-    // XXX Not handling errors in yp_eq yet because this is just temporary
-    if (yp_eq(encoding, yp_s_utf_8) != yp_True) return yp_NotImplementedError;
+    if (ypObject_TYPE_PAIR_CODE(encoding) != ypStr_CODE) return_yp_BAD_TYPE(encoding);
+    if (ypObject_TYPE_PAIR_CODE(errors) != ypStr_CODE) return_yp_BAD_TYPE(errors);
 
+    // TODO Python ignores "unknown encoding/errors" on empty buffer, but I'd rather raise error.
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
-    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
-    result = ypStringLib_decode_frombytesC_utf_8(type, len, source, errors);
+    if (yp_eq(encoding, yp_s_utf_8) == yp_True) {
+        result = ypStringLib_decode_frombytesC_utf_8(type, len, source, errors);
+    } else if (yp_eq(encoding, yp_s_latin_1) == yp_True) {
+        result = ypStringLib_decode_frombytesC_latin_1(type, len, source, errors);
+    } else {
+        return yp_NotImplementedError;
+    }
     if (yp_isexceptionC(result)) return result;
+
     yp_ASSERT(ypObject_TYPE_CODE(result) == type, "text encoding didn't return correct type");
     ypStr_ASSERT_INVARIANTS(result);
     return result;
@@ -12235,11 +12274,13 @@ static ypObject *_ypStr_frombytes(
 ypObject *yp_str_frombytesC4(
         yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors)
 {
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
     return _ypStr_frombytes(ypStr_CODE, len, source, encoding, errors);
 }
 ypObject *yp_chrarray_frombytesC4(
         yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors)
 {
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
     return _ypStr_frombytes(ypChrArray_CODE, len, source, encoding, errors);
 }
 ypObject *yp_str_frombytesC2(yp_ssize_t len, const yp_uint8_t *source)
@@ -12253,45 +12294,34 @@ ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source)
     return ypStringLib_decode_frombytesC_utf_8(ypChrArray_CODE, len, source, yp_s_strict);
 }
 
-// XXX source must be a bytes/bytearray object.
-static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
-{
-    ypObject *result;
-
-    // TODO When we open this up to other types with a buffer interface, make sure we continue
-    // to deny str/chrarray as source, as Python does.
-    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(source) == ypBytes_CODE);
-
-    // XXX Not handling errors in yp_eq yet because this is just temporary
-    // TODO Python ignores "unknown encoding/errors" on empty buffer, but I'd rather raise error.
-    if (yp_eq(encoding, yp_s_utf_8) != yp_True) return yp_NotImplementedError;
-
-    // TODO Python limits this to codecs that identify themselves as text encodings: do the same
-    result = ypStringLib_decode_frombytesC_utf_8(
-            type, ypBytes_LEN(source), ypBytes_DATA(source), errors);
-    if (yp_isexceptionC(result)) return result;
-    yp_ASSERT(ypObject_TYPE_CODE(result) == type, "text encoding didn't return correct type");
-    ypStr_ASSERT_INVARIANTS(result);
-    return result;
-}
 ypObject *yp_str3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    // TODO When we open this up to other types with a buffer interface, make sure we continue
+    // to deny str/chrarray as source, as Python does.
     if (ypObject_TYPE_PAIR_CODE(source) != ypBytes_CODE) return_yp_BAD_TYPE(source);
-    return _ypStr_decode(ypStr_CODE, source, encoding, errors);
+    return _ypStr_frombytes(
+            ypStr_CODE, ypBytes_LEN(source), ypBytes_DATA(source), encoding, errors);
 }
 ypObject *yp_chrarray3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    // TODO When we open this up to other types with a buffer interface, make sure we continue
+    // to deny str/chrarray as source, as Python does.
     if (ypObject_TYPE_PAIR_CODE(source) != ypBytes_CODE) return_yp_BAD_TYPE(source);
-    return _ypStr_decode(ypChrArray_CODE, source, encoding, errors);
+    return _ypStr_frombytes(
+            ypChrArray_CODE, ypBytes_LEN(source), ypBytes_DATA(source), encoding, errors);
 }
 ypObject *yp_decode3(ypObject *b, ypObject *encoding, ypObject *errors)
 {
+    // TODO When we open this up to other types with a buffer interface, make sure we continue
+    // to deny str/chrarray as source, as Python does.
     if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_METHOD_ERR(b);
-    return _ypStr_decode(
-            ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, b, encoding, errors);
+    return _ypStr_frombytes(ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, ypBytes_LEN(b),
+            ypBytes_DATA(b), encoding, errors);
 }
 ypObject *yp_decode(ypObject *b)
 {
+    // TODO When we open this up to other types with a buffer interface, make sure we continue
+    // to deny str/chrarray as source, as Python does.
     if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_METHOD_ERR(b);
     return ypStringLib_decode_frombytesC_utf_8(
             ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, ypBytes_LEN(b), ypBytes_DATA(b),
@@ -12392,7 +12422,7 @@ static ypObject *_yp_chrC(int type, yp_int_t i)
 
     // Recall we've already checked that i isn't outside of a 32-bit range (MAX_UNICODE)
     newS_enc->setindexX(ypStr_DATA(newS), 0, (yp_uint32_t)i);
-    newS_enc->setindexX(ypStr_DATA(newS), 1, 0);
+    newS_enc->setindexX(ypStr_DATA(newS), 1, '\0');
     ypStr_SET_LEN(newS, 1);
     ypStr_ASSERT_INVARIANTS(newS);
     return newS;

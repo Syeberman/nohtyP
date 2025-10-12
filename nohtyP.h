@@ -1148,10 +1148,10 @@ ypAPI void yp_rpartition(
 //      Ex: yp_split3("1,,2,3", ",", 2) returns ["1", "", "2,3"]
 ypAPI ypObject *yp_splitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
 
-// Equivalent to yp_splitC3(s, sep, -1);
+// Equivalent to yp_splitC3(s, sep, -1).
 ypAPI ypObject *yp_split2(ypObject *s, ypObject *sep);
 
-// Equivalent to yp_splitC3(s, yp_None, -1);
+// Equivalent to yp_splitC3(s, yp_None, -1).
 ypAPI ypObject *yp_split(ypObject *s);
 
 // Similar to yp_splitC3, except only performs the rightmost splits up to maxsplit.
@@ -1997,6 +1997,7 @@ typedef struct _yp_initialize_parameters_t {
     // Configures an external character database for text strings (str/chrarray). Set to NULL to use
     // nohtyP's defaults, which supports only the latin-1 characters. To enable full Unicode
     // support, an external character database is required.
+    // FIXME Test both character databases from within munit_test.
     const yp_character_database_t *text_character_database;
 
     // Setting everything_immortal to true forces all allocated objects to be immortal, effectively
@@ -2050,6 +2051,8 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **
 // modified while using the array. As a special case, if size is NULL, the string must not contain
 // null characters and *encoded will point to a null-terminated string. On error, sets *size to zero
 // (if size is not NULL), *encoded to NULL, *encoding to the exception, and returns the exception.
+// FIXME Document byte ordering, absence of BOM, etc.
+// FIXME Go away from encoding, and instead return the elemet size (1, 2, or 4) as an integer.
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding);
 
