@@ -1,5 +1,7 @@
 
 #include "munit_test/unittest.h"
+#pragma GCC diagnostic ignored "-Wunused-function"  // FIXME Remove
+
 
 // TODO We go to the trouble of having fixture_type_t.rand_items/etc to allow the type to control
 // what types of items are stored inside it. But then we use functions like
@@ -107,6 +109,25 @@ static void array_sort(yp_ssize_t n, ypObject **array)
     qsort(array, (size_t)n, sizeof(ypObject *), _array_sort_cmp);
 }
 
+// Takes a va_list of values and returns a malloc'd array containing the values. Ensures malloc
+// succeeds and that the values are not truncated.
+#define DEFINE_ARRAY_FROM_VA_LIST_FUNC(name, out_t, in_t)                 \
+    static out_t *name(int n, va_list args)                               \
+    {                                                                     \
+        out_t *result;                                                    \
+        int    i;                                                         \
+        assert_not_null(result = malloc((size_t)(n * yp_sizeof(out_t)))); \
+        for (i = 0; i < n; i++) {                                         \
+            in_t value = va_arg(args, in_t);                              \
+            result[i] = (out_t)value;                                     \
+            munit_assert((yp_int64_t)result[i] == (yp_int64_t)value);     \
+        }                                                                 \
+        return result;                                                    \
+    }
+// Integer variable arguments are promoted to int by default.
+DEFINE_ARRAY_FROM_VA_LIST_FUNC(array_fromuint8NV, yp_uint8_t, int)
+#undef DEFINE_ARRAY_FROM_VA_LIST_FUNC
+
 
 // If something should happen 2 in 23 times: RAND_BOOL_FRACTION(2, 23)
 // TODO Better name? Better argument names?
@@ -167,6 +188,18 @@ static void rand_objs_func_error(uniqueness_t *uq, yp_ssize_t n, ypObject **arra
 // GCOVR_EXCL_STOP
 
 
+// Chooses a random element from the array with the given length
+#define rand_choice(len, array) ((array)[munit_rand_int_range(0, ((int)(len)) - 1)])
+
+// Chooses a random element from the array. Only call for arrays of fixed size that haven't been
+// coerced to pointers.
+#define rand_choice_array(array) rand_choice(yp_lengthof_array(array), (array))
+
+static fixture_type_t *rand_choice_fixture_types(fixture_types_t *types)
+{
+    return rand_choice(types->len, types->types);
+}
+
 // Returns a random yp_int_t value. Prioritizes zero and small numbers.
 static yp_int_t rand_intC(void)
 {
@@ -194,25 +227,48 @@ static yp_float_t rand_floatCF(void)
     }
 }
 
-// Populates source with len random ascii bytes.
-static void rand_ascii(yp_ssize_t len, yp_uint8_t *source)
+// Returns a random ascii ordinal.
+static yp_int_t rand_ord_asciiC(void) { return munit_rand_int_range(0x00u, 0x7Fu); }
+
+// Returns a random 1-byte Unicode ordinal.
+static yp_int_t rand_ord_1byteC(void) { return munit_rand_int_range(0x00u, 0xFFu); }
+
+// Returns a random 2-byte Unicode ordinal. Will not return a surrogate ordinal, as those cannot be
+// encoded with utf-8.
+static yp_int_t rand_ord_2bytesC(void)
 {
-    yp_ssize_t i;
-    for (i = 0; i < len; i++) {
-        source[i] = (yp_uint8_t)munit_rand_int_range(0, 0x7F);
-    }
+    yp_int_t result = munit_rand_int_range(0x0100u, 0xFFFFu - ypStringLib_NUM_SURROGATES);
+    if (result >= ypStringLib_MIN_SURROGATE) result += ypStringLib_NUM_SURROGATES;
+    return result;
 }
 
-// Chooses a random element from the array with the given length
-#define rand_choice(len, array) ((array)[munit_rand_int_range(0, ((int)(len)) - 1)])
-
-// Chooses a random element from the array. Only call for arrays of fixed size that haven't been
-// coerced to pointers.
-#define rand_choice_array(array) rand_choice(yp_lengthof_array(array), (array))
-
-static fixture_type_t *rand_choice_fixture_types(fixture_types_t *types)
+// Returns a random surrogate Unicode ordinal. Recall these are 2-byte values which cannot be
+// encoded with utf-8.
+static yp_int_t rand_ord_surrC(void)
 {
-    return rand_choice(types->len, types->types);
+    return munit_rand_int_range(ypStringLib_MIN_SURROGATE, ypStringLib_MAX_SURROGATE);
+}
+
+// Returns a random 4-byte Unicode ordinal.
+static yp_int_t rand_ord_4bytesC(void)
+{
+    return munit_rand_int_range(0x00010000u, ypStringLib_MAX_UNICODE);
+}
+
+// Returns a random 1- or 2-byte Unicode ordinal. Will not return a surrogate ordinal, as those
+// cannot be encoded with utf-8.
+static yp_int_t rand_ord_1or2bytesC(void)
+{
+    yp_int_t (*funcs[])(void) = {rand_ord_1byteC, rand_ord_2bytesC};
+    return rand_choice_array(funcs)();
+}
+
+// Returns a random Unicode ordinal (1-, 2-, or 4-byte). Will not return a surrogate ordinal, as
+// those cannot be encoded with utf-8.
+static yp_int_t rand_ordC(void)
+{
+    yp_int_t (*funcs[])(void) = {rand_ord_1byteC, rand_ord_2bytesC, rand_ord_4bytesC};
+    return rand_choice_array(funcs)();
 }
 
 
@@ -228,6 +284,7 @@ typedef struct _uniqueness_t {
 extern uniqueness_t *uniqueness_new(void)
 {
     uniqueness_t *uq = malloc(sizeof(uniqueness_t));
+    assert_not_null(uq);
     uq->duplicates = 0;
     uq->len = 0;
     return uq;
@@ -285,11 +342,12 @@ extern void uniqueness_dealloc(uniqueness_t *uq)
 
 // A convenience macro to execute statement repeatedly until uniqueness_push indicates a unique
 // object was produced, at which point that object is returned.
-#define _return_unique(uq, statement)               \
-    do {                                            \
-        ypObject *obj = (statement); /* new ref */  \
-        if (uniqueness_push((uq), obj)) return obj; \
-        yp_decref(obj); /* loop until unique */     \
+#define _return_unique(uq, statement)                       \
+    do {                                                    \
+        ypObject *obj;                                      \
+        assert_not_raises(obj = (statement)); /* new ref */ \
+        if (uniqueness_push((uq), obj)) return obj;         \
+        yp_decref(obj); /* loop until unique */             \
     } while (1)
 
 
@@ -332,17 +390,40 @@ static ypObject *rand_obj_any_keyvalue_memo(const rand_obj_supplier_memo_t *memo
 static ypObject *rand_obj_int(uniqueness_t *uq) { _return_unique(uq, yp_intC(rand_intC())); }
 
 // XXX Interesting. 0 is a falsy byte, but '\x00' is not a falsy char.
-// TODO Could also return an intstore.
+// FIXME Could also return an intstore?
 static ypObject *rand_obj_byte(uniqueness_t *uq)
 {
     _return_unique(uq, yp_intC(munit_rand_int_range(0, 255)));
 }
 
-// TODO Return more than just latin-1 characters
-// TODO Could also return a chrarray.
+static ypObject *rand_obj_chr_1byte(uniqueness_t *uq)
+{
+    _return_unique(uq, yp_chrC(rand_ord_1byteC()));
+}
+
+// Will not return a surrogate character, as those cannot be encoded with utf-8.
+static ypObject *rand_obj_chr_2bytes(uniqueness_t *uq)
+{
+    _return_unique(uq, yp_chrC(rand_ord_2bytesC()));
+}
+
+static ypObject *rand_obj_chr_4bytes(uniqueness_t *uq)
+{
+    _return_unique(uq, yp_chrC(rand_ord_4bytesC()));
+}
+
+// Will not return a surrogate character, as those cannot be encoded with utf-8.
+static ypObject *rand_obj_chr_1or2bytes(uniqueness_t *uq)
+{
+    _return_unique(uq, yp_chrC(rand_ord_1or2bytesC()));
+}
+
+// Will not return a surrogate character, as those cannot be encoded with utf-8.
+// FIXME Could also return a chrarray?
 static ypObject *rand_obj_chr(uniqueness_t *uq)
 {
-    _return_unique(uq, yp_chrC(munit_rand_int_range(0, 255)));
+    // FIXME _return_unique(uq, yp_chrC(rand_ordC()));
+    _return_unique(uq, yp_chrC(rand_ord_1byteC()));
 }
 
 static ypObject *_rand_obj_hashable(fixture_type_t *type)
@@ -419,52 +500,32 @@ extern ypObject *rand_obj_any(uniqueness_t *uq)
     _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_all)));
 }
 
-static void rand_objs_int(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    yp_ssize_t i;
-    for (i = 0; i < n; i++) array[i] = rand_obj_int(uq);  // new ref
-}
-
-static void rand_objs_byte(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    yp_ssize_t i;
-    for (i = 0; i < n; i++) array[i] = rand_obj_byte(uq);  // new ref
-}
-
-static void rand_objs_chr(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    yp_ssize_t i;
-    for (i = 0; i < n; i++) array[i] = rand_obj_chr(uq);  // new ref
-}
+// Most "random objects" functions fill an array with the output of a "random object" function, and
+// then have an *_ordered variant that sorts the array afterwards.
+#define DEFINE_RAND_OBJS_FUNC(name, rand_obj_func)                               \
+    static void name(uniqueness_t *uq, yp_ssize_t n, ypObject **array)           \
+    {                                                                            \
+        yp_ssize_t i;                                                            \
+        for (i = 0; i < n; i++) array[i] = rand_obj_func(uq); /* new ref */      \
+    }                                                                            \
+    static void name##_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array) \
+    {                                                                            \
+        name(uq, n, array);                                                      \
+        array_sort(n, array);                                                    \
+    }
+DEFINE_RAND_OBJS_FUNC(rand_objs_int, rand_obj_int)
+DEFINE_RAND_OBJS_FUNC(rand_objs_byte, rand_obj_byte)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr_1byte, rand_obj_chr_1byte)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr_2bytes, rand_obj_chr_2bytes)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr_4bytes, rand_obj_chr_4bytes)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr_1or2bytes, rand_obj_chr_1or2bytes)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr, rand_obj_chr)
+#undef DEFINE_RAND_OBJS_FUNC
 
 static void rand_objs_any_hashable(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
     yp_ssize_t i;
     for (i = 0; i < n; i++) array[i] = rand_obj_any_hashable(uq);  // new ref
-}
-
-static void rand_objs_any(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    yp_ssize_t i;
-    for (i = 0; i < n; i++) array[i] = rand_obj_any(uq);  // new ref
-}
-
-static void rand_objs_int_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    rand_objs_int(uq, n, array);
-    array_sort(n, array);
-}
-
-static void rand_objs_byte_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    rand_objs_byte(uq, n, array);
-    array_sort(n, array);
-}
-
-static void rand_objs_chr_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    rand_objs_chr(uq, n, array);
-    array_sort(n, array);
 }
 
 // All objects will be of the same type that supports yp_hash and total ordering.
@@ -475,6 +536,12 @@ static void rand_objs_any_hashable_ordered(uniqueness_t *uq, yp_ssize_t n, ypObj
     void (*funcs[])(uniqueness_t *uq, yp_ssize_t n, ypObject **array) = {
             rand_objs_int_ordered, rand_objs_byte_ordered, rand_objs_chr_ordered};
     rand_choice_array(funcs)(uq, n, array);
+}
+
+static void rand_objs_any(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) array[i] = rand_obj_any(uq);  // new ref
 }
 
 // All objects will be of the same type that supports total ordering.
@@ -527,20 +594,6 @@ extern ypObject *new_itemsK(fixture_type_t *outer, fixture_type_t *inner, int k,
     result = new_itemsKV(outer, inner, k, args);  // new ref
     va_end(args);
     return result;
-}
-
-
-// Takes a va_list of int values, converts each value using fromordC, and appends them to string.
-static void fromordsCNV_helper(
-        ypObject *string, ypObject *(*fromordC)(yp_int_t), int n, va_list args)
-{
-    for (/*n already set*/; n > 0; n--) {
-        ypObject *item;
-        // Integer variable arguments are promoted to int by default; yp_int_t here causes errors.
-        assert_not_raises(item = fromordC(va_arg(args, int)));
-        assert_not_raises_exc(yp_append(string, item, &exc));
-        yp_decref(item);
-    }
 }
 
 
@@ -1207,6 +1260,17 @@ static void initialize_fixture_type_range(void)
 }
 
 
+// Takes a va_list of int values, stores them in an array, and returns the results of frombytesC.
+static ypObject *_fromordsCN_bytes(
+        ypObject *(*frombytesC)(yp_ssize_t, const yp_uint8_t *), int n, va_list args)
+{
+    ypObject *result;
+    void     *source = array_fromuint8NV(n, args);
+    assert_not_exception(result = frombytesC(n, source));
+    free(source);
+    return result;
+}
+
 static ypObject *new_rand_bytes(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
@@ -1243,12 +1307,9 @@ static ypObject *fromordsCN_bytes(int n, ...)
 {
     va_list   args;
     ypObject *result;
-    assert_not_raises(result = yp_bytearray0());
     va_start(args, n);
-    fromordsCNV_helper(result, yp_intC, n, args);
+    result = _fromordsCN_bytes(yp_bytesC, n, args);
     va_end(args);
-    assert_not_raises_exc(yp_freeze(result, &exc));
-    assert_type_is(result, yp_t_bytes);
     return result;
 }
 
@@ -1339,9 +1400,8 @@ static ypObject *fromordsCN_bytearray(int n, ...)
 {
     va_list   args;
     ypObject *result;
-    assert_not_raises(result = yp_bytearray0());
     va_start(args, n);
-    fromordsCNV_helper(result, yp_intC, n, args);
+    result = _fromordsCN_bytes(yp_bytearrayC, n, args);
     va_end(args);
     return result;
 }
@@ -1391,37 +1451,122 @@ static void initialize_fixture_type_bytes(void)
 }
 
 
-// TODO Return larger characters than just ascii.
+// The rand_ord functions used in fixture_type_str and fixture_type_chrarray. For each string, one
+// of these functions is chosen, and used to generate all characters. As such, these fixture types
+// can contain a variety of characters, up to a maximum.
+yp_int_t (*_max_rand_ord_funcs[])(void) = {
+        rand_ord_asciiC, rand_ord_1byteC};  // FIXME, rand_ord_1or2bytesC, rand_ordC};
+
+// Returns a random str of a random length (but not empty), using characters from rand_ord.
+static ypObject *_new_rand_str(yp_int_t (*rand_ord)(void))
+{
+    yp_ssize_t len;
+    ypObject  *source;
+    ypObject  *result;
+
+    len = munit_rand_int_range(1, 16);
+    assert_not_raises(source = yp_listN(0));  // new ref
+    for (/*len already set*/; len > 0; len--) {
+        ypObject *chr = yp_chrC(rand_ord());  // new ref
+        assert_not_raises_exc(yp_append(source, chr, &exc));
+        yp_decref(chr);
+    }
+    assert_not_raises(result = yp_concat(yp_str_empty, source));
+    yp_decref(source);
+    assert_type_is(result, yp_t_str);
+    return result;
+}
+
+// Returns a random chrarray of a random length (but not empty), using characters from rand_ord.
+static ypObject *_new_rand_chrarray(yp_int_t (*rand_ord)(void))
+{
+    yp_ssize_t len;
+    ypObject  *result;
+
+    len = munit_rand_int_range(1, 16);
+    assert_not_raises(result = yp_chrarray0());  // new ref
+    for (/*len already set*/; len > 0; len--) {
+        ypObject *chr = yp_chrC(rand_ord());  // new ref
+        assert_not_raises_exc(yp_append(result, chr, &exc));
+        yp_decref(chr);
+    }
+    assert_type_is(result, yp_t_chrarray);
+    return result;
+}
+
+// There is no yp_strN, because this is an odd way to construct a str.
+static ypObject *_newN_str(int n, va_list args)
+{
+    ypObject *source;
+    ypObject *result;
+    assert_not_raises(source = yp_tupleNV(n, args));  // new ref
+    assert_not_raises(result = yp_concat(yp_str_empty, source));
+    yp_decref(source);
+    assert_type_is(result, yp_t_str);
+    return result;
+}
+
+// There is no yp_chrarrayN, because this is an odd way to construct a chrarray.
+static ypObject *_newN_chrarray(int n, va_list args)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray0());  // new ref
+    for (/*n already set*/; n > 0; n--) {
+        ypObject *chr = va_arg(args, ypObject *);  // borrowed
+        assert_not_raises_exc(yp_append(result, chr, &exc));
+    }
+    assert_type_is(result, yp_t_chrarray);
+    return result;
+}
+
+static ypObject *_fromordsCN_str(int n, va_list args)
+{
+    ypObject *source;
+    ypObject *result;
+
+    assert_not_raises(source = yp_listN(0));  // new ref
+    for (/*n already set*/; n > 0; n--) {
+        // Integer variable arguments are promoted to int by default.
+        ypObject *chr = yp_chrC(va_arg(args, int));  // new ref
+        assert_not_raises_exc(yp_append(source, chr, &exc));
+        yp_decref(chr);
+    }
+    assert_not_raises(result = yp_concat(yp_str_empty, source));
+    yp_decref(source);
+    assert_type_is(result, yp_t_str);
+    return result;
+}
+
+static ypObject *_fromordsCN_chrarray(int n, va_list args)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray0());  // new ref
+    for (/*n already set*/; n > 0; n--) {
+        // Integer variable arguments are promoted to int by default.
+        ypObject *chr = yp_chrC(va_arg(args, int));  // new ref
+        assert_not_raises_exc(yp_append(result, chr, &exc));
+        yp_decref(chr);
+    }
+    assert_type_is(result, yp_t_chrarray);
+    return result;
+}
+
 static ypObject *new_rand_str(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_str_empty;
     } else {
-        ypObject  *result;
-        yp_uint8_t source[16];
-        yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
-        rand_ascii(len, source);
-        result = yp_str_frombytesC4(len, source, yp_s_utf_8, yp_s_strict);
-        assert_not_exception(result);
-        return result;
+        return _new_rand_str(rand_choice_array(_max_rand_ord_funcs));
     }
 }
 
-// There is no yp_strN, because this is an odd way to construct a str.
 static ypObject *newN_str(int n, ...)
 {
     va_list   args;
-    ypObject *tuple;
     ypObject *result;
-
     va_start(args, n);
-    tuple = yp_tupleNV(n, args);  // new ref
+    result = _newN_str(n, args);  // new ref
     va_end(args);
-
-    // Recall that yp_str isn't a typical container constructor, so we use yp_concat.
-    result = yp_concat(yp_str_empty, tuple);
-    yp_decref(tuple);
-    assert_not_exception(result);
     return result;
 }
 
@@ -1429,12 +1574,9 @@ static ypObject *fromordsCN_str(int n, ...)
 {
     va_list   args;
     ypObject *result;
-    assert_not_raises(result = yp_chrarray0());
     va_start(args, n);
-    fromordsCNV_helper(result, yp_chrC, n, args);
+    result = _fromordsCN_str(n, args);  // new ref
     va_end(args);
-    assert_not_raises_exc(yp_freeze(result, &exc));
-    assert_type_is(result, yp_t_str);
     return result;
 }
 
@@ -1486,38 +1628,22 @@ static fixture_type_t fixture_type_str_struct = {
 
 fixture_type_t *fixture_type_str = &fixture_type_str_struct;
 
-// TODO Return larger characters than just ascii.
 static ypObject *new_rand_chrarray(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_chrarray0();
     } else {
-        ypObject  *result;
-        yp_uint8_t source[16];
-        yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
-        rand_ascii(len, source);
-        result = yp_chrarray_frombytesC4(len, source, yp_s_utf_8, yp_s_strict);
-        assert_not_exception(result);
-        return result;
+        return _new_rand_chrarray(rand_choice_array(_max_rand_ord_funcs));
     }
 }
 
-// There is no yp_chrarrayN, because this is an odd way to construct a chrarray.
 static ypObject *newN_chrarray(int n, ...)
 {
     va_list   args;
-    ypObject *tuple;
     ypObject *result;
-
     va_start(args, n);
-    tuple = yp_tupleNV(n, args);  // new ref
+    result = _newN_chrarray(n, args);  // new ref
     va_end(args);
-
-    // Recall that yp_chrarray isn't a typical container constructor, so we use yp_extend.
-    result = yp_chrarray0();
-    assert_not_exception(result);
-    assert_not_raises_exc(yp_extend(result, tuple, &exc));
-    yp_decref(tuple);
     return result;
 }
 
@@ -1525,9 +1651,8 @@ static ypObject *fromordsCN_chrarray(int n, ...)
 {
     va_list   args;
     ypObject *result;
-    assert_not_raises(result = yp_chrarray0());
     va_start(args, n);
-    fromordsCNV_helper(result, yp_chrC, n, args);
+    result = _fromordsCN_chrarray(n, args);  // new ref
     va_end(args);
     return result;
 }
@@ -2520,6 +2645,9 @@ static void initialize_fixture_type_function(void)
 }
 
 
+// FIXME I'm not sure "dirty" should be part of _all here. If we did the same for strings
+// (1-, 2-, and 4-byte, plus "any characters") that's *eight* different types (mut and immut).
+// FIXME ...or, rather, have a "_most" or "_prime" or something that contains the base versions?
 static fixture_type_t *fixture_types_all_types[] = {&fixture_type_type_struct,
         &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
         &fixture_type_intstore_struct, &fixture_type_float_struct, &fixture_type_floatstore_struct,
@@ -2709,7 +2837,7 @@ extern yp_int_t yp_asintC_not_raises(ypObject *number)
 }
 
 
-#define MALLOC_TRACKER_MAX_LEN 4000
+#define MALLOC_TRACKER_MAX_LEN 5000
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {

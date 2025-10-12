@@ -1073,6 +1073,7 @@ static MunitResult test_startswith(const MunitParameter params[], fixture_t *fix
     peer_type_t    *peer;
 
     for (peer = type->peers; peer->type != NULL; peer++) {
+        // FIXME Test that an error is raised on bad type.
         if (!peer->type->is_string) continue;  // Skip peers that are not strings.
         _test_startswith(type, peer);
     }

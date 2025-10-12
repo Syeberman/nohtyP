@@ -58,6 +58,11 @@ extern "C" {
 #define PRIssize "lld"
 #endif
 
+#define ypStringLib_MAX_UNICODE (0x10FFFFu)
+#define ypStringLib_MIN_SURROGATE (0xD800u)
+#define ypStringLib_MAX_SURROGATE (0xDFFFu)
+#define ypStringLib_NUM_SURROGATES (ypStringLib_MAX_SURROGATE - ypStringLib_MIN_SURROGATE + 1)
+
 // Work around preprocessing bug in msvs_120 and earlier: https://stackoverflow.com/a/3985071/770500
 #define _ESC(...) __VA_ARGS__
 
@@ -920,6 +925,7 @@ typedef struct _fixture_type_t {
     rand_objs_func rand_ordered_items;
 
     // Functions for strings (bytes, str, etc.).
+    // FIXME The string methods that take "peers" all require fellow strings. Which is good!
     objvarargfunc fromordsCN;  // Creates a string from the int ordinal values.
 
     // Flags to describe the properties of the type.
