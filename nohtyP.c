@@ -7525,7 +7525,7 @@ static const ypStringLib_encinfo *_ypStringLib_checkenc_contiguous_ucs_2(
         const void *data, yp_ssize_t start, yp_ssize_t slicelength)
 {
     const _yp_uint_t  mask = ypStringLib_TYPE_CHECKENC_1FROM2_MASK;
-    const yp_uint8_t *p = (yp_uint8_t *)data + start;
+    const yp_uint8_t *p = (yp_uint8_t *)data + (start * 2);
     const yp_uint8_t *end = p + (slicelength * 2);
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN(end, yp_sizeof(_yp_uint_t));
     yp_ASSERT((*(yp_uint8_t *)&mask) == 0,
@@ -7612,7 +7612,7 @@ final_loop:
 static const ypStringLib_encinfo *_ypStringLib_checkenc_contiguous_ucs_4(
         const void *data, yp_ssize_t start, yp_ssize_t slicelength)
 {
-    const yp_uint8_t *p = (yp_uint8_t *)data + start;
+    const yp_uint8_t *p = (yp_uint8_t *)data + (start * 4);
     const yp_uint8_t *end = p + (slicelength * 4);
     yp_ASSERT(yp_IS_ALIGNED(data, 4), "unexpected alignment for ucs-4 data");
     yp_ASSERT1(slicelength > 0);
