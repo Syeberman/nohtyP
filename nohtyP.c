@@ -11663,11 +11663,14 @@ static ypObject *chrarray_remove(ypObject *s, ypObject *x, int raise_on_missing)
     _ypStr_coerce_encoding_free(x, x_data);
     if (i < 0) goto missing;
 
-    // We found a match to remove.
-    ypStr_ELEMMOVE(s, i, i + x_len);
-    ypStr_SET_LEN(s, ypStr_LEN(s) - x_len);
-    ypStr_ASSERT_INVARIANTS(s);
-    return yp_None;
+    // We found a match to remove. It's possible we will need to downconvert s. The logic to do this
+    // is already implemented in _ypStringLib_delslice.
+    // TODO Because we know x's encoding, we could quickly tell if a downconvert is even possible.
+    if (x_len == ypStr_LEN(s)) {
+        return ypStringLib_clear(s);
+    } else {
+        return _ypStringLib_delslice(s, i, i + x_len, 1, x_len);
+    }
 
 missing:
     return raise_on_missing ? yp_ValueError : yp_None;
