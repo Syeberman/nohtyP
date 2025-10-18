@@ -8445,7 +8445,7 @@ static ypObject *_ypStringLib_setslice_regular(ypObject *s, yp_ssize_t start, yp
 static ypObject *_ypStringLib_setslice_extended(ypObject *s, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step, void *x_data, yp_ssize_t x_len, const ypStringLib_encinfo *x_enc)
 {
-    const ypStringLib_encinfo *oldEnc = ypStringLib_ENC(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
     const ypStringLib_encinfo *newEnc =
             _ypStringLib_setslice_newEnc(s, start, stop, step, x_len, x_enc);
     yp_ssize_t i;
@@ -8460,7 +8460,7 @@ static ypObject *_ypStringLib_setslice_extended(ypObject *s, yp_ssize_t start, y
     // TODO This will copy over characters that will be immediately replaced by x's characters.
     // A possible optimization here could be skipping those characters. (Then again, a bulk "all
     // characters" operation may be more efficient than skipping them.)
-    if (oldEnc->elemsize < newEnc->elemsize) {
+    if (s_enc->elemsize < newEnc->elemsize) {
         // Recall _ypStringLib_maybe_realloc adjusts alloclen for the new encoding.
         // TODO Overallocate?
         void *oldptr = _ypStringLib_maybe_realloc(s, ypStringLib_LEN(s), 0, newEnc);
@@ -8468,19 +8468,22 @@ static ypObject *_ypStringLib_setslice_extended(ypObject *s, yp_ssize_t start, y
 
         // Add one to the lengths below to include the hidden null-terminator.
         if (ypStringLib_DATA(s) == oldptr) {
-            ypStringLib_inplace_upconvert(newEnc->sizeshift, oldEnc->sizeshift, ypStringLib_DATA(s),
+            ypStringLib_inplace_upconvert(newEnc->sizeshift, s_enc->sizeshift, ypStringLib_DATA(s),
                     ypStringLib_LEN(s) + 1);
         } else {
             ypStringLib_elemcopy_maybeupconvert(newEnc->sizeshift, ypStringLib_DATA(s), 0,
-                    oldEnc->sizeshift, oldptr, 0, ypStringLib_LEN(s) + 1);
+                    s_enc->sizeshift, oldptr, 0, ypStringLib_LEN(s) + 1);
             ypMem_REALLOC_CONTAINER_FREE_OLDPTR(s, ypStringLibObject, oldptr);
         }
+
+        // s is now in the new encoding.
+        s_enc = newEnc;
     }
 
     // s is now large enough to hold x's characters, so copy them in.
     for (i = 0; i < x_len; i++) {
         yp_uint32_t x_char = x_enc->getindexX(x_data, i);
-        newEnc->setindexX(ypStringLib_DATA(s), ypSlice_INDEX(start, step, i), x_char);
+        s_enc->setindexX(ypStringLib_DATA(s), ypSlice_INDEX(start, step, i), x_char);
     }
 
     // If our encoding is shrinking, shrink it after we copy in the elements of x, because the
@@ -8490,15 +8493,17 @@ static ypObject *_ypStringLib_setslice_extended(ypObject *s, yp_ssize_t start, y
     // optimization could be to allow ypStringLib_inplace_downconvert to silently truncate data
     // (it asserts on debug builds, currently), so we could do the target conversion first. But then
     // we'd still be copying characters unnecessarily, see the related TODO above.
-    if (oldEnc->elemsize > newEnc->elemsize) {
-        yp_ssize_t newAlloclen = ypStringLib_ALLOCLEN(s) << (oldEnc->sizeshift - newEnc->sizeshift);
+    if (s_enc->elemsize > newEnc->elemsize) {
+        yp_ssize_t newAlloclen = ypStringLib_ALLOCLEN(s) << (s_enc->sizeshift - newEnc->sizeshift);
         ypStringLib_SET_ALLOCLEN(s, newAlloclen);
         // Add one to the length to include the hidden null-terminator.
         ypStringLib_inplace_downconvert(
-                newEnc->sizeshift, oldEnc->sizeshift, ypStringLib_DATA(s), ypStringLib_LEN(s) + 1);
+                newEnc->sizeshift, s_enc->sizeshift, ypStringLib_DATA(s), ypStringLib_LEN(s) + 1);
+        // s is now in the new encoding.
+        s_enc = newEnc;
     }
 
-    ypStringLib_ENC_CODE(s) = newEnc->code;
+    ypStringLib_ENC_CODE(s) = s_enc->code;
     // The length of s does not change for extended setslices.
     ypStringLib_ASSERT_INVARIANTS(s);
     return yp_None;
