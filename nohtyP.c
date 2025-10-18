@@ -7326,6 +7326,7 @@ static void ypStringLib_setindexX_4bytes(void *dest, yp_ssize_t dest_i, yp_uint3
 _ypStringLib_INPLACE_UPCONVERT_FUNCTION(_ypStringLib_inplace_4from2, yp_uint32_t, yp_uint16_t);
 _ypStringLib_INPLACE_UPCONVERT_FUNCTION(_ypStringLib_inplace_4from1, yp_uint32_t, yp_uint8_t);
 _ypStringLib_INPLACE_UPCONVERT_FUNCTION(_ypStringLib_inplace_2from1, yp_uint16_t, yp_uint8_t);
+#undef _ypStringLib_INPLACE_UPCONVERT_FUNCTION
 
 // Converts the len characters at data to a larger encoding
 // XXX There must be enough room in data to fit the larger characters
@@ -7368,6 +7369,7 @@ static void ypStringLib_inplace_upconvert(
 _ypStringLib_INPLACE_DOWNCONVERT_FUNCTION(_ypStringLib_inplace_1from2, yp_uint8_t, yp_uint16_t);
 _ypStringLib_INPLACE_DOWNCONVERT_FUNCTION(_ypStringLib_inplace_1from4, yp_uint8_t, yp_uint32_t);
 _ypStringLib_INPLACE_DOWNCONVERT_FUNCTION(_ypStringLib_inplace_2from4, yp_uint16_t, yp_uint32_t);
+#undef _ypStringLib_INPLACE_DOWNCONVERT_FUNCTION
 
 // Converts the len characters at data to a smaller encoding.
 // XXX Ensure data can be losslessly converted to the smaller encoding. Too-large characters will
@@ -7410,6 +7412,7 @@ static void ypStringLib_inplace_downconvert(
 _ypStringLib_ELEMCOPY_UPCONVERT_FUNCTION(_ypStringLib_elemcopy_4from2, yp_uint32_t, yp_uint16_t);
 _ypStringLib_ELEMCOPY_UPCONVERT_FUNCTION(_ypStringLib_elemcopy_4from1, yp_uint32_t, yp_uint8_t);
 _ypStringLib_ELEMCOPY_UPCONVERT_FUNCTION(_ypStringLib_elemcopy_2from1, yp_uint16_t, yp_uint8_t);
+#undef _ypStringLib_ELEMCOPY_UPCONVERT_FUNCTION
 
 // Copies len elements from src starting at src_i, and places them at dest starting at dest_i.
 // To be used in contexts where dest may have a larger encoding than src (i.e. where
@@ -7463,6 +7466,7 @@ _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_1from4, yp_uint
 _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_2from2, yp_uint16_t, yp_uint16_t);
 _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_2from4, yp_uint16_t, yp_uint32_t);
 _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_4from4, yp_uint32_t, yp_uint32_t);
+#undef _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION
 
 // Copies slicelength elements from src starting at src_i, and places them at dest starting at
 // dest_i. To be used in contexts where dest may have a smaller encoding than src (i.e. where
@@ -8627,6 +8631,22 @@ static ypObject *ypStringLib_delslice(
     if (slicelength >= ypStringLib_LEN(s)) return ypStringLib_clear(s);
 
     return _ypStringLib_delslice(s, start, stop, step, slicelength);
+}
+
+// XXX i must be an adjusted index.
+static ypObject *_ypStringLib_delindex(ypObject *s, yp_ssize_t i)
+{
+    yp_ssize_t s_len = ypStringLib_LEN(s);
+
+    yp_ASSERT(i >= 0 && i < s_len, "index out of range");
+
+    // It's possible we will need to downconvert s in order to delete s[i]. The logic to do this is
+    // already implemented in _ypStringLib_delslice.
+    // FIXME Do we want to specialize this to not rely on delslice? Because we are removing a single
+    // character, we can inspect that character to see if deleting it could possibly change the
+    // encoding.
+    if (s_len < 2) return ypStringLib_clear(s);
+    return _ypStringLib_delslice(s, i, i + 1, 1, 1);
 }
 
 // Helper function for bytes_find and str_find. The string to find (x_data and x_len) must have
@@ -11556,7 +11576,7 @@ static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
 
     // It's possible we will need to either upconvert or downconvert s in order to replace s[i]
     // with x. The logic to do this is already implemented in ypStringLib_setslice_fromstring.
-    // TODO Do we want a setslice that asserts the slice arguments are already adjusted?
+    // FIXME Do we want a setslice that asserts the slice arguments are already adjusted?
     return ypStringLib_setslice_fromstring7(s, i, i + 1, 1, &x_asitem, 1, x_enc);
 }
 
@@ -11565,10 +11585,7 @@ static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i, int raise_on_missi
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
         return raise_on_missing ? yp_IndexError : yp_None;
     }
-
-    // It's possible we will need to downconvert s in order to delete s[i]. The logic to do this is
-    // already implemented in _ypStringLib_delslice.
-    return _ypStringLib_delslice(s, i, i + 1, 1, 1);
+    return _ypStringLib_delindex(s, i);
 }
 
 static ypObject *_ypStr_fromiterable(int type, ypObject *iterable);
@@ -11611,14 +11628,22 @@ static ypObject *chrarray_push(ypObject *s, ypObject *x)
 static ypObject *chrarray_pop(ypObject *s)
 {
     const ypStringLib_encinfo *s_enc = ypStr_ENC(s);
+    yp_ssize_t                 s_len = ypStr_LEN(s);
+    ypObject                  *popped;
     ypObject                  *result;
 
-    if (ypStr_LEN(s) < 1) return yp_IndexError;
-    result = yp_chrC(s_enc->getindexX(ypStr_DATA(s), ypStr_LEN(s) - 1));
-    ypStr_SET_LEN(s, ypStr_LEN(s) - 1);
-    s_enc->setindexX(ypStr_DATA(s), ypStr_LEN(s), '\0');
-    ypStr_ASSERT_INVARIANTS(s);
-    return result;
+    if (s_len < 1) return yp_IndexError;
+
+    popped = yp_chrC(s_enc->getindexX(ypStr_DATA(s), s_len - 1));  // new ref
+    if (yp_isexceptionC(popped)) return popped;
+
+    result = _ypStringLib_delindex(s, s_len - 1);
+    if (yp_isexceptionC(result)) {
+        yp_decref(popped);
+        return result;
+    }
+
+    return popped;
 }
 
 static ypObject *chrarray_remove(ypObject *s, ypObject *x, int raise_on_missing)
@@ -11680,17 +11705,23 @@ static ypObject *chrarray_insert(ypObject *s, yp_ssize_t i, ypObject *x)
 static ypObject *chrarray_popindex(ypObject *s, yp_ssize_t i)
 {
     const ypStringLib_encinfo *s_enc = ypStr_ENC(s);
+    ypObject                  *popped;
     ypObject                  *result;
 
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
         return yp_IndexError;
     }
 
-    result = yp_chrC(s_enc->getindexX(ypStr_DATA(s), i));
-    ypStr_ELEMMOVE(s, i, i + 1);
-    ypStr_SET_LEN(s, ypStr_LEN(s) - 1);
-    ypStr_ASSERT_INVARIANTS(s);
-    return result;
+    popped = yp_chrC(s_enc->getindexX(ypStr_DATA(s), i));
+    if (yp_isexceptionC(popped)) return popped;
+
+    result = _ypStringLib_delindex(s, i);
+    if (yp_isexceptionC(result)) {
+        yp_decref(popped);
+        return result;
+    }
+
+    return popped;
 }
 
 // XXX Adapted from Python's reverse_slice.
