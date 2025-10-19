@@ -11815,38 +11815,44 @@ static ypObject *str_len(ypObject *s, yp_ssize_t *len)
 static ypObject *_str_tailmatch(
         ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
-    yp_ssize_t slice_len;
-    yp_ssize_t cmp_start;
+    const ypStringLib_encinfo *s_enc = ypStr_ENC(s);
+    yp_ssize_t                 s_len = ypStr_LEN(s);
+    void                      *s_data = ypStr_DATA(s);
+    const ypStringLib_encinfo *x_enc = ypStr_ENC(x);
+    yp_ssize_t                 x_len = ypStr_LEN(x);
+    void                      *x_data = ypStr_DATA(x);
+    yp_ssize_t                 slice_len;
+    yp_ssize_t                 cmp_start;
 
-    if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypStr_CODE);
+
+    // If the prefix is a larger encoding than the string, the string can't possibly contain it.
+    if (x_enc->elemsize > s_enc->elemsize) return yp_False;
 
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
     // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    ypSlice_AdjustIndicesC_validstep(ypStr_LEN(s), &start, &end, 1, &slice_len);
+    ypSlice_AdjustIndicesC_validstep(s_len, &start, &end, 1, &slice_len);
 
-    // If the prefix is longer than the slice, the slice can't possibly start with it
-    if (ypStr_LEN(x) > slice_len) return yp_False;
+    // If the prefix is longer than the slice, the slice can't possibly contain it.
+    if (x_len > slice_len) return yp_False;
 
     if (direction == yp_FIND_REVERSE) {
-        cmp_start = end - ypStr_LEN(x);  // endswith
+        cmp_start = end - x_len;  // endswith
     } else {
         cmp_start = start;  // startswith
     }
 
-    if (ypStr_ENC_CODE(s) == ypStr_ENC_CODE(x)) {
-        yp_ssize_t sizeshift = ypStr_ENC(x)->sizeshift;
-
-        int memcmp_result = ypStr_MEMCMP(
-                sizeshift, ypStr_DATA(s), cmp_start, ypStr_DATA(x), (yp_ssize_t)0, ypStr_LEN(x));
+    if (s_enc->sizeshift == x_enc->sizeshift) {
+        int memcmp_result =
+                ypStr_MEMCMP(s_enc->sizeshift, s_data, cmp_start, x_data, (yp_ssize_t)0, x_len);
         return ypBool_FROM_C(memcmp_result == 0);
     } else {
-        ypStringLib_getindexXfunc s_getindexX = ypStr_ENC(s)->getindexX;
-        ypStringLib_getindexXfunc x_getindexX = ypStr_ENC(x)->getindexX;
-
-        yp_ssize_t i;
-        for (i = 0; i < ypStr_LEN(x); i++) {
-            if (s_getindexX(s, cmp_start + i) != x_getindexX(x, i)) return yp_False;
+        ypStringLib_getindexXfunc s_getindexX = s_enc->getindexX;
+        ypStringLib_getindexXfunc x_getindexX = x_enc->getindexX;
+        yp_ssize_t                i;
+        for (i = 0; i < x_len; i++) {
+            if (s_getindexX(s_data, cmp_start + i) != x_getindexX(x_data, i)) return yp_False;
         }
         return yp_True;
     }
@@ -11858,15 +11864,19 @@ static ypObject *_str_startswith_or_endswith(
     // We're called directly (ypFunction calls str_startswith), so ensure we're called correctly
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(s) == ypStr_CODE);
 
-    // FIXME Also support lists?  Python requires a tuple here...
+    // TODO Also support lists?  Python requires a tuple here, but this is nohtyP...
     if (ypObject_TYPE_CODE(x) == ypTuple_CODE) {
         yp_ssize_t i;
         for (i = 0; i < ypTuple_LEN(x); i++) {
-            ypObject *result = _str_tailmatch(s, ypTuple_ARRAY(x)[i], start, end, direction);
+            ypObject *result;
+            ypObject *item = ypTuple_ARRAY(x)[i];  // borrowed
+            if (ypObject_TYPE_PAIR_CODE(item) != ypStr_CODE) return_yp_BAD_TYPE(item);
+            result = _str_tailmatch(s, item, start, end, direction);
             if (result != yp_False) return result;  // yp_True or an exception
         }
         return yp_False;
     } else {
+        if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
         return _str_tailmatch(s, x, start, end, direction);
     }
 }
