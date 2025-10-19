@@ -8596,6 +8596,7 @@ static ypObject *_ypStringLib_delslice(
     // Add one to the length to include the hidden null-terminator
     _ypSlice_delslice_memmove(ypStringLib_DATA(s), ypStringLib_LEN(s) + 1, oldEnc->elemsize, start,
             stop, step, slicelength);
+    ypStringLib_SET_LEN(s, ypStringLib_LEN(s) - slicelength);
 
     // TODO We move around the remaining characters in _ypSlice_delslice_memmove, only to move them
     // again in ypStringLib_inplace_downconvert. A possible optimization could be a version of
@@ -8616,7 +8617,6 @@ static ypObject *_ypStringLib_delslice(
     }
 
     ypStringLib_ENC_CODE(s) = newEnc->code;
-    ypStringLib_SET_LEN(s, ypStringLib_LEN(s) - slicelength);
     ypStringLib_ASSERT_INVARIANTS(s);
     return yp_None;
 }
