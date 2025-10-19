@@ -41,6 +41,18 @@ static int isbinary(fixture_type_t *type)
 }
 
 
+// FIXME More string-specific getslice tests...and also setslice and the other methods where we
+// need to convert between character widths.
+static MunitResult test_getslice(const MunitParameter params[], fixture_t *fixture)
+{
+    // fixture_type_t *type = fixture->type;
+    // ypObject       *s = type->fromordsCN(N(0x101, 0xF0, 0x11010));
+    // ypObject       *slice;
+    // assert_not_raises(slice = yp_getsliceC4(s, 0, 2, 2));
+    // yp_decrefN(N(s, slice));
+    return MUNIT_OK;
+}
+
 // Shared tests for yp_findC5, yp_indexC5, yp_rfindC5, yp_rindexC5, etc. The _test_findC in
 // test_sequence checks for the behaviour shared amongst all sequences; this _test_findC considers
 // the behaviour unique to strings, namely substring matching.
@@ -1091,15 +1103,15 @@ static MunitResult test_endswith(const MunitParameter params[], fixture_t *fixtu
 static MunitParameterEnum test_string_params[] = {
         {param_key_type, param_values_types_string}, {NULL}};
 
-MunitTest test_string_tests[] = {TEST(test_findC, test_string_params),
-        TEST(test_indexC, test_string_params), TEST(test_rfindC, test_string_params),
-        TEST(test_rindexC, test_string_params), TEST(test_isalnum, test_string_params),
-        TEST(test_isalpha, test_string_params), TEST(test_isascii, test_string_params),
-        TEST(test_isdecimal, test_string_params), TEST(test_isdigit, test_string_params),
-        TEST(test_isidentifier, test_string_params), TEST(test_islower, test_string_params),
-        TEST(test_isnumeric, test_string_params), TEST(test_isprintable, test_string_params),
-        TEST(test_isspace, test_string_params), TEST(test_isupper, test_string_params),
-        TEST(test_latin_1_classifiers, test_string_params),
+MunitTest test_string_tests[] = {TEST(test_getslice, test_string_params),
+        TEST(test_findC, test_string_params), TEST(test_indexC, test_string_params),
+        TEST(test_rfindC, test_string_params), TEST(test_rindexC, test_string_params),
+        TEST(test_isalnum, test_string_params), TEST(test_isalpha, test_string_params),
+        TEST(test_isascii, test_string_params), TEST(test_isdecimal, test_string_params),
+        TEST(test_isdigit, test_string_params), TEST(test_isidentifier, test_string_params),
+        TEST(test_islower, test_string_params), TEST(test_isnumeric, test_string_params),
+        TEST(test_isprintable, test_string_params), TEST(test_isspace, test_string_params),
+        TEST(test_isupper, test_string_params), TEST(test_latin_1_classifiers, test_string_params),
         TEST(test_startswith, test_string_params), TEST(test_endswith, test_string_params), {NULL}};
 
 

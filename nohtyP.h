@@ -1920,6 +1920,13 @@ typedef struct _yp_memory_allocator_t {
     // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
     void *(*malloc_resize)(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
 
+    // FIXME I don't think we need this at all, since we get the actual size in malloc. Both
+    // TCMalloc and Mimalloc just allocate new buffers. Jemalloc _might_ expand large buffers.
+    //
+    // - https://github.com/google/tcmalloc/blob/a9f51aa745ce9cc1d6812b01d0048ea4d5b85bb6/tcmalloc/tcmalloc.cc#L1289
+    // - https://github.com/microsoft/mimalloc/blob/09a27098aa6e9286518bd9c74e6ffa7199c3f04e/src/alloc.c#L269
+    // - https://github.com/jemalloc/jemalloc/blob/1972241cd204c60fb5b66f23c48a117879636161/src/arena.c#L1504
+
     // Frees memory returned by malloc and malloc_resize. May abort on error.
     void (*free)(void *p);
 
@@ -2242,6 +2249,7 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, yp_ssize_t *
 // This structure is likely to change in future versions; it should only exist in-memory
 // XXX dicts abuse ob_alloclen to hold a search finger for popitem
 // XXX The dealloc list (i.e., yp_decref) abuses ob_hash to point to the next object to dealloc
+// FIXME I'm tracking the allocated length here, but so is the memory manager. Remove ob_alloclen?
 typedef yp_uint16_t _yp_ob_type_t;
 typedef yp_int32_t  _yp_ob_len_t;
 struct _ypObject {

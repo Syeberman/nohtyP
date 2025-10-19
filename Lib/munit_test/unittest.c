@@ -420,11 +420,7 @@ static ypObject *rand_obj_chr_1or2bytes(uniqueness_t *uq)
 
 // Will not return a surrogate character, as those cannot be encoded with utf-8.
 // FIXME Could also return a chrarray?
-static ypObject *rand_obj_chr(uniqueness_t *uq)
-{
-    // FIXME _return_unique(uq, yp_chrC(rand_ordC()));
-    _return_unique(uq, yp_chrC(rand_ord_1byteC()));
-}
+static ypObject *rand_obj_chr(uniqueness_t *uq) { _return_unique(uq, yp_chrC(rand_ordC())); }
 
 static ypObject *_rand_obj_hashable(fixture_type_t *type)
 {
@@ -1455,7 +1451,7 @@ static void initialize_fixture_type_bytes(void)
 // of these functions is chosen, and used to generate all characters. As such, these fixture types
 // can contain a variety of characters, up to a maximum.
 yp_int_t (*_max_rand_ord_funcs[])(void) = {
-        rand_ord_asciiC, rand_ord_1byteC};  // FIXME, rand_ord_1or2bytesC, rand_ordC};
+        rand_ord_asciiC, rand_ord_1byteC, rand_ord_1or2bytesC, rand_ordC};
 
 // Returns a random str of a random length (but not empty), using characters from rand_ord.
 static ypObject *_new_rand_str(yp_int_t (*rand_ord)(void))
@@ -2837,7 +2833,7 @@ extern yp_int_t yp_asintC_not_raises(ypObject *number)
 }
 
 
-#define MALLOC_TRACKER_MAX_LEN 5000
+#define MALLOC_TRACKER_MAX_LEN 6000
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {
