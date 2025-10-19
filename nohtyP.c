@@ -87,6 +87,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 
 #if defined(_MSC_VER)  // MSVC
 #include <Windows.h>
@@ -820,6 +821,7 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 
 // Versions of memcmp/etc that don't warn about yp_ssize_t or yp_uint8_t* mismatches.
 #define yp_memcmp(x, y, l) (memcmp((x), (y), (size_t)(l)))
+#define yp_wmemcmp(x, y, l) (wmemcmp((x), (y), (size_t)(l)))
 #define yp_memcpy(d, s, l) (memcpy((d), (s), (size_t)(l)))
 #define yp_memmove(d, s, l) (memmove((d), (s), (size_t)(l)))
 #define yp_memset(x, c, l) (memset((x), (c), (size_t)(l)))
@@ -11955,45 +11957,60 @@ static ypObject *str_splitlines(ypObject *s, ypObject *keepends) { return yp_Not
 
 static yp_ssize_t _ypStr_relative_cmp(ypObject *s, ypObject *x)
 {
-    yp_ssize_t s_len = ypStr_LEN(s);
-    yp_ssize_t x_len = ypStr_LEN(x);
-    yp_ssize_t cmp = yp_memcmp(ypStr_DATA(s), ypStr_DATA(x), MIN(s_len, x_len));
-    return cmp == 0 ? s_len - x_len : cmp;
+    const ypStringLib_encinfo *s_enc = ypStr_ENC(s);
+    yp_ssize_t                 s_len = ypStr_LEN(s);
+    void                      *s_data = ypStr_DATA(s);
+    const ypStringLib_encinfo *x_enc = ypStr_ENC(x);
+    yp_ssize_t                 x_len = ypStr_LEN(x);
+    void                      *x_data = ypStr_DATA(x);
+    yp_ssize_t                 min_len = MIN(s_len, x_len);
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(s) == ypStr_CODE);
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypStr_CODE);
+
+    // TODO It'd be nice if C gave us other memcmp variants besides char and wchar_t.
+    if (s_enc->elemsize == 1 && x_enc->elemsize == 1) {
+        yp_ssize_t cmp = yp_memcmp(s_data, x_data, min_len);
+        return cmp == 0 ? s_len - x_len : cmp;
+        // FIXME Make this work.
+        // } else if (s_enc->elemsize == yp_sizeof(wchar_t) && x_enc->elemsize ==
+        // yp_sizeof(wchar_t)) {
+        //     yp_ssize_t cmp = yp_wmemcmp(s_data, x_data, min_len);
+        //     return cmp == 0 ? s_len - x_len : cmp;
+    } else {
+        ypStringLib_getindexXfunc s_getindexX = s_enc->getindexX;
+        ypStringLib_getindexXfunc x_getindexX = x_enc->getindexX;
+        yp_ssize_t                i;
+        for (i = 0; i < min_len; i++) {
+            yp_uint32_t s_i = s_getindexX(s_data, i);
+            yp_uint32_t x_i = x_getindexX(x_data, i);
+            if (s_i != x_i) return (yp_ssize_t)s_i - (yp_ssize_t)x_i;
+        }
+        return s_len - x_len;
+    }
 }
 static ypObject *str_lt(ypObject *s, ypObject *x)
 {
     if (s == x) return yp_False;
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_ComparisonNotImplemented;
-    // TODO relative comps for ucs-2 and -4
-    if (ypStr_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
-    if (ypStr_ENC_CODE(x) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) < 0);
 }
 static ypObject *str_le(ypObject *s, ypObject *x)
 {
     if (s == x) return yp_True;
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_ComparisonNotImplemented;
-    // TODO relative comps for ucs-2 and -4
-    if (ypStr_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
-    if (ypStr_ENC_CODE(x) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) <= 0);
 }
 static ypObject *str_ge(ypObject *s, ypObject *x)
 {
     if (s == x) return yp_True;
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_ComparisonNotImplemented;
-    // TODO relative comps for ucs-2 and -4
-    if (ypStr_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
-    if (ypStr_ENC_CODE(x) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) >= 0);
 }
 static ypObject *str_gt(ypObject *s, ypObject *x)
 {
     if (s == x) return yp_False;
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_ComparisonNotImplemented;
-    // TODO relative comps for ucs-2 and -4
-    if (ypStr_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
-    if (ypStr_ENC_CODE(x) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) > 0);
 }
 
