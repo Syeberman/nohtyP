@@ -983,7 +983,7 @@ static yp_hash_t yp_HashPointer(void *p)
 // Return the hash of the given number of bytes; always succeeds
 // XXX Adapted from Python's _Py_HashBytes in pyhash.c.
 // TODO Python now uses pysiphash for security.
-static yp_hash_t yp_HashBytes(yp_uint8_t *p, yp_ssize_t len)
+static yp_hash_t yp_HashBuffer(yp_uint8_t *p, yp_ssize_t len)
 {
     yp_uhash_t x;
     yp_ssize_t i;
@@ -11002,7 +11002,7 @@ static ypObject *bytes_ne(ypObject *b, ypObject *x)
 static ypObject *bytes_currenthash(
         ypObject *b, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    *hash = yp_HashBytes(ypBytes_DATA(b), ypBytes_LEN(b));
+    *hash = yp_HashBuffer(ypBytes_DATA(b), ypBytes_LEN(b));
 
     // Since we never contain mutable objects, we can cache our hash
     if (!ypObject_IS_MUTABLE(b)) ypObject_CACHED_HASH(b) = *hash;
@@ -12042,12 +12042,10 @@ static ypObject *str_ne(ypObject *s, ypObject *x)
 }
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
-// TODO bring this in-line with Python's string hashing; it's currently using bytes hashing
 static ypObject *str_currenthash(
         ypObject *s, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    if (ypStr_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
-    *hash = yp_HashBytes(ypStr_DATA(s), ypStr_LEN(s) << ypStr_ENC(s)->sizeshift);
+    *hash = yp_HashBuffer(ypStr_DATA(s), ypStr_LEN(s) << ypStr_ENC(s)->sizeshift);
 
     // Since we never contain mutable objects, we can cache our hash
     if (!ypObject_IS_MUTABLE(s)) ypObject_CACHED_HASH(s) = *hash;
