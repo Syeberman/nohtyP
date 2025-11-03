@@ -399,7 +399,7 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
         assert_ssizeC(len, ==, 0);
         assert_ptr(bytes, ==, NULL);
     }
-    if (type != fixture_type_str && type != fixture_type_chrarray) {
+    if (type->yp_type != yp_t_str && type->yp_type != yp_t_chrarray) {
         yp_ssize_t        size = -1;
         const yp_uint8_t *encoded = (yp_uint8_t *)-1;
         ypObject         *encoding = (ypObject *)-1;

@@ -9,7 +9,7 @@
 // under test. If this becomes a problem the tests will fail, but it may become a problem.
 
 
-#define FIXTURE_TYPES_ALL_LEN 24  // Verified in initialize_fixture_types.
+#define FIXTURE_TYPES_ALL_LEN 30  // Verified in initialize_fixture_types.
 
 
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
@@ -20,6 +20,22 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
     }
     return FALSE;
 }
+
+// FIXME Move to unittest.h?
+#define assert_str_encoding(obj, expected)                                                      \
+    do {                                                                                        \
+        ypObject         *_ypmt_STR_ENC_obj = (obj);                                            \
+        ypObject         *_ypmt_STR_ENC_expected = (expected);                                  \
+        yp_ssize_t        _ypmt_STR_ENC_size;                                                   \
+        const yp_uint8_t *_ypmt_STR_ENC_encoded;                                                \
+        ypObject         *_ypmt_STR_ENC_encoding;                                               \
+        ypObject *_ypmt_STR_ENC_result = yp_asencodedCX(_ypmt_STR_ENC_obj, &_ypmt_STR_ENC_size, \
+                &_ypmt_STR_ENC_encoded, &_ypmt_STR_ENC_encoding);                               \
+        _assert_not_raises(                                                                     \
+                _ypmt_STR_ENC_result, "yp_asencodedCX(%s, &size, &encoded, &encoding)", #obj);  \
+        _assert_obj(_ypmt_STR_ENC_encoding, is, _ypmt_STR_ENC_expected, "<%s encoding>", "%s",  \
+                #obj, #expected);                                                               \
+    } while (0)
 
 
 // Helper function for assert_setlike. If yp_miniiter_next succeeds, sets *actual to a new reference
@@ -153,6 +169,12 @@ static fixture_type_t fixture_type_bytes_struct;
 static fixture_type_t fixture_type_bytearray_struct;
 static fixture_type_t fixture_type_str_struct;
 static fixture_type_t fixture_type_chrarray_struct;
+static fixture_type_t fixture_type_str_1byte_struct;
+static fixture_type_t fixture_type_chrarray_1byte_struct;
+static fixture_type_t fixture_type_str_2bytes_struct;
+static fixture_type_t fixture_type_chrarray_2bytes_struct;
+static fixture_type_t fixture_type_str_4bytes_struct;
+static fixture_type_t fixture_type_chrarray_4bytes_struct;
 static fixture_type_t fixture_type_tuple_struct;
 static fixture_type_t fixture_type_list_struct;
 static fixture_type_t fixture_type_frozenset_struct;
@@ -1547,6 +1569,59 @@ static ypObject *_fromordsCN_chrarray(int n, va_list args)
     return result;
 }
 
+#define DEFINE_PEERS_STR(name, objs_self, objs_1byte, objs_2byte, objs_4byte)                     \
+    static peer_type_t name[] = {{&fixture_type_iter_struct, objs_self},                          \
+            {&fixture_type_str_struct, objs_self}, {&fixture_type_chrarray_struct, objs_self},    \
+            {&fixture_type_str_1byte_struct, (objs_1byte)},                                       \
+            {&fixture_type_chrarray_1byte_struct, (objs_1byte)},                                  \
+            {&fixture_type_str_2bytes_struct, (objs_2byte)},                                      \
+            {&fixture_type_chrarray_2bytes_struct, (objs_2byte)},                                 \
+            {&fixture_type_str_4bytes_struct, (objs_4byte)},                                      \
+            {&fixture_type_chrarray_4bytes_struct, (objs_4byte)},                                 \
+            {&fixture_type_tuple_struct, objs_self}, {&fixture_type_list_struct, objs_self},      \
+            {&fixture_type_frozenset_struct, objs_self}, {&fixture_type_set_struct, objs_self},   \
+            {&fixture_type_frozenset_dirty_struct, objs_self},                                    \
+            {&fixture_type_set_dirty_struct, objs_self},                                          \
+            {&fixture_type_frozendict_struct, objs_self}, {&fixture_type_dict_struct, objs_self}, \
+            {&fixture_type_frozendict_dirty_struct, objs_self},                                   \
+            {&fixture_type_dict_dirty_struct, objs_self}, {NULL}}
+
+#define DEFINE_FIXTURE_TYPE_STR_STRUCT(name, pair_name, peers, rand_items, is_mutable)      \
+    static fixture_type_t fixture_type_##name##_struct = {                                  \
+            #name,                              /* name */                                  \
+            NULL,                               /* type (initialized at runtime) */         \
+            NULL,                               /* falsy (initialized at runtime, maybe) */ \
+            &fixture_type_##pair_name##_struct, /* pair */                                  \
+                                                                                            \
+            new_rand_##name, /* _new_rand */                                                \
+                                                                                            \
+            new_##name, /* new_ */                                                          \
+            (peers),    /* peers */                                                         \
+                                                                                            \
+            newN_##name,  /* newN */                                                        \
+            (rand_items), /* rand_items */                                                  \
+                                                                                            \
+            objvarargfunc_error,  /* newK */                                                \
+            rand_objs_func_error, /* rand_values */                                         \
+                                                                                            \
+            rand_items##_ordered, /* rand_ordered_items */                                  \
+                                                                                            \
+            fromordsCN_##name, /* fromordsCN */                                             \
+                                                                                            \
+            (is_mutable), /* is_mutable */                                                  \
+            FALSE,        /* is_numeric */                                                  \
+            TRUE,         /* is_iterable */                                                 \
+            TRUE,         /* is_collection */                                               \
+            TRUE,         /* is_sequence */                                                 \
+            TRUE,         /* is_string */                                                   \
+            FALSE,        /* is_setlike */                                                  \
+            FALSE,        /* is_mapping */                                                  \
+            FALSE,        /* is_callable */                                                 \
+            FALSE,        /* is_patterned */                                                \
+            FALSE,        /* original_object_return */                                      \
+            TRUE,         /* hashable_items_only */                                         \
+    }
+
 static ypObject *new_rand_str(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
@@ -1554,6 +1629,13 @@ static ypObject *new_rand_str(const rand_obj_supplier_memo_t *memo)
     } else {
         return _new_rand_str(rand_choice_array(_max_rand_ord_funcs));
     }
+}
+
+static ypObject *new_str(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_str(object));
+    return result;
 }
 
 static ypObject *newN_str(int n, ...)
@@ -1576,52 +1658,9 @@ static ypObject *fromordsCN_str(int n, ...)
     return result;
 }
 
-static peer_type_t peers_str[] = {{&fixture_type_iter_struct, rand_objs_chr},
-        {&fixture_type_str_struct, rand_objs_chr}, {&fixture_type_chrarray_struct, rand_objs_chr},
-        {&fixture_type_tuple_struct, rand_objs_chr}, {&fixture_type_list_struct, rand_objs_chr},
-        {&fixture_type_frozenset_struct, rand_objs_chr}, {&fixture_type_set_struct, rand_objs_chr},
-        {&fixture_type_frozenset_dirty_struct, rand_objs_chr},
-        {&fixture_type_set_dirty_struct, rand_objs_chr},
-        {&fixture_type_frozendict_struct, rand_objs_chr},
-        {&fixture_type_dict_struct, rand_objs_chr},
-        {&fixture_type_frozendict_dirty_struct, rand_objs_chr},
-        {&fixture_type_dict_dirty_struct, rand_objs_chr}, {NULL}};
-
-static fixture_type_t fixture_type_str_struct = {
-        "str",                          // name
-        NULL,                           // type (initialized at runtime)
-        NULL,                           // falsy (initialized at runtime, maybe)
-        &fixture_type_chrarray_struct,  // pair
-
-        new_rand_str,  // _new_rand
-
-        yp_str,     // new_
-        peers_str,  // peers
-
-        newN_str,       // newN
-        rand_objs_chr,  // rand_items
-
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
-
-        rand_objs_chr_ordered,  // rand_ordered_items
-
-        fromordsCN_str,  // fromordsCN
-
-        FALSE,  // is_mutable
-        FALSE,  // is_numeric
-        TRUE,   // is_iterable
-        TRUE,   // is_collection
-        TRUE,   // is_sequence
-        TRUE,   // is_string
-        FALSE,  // is_setlike
-        FALSE,  // is_mapping
-        FALSE,  // is_callable
-        FALSE,  // is_patterned
-        FALSE,  // original_object_return
-        TRUE,   // hashable_items_only
-};
-
+DEFINE_PEERS_STR(
+        peers_str, rand_objs_chr, rand_objs_chr_1byte, rand_objs_chr_2bytes, rand_objs_chr_4bytes);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(str, chrarray, peers_str, rand_objs_chr, FALSE);
 fixture_type_t *fixture_type_str = &fixture_type_str_struct;
 
 static ypObject *new_rand_chrarray(const rand_obj_supplier_memo_t *memo)
@@ -1631,6 +1670,13 @@ static ypObject *new_rand_chrarray(const rand_obj_supplier_memo_t *memo)
     } else {
         return _new_rand_chrarray(rand_choice_array(_max_rand_ord_funcs));
     }
+}
+
+static ypObject *new_chrarray(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray(object));
+    return result;
 }
 
 static ypObject *newN_chrarray(int n, ...)
@@ -1653,49 +1699,282 @@ static ypObject *fromordsCN_chrarray(int n, ...)
     return result;
 }
 
-static fixture_type_t fixture_type_chrarray_struct = {
-        "chrarray",                // name
-        NULL,                      // type (initialized at runtime)
-        NULL,                      // falsy (initialized at runtime, maybe)
-        &fixture_type_str_struct,  // pair
-
-        new_rand_chrarray,  // _new_rand
-
-        yp_chrarray,  // new_
-        peers_str,    // peers
-
-        newN_chrarray,  // newN
-        rand_objs_chr,  // rand_items
-
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
-
-        rand_objs_chr_ordered,  // rand_ordered_items
-
-        fromordsCN_chrarray,  // fromordsCN
-
-        TRUE,   // is_mutable
-        FALSE,  // is_numeric
-        TRUE,   // is_iterable
-        TRUE,   // is_collection
-        TRUE,   // is_sequence
-        TRUE,   // is_string
-        FALSE,  // is_setlike
-        FALSE,  // is_mapping
-        FALSE,  // is_callable
-        FALSE,  // is_patterned
-        FALSE,  // original_object_return
-        TRUE,   // hashable_items_only
-};
-
+DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray, str, peers_str, rand_objs_chr, TRUE);
 fixture_type_t *fixture_type_chrarray = &fixture_type_chrarray_struct;
+
+static ypObject *new_rand_str_1byte(const rand_obj_supplier_memo_t *memo)
+{
+    if (RAND_OBJ_RETURN_FALSY()) {
+        return yp_str_empty;
+    } else {
+        ypObject *result = _new_rand_str(rand_ord_1byteC);
+        assert_str_encoding(result, yp_s_latin_1);
+        return result;
+    }
+}
+
+static ypObject *new_str_1byte(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_str(object));
+    assert_str_encoding(result, yp_s_latin_1);
+    return result;
+}
+
+static ypObject *newN_str_1byte(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_str(n, args);  // new ref
+    va_end(args);
+    assert_str_encoding(result, yp_s_latin_1);
+    return result;
+}
+
+static ypObject *fromordsCN_str_1byte(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_str(n, args);  // new ref
+    va_end(args);
+    assert_str_encoding(result, yp_s_latin_1);
+    return result;
+}
+
+DEFINE_PEERS_STR(peers_str_1byte, rand_objs_chr_1byte, rand_objs_chr_1byte, NULL, NULL);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(
+        str_1byte, chrarray_1byte, peers_str_1byte, rand_objs_chr_1byte, FALSE);
+fixture_type_t *fixture_type_str_1byte = &fixture_type_str_1byte_struct;
+
+static ypObject *new_rand_chrarray_1byte(const rand_obj_supplier_memo_t *memo)
+{
+    if (RAND_OBJ_RETURN_FALSY()) {
+        return yp_chrarray0();
+    } else {
+        ypObject *result = _new_rand_chrarray(rand_ord_1byteC);
+        assert_str_encoding(result, yp_s_latin_1);
+        return result;
+    }
+}
+
+static ypObject *new_chrarray_1byte(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray(object));
+    assert_str_encoding(result, yp_s_latin_1);
+    return result;
+}
+
+static ypObject *newN_chrarray_1byte(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_chrarray(n, args);  // new ref
+    va_end(args);
+    assert_str_encoding(result, yp_s_latin_1);
+    return result;
+}
+
+static ypObject *fromordsCN_chrarray_1byte(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_chrarray(n, args);  // new ref
+    va_end(args);
+    assert_str_encoding(result, yp_s_latin_1);
+    return result;
+}
+
+DEFINE_FIXTURE_TYPE_STR_STRUCT(
+        chrarray_1byte, str_1byte, peers_str_1byte, rand_objs_chr_1byte, TRUE);
+fixture_type_t *fixture_type_chrarray_1byte = &fixture_type_chrarray_1byte_struct;
+
+static ypObject *new_rand_str_2bytes(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = _new_rand_str(rand_ord_2bytesC);
+    assert_str_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *new_str_2bytes(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_str(object));
+    if (yp_lenC_not_raises(result) > 0) assert_str_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *newN_str_2bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_str(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *fromordsCN_str_2bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_str(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+DEFINE_PEERS_STR(peers_str_2bytes, rand_objs_chr_2bytes, NULL, rand_objs_chr_2bytes, NULL);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(
+        str_2bytes, chrarray_2bytes, peers_str_2bytes, rand_objs_chr_2bytes, FALSE);
+fixture_type_t *fixture_type_str_2bytes = &fixture_type_str_2bytes_struct;
+
+static ypObject *new_rand_chrarray_2bytes(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = _new_rand_chrarray(rand_ord_2bytesC);
+    assert_str_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *new_chrarray_2bytes(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray(object));
+    if (yp_lenC_not_raises(result) > 0) assert_str_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *newN_chrarray_2bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_chrarray(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *fromordsCN_chrarray_2bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_chrarray(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+DEFINE_FIXTURE_TYPE_STR_STRUCT(
+        chrarray_2bytes, str_2bytes, peers_str_2bytes, rand_objs_chr_2bytes, TRUE);
+fixture_type_t *fixture_type_chrarray_2bytes = &fixture_type_chrarray_2bytes_struct;
+
+static ypObject *new_rand_str_4bytes(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = _new_rand_str(rand_ord_4bytesC);
+    assert_str_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *new_str_4bytes(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_str(object));
+    if (yp_lenC_not_raises(result) > 0) assert_str_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *newN_str_4bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_str(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *fromordsCN_str_4bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_str(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+DEFINE_PEERS_STR(peers_str_4bytes, rand_objs_chr_4bytes, NULL, NULL, rand_objs_chr_4bytes);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(
+        str_4bytes, chrarray_4bytes, peers_str_4bytes, rand_objs_chr_4bytes, FALSE);
+fixture_type_t *fixture_type_str_4bytes = &fixture_type_str_4bytes_struct;
+
+static ypObject *new_rand_chrarray_4bytes(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = _new_rand_chrarray(rand_ord_4bytesC);
+    assert_str_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *new_chrarray_4bytes(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray(object));
+    if (yp_lenC_not_raises(result) > 0) assert_str_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *newN_chrarray_4bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_chrarray(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *fromordsCN_chrarray_4bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_chrarray(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+DEFINE_FIXTURE_TYPE_STR_STRUCT(
+        chrarray_4bytes, str_4bytes, peers_str_4bytes, rand_objs_chr_4bytes, TRUE);
+fixture_type_t *fixture_type_chrarray_4bytes = &fixture_type_chrarray_4bytes_struct;
 
 static void initialize_fixture_type_str(void)
 {
     fixture_type_str->yp_type = yp_t_str;
     fixture_type_str->falsy = yp_str_empty;
     fixture_type_chrarray->yp_type = yp_t_chrarray;
+    fixture_type_str_1byte->yp_type = yp_t_str;
+    fixture_type_str_1byte->falsy = yp_str_empty;
+    fixture_type_chrarray_1byte->yp_type = yp_t_chrarray;
+    fixture_type_str_2bytes->yp_type = yp_t_str;
+    fixture_type_chrarray_2bytes->yp_type = yp_t_chrarray;
+    fixture_type_str_4bytes->yp_type = yp_t_str;
+    fixture_type_chrarray_4bytes->yp_type = yp_t_chrarray;
 }
+
+#undef DEFINE_PEERS_STR
+#undef DEFINE_FIXTURE_TYPE_STR_STRUCT
 
 
 static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
@@ -2649,6 +2928,9 @@ static fixture_type_t *fixture_types_all_types[] = {&fixture_type_type_struct,
         &fixture_type_intstore_struct, &fixture_type_float_struct, &fixture_type_floatstore_struct,
         &fixture_type_iter_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
         &fixture_type_bytearray_struct, &fixture_type_str_struct, &fixture_type_chrarray_struct,
+        &fixture_type_str_1byte_struct, &fixture_type_chrarray_1byte_struct,
+        &fixture_type_str_2bytes_struct, &fixture_type_chrarray_2bytes_struct,
+        &fixture_type_str_4bytes_struct, &fixture_type_chrarray_4bytes_struct,
         &fixture_type_tuple_struct, &fixture_type_list_struct, &fixture_type_frozenset_struct,
         &fixture_type_set_struct, &fixture_type_frozenset_dirty_struct,
         &fixture_type_set_dirty_struct, &fixture_type_frozendict_struct, &fixture_type_dict_struct,
@@ -2685,7 +2967,9 @@ DEFINE_FIXTURE_TYPES(callable, not_callable);
 DEFINE_FIXTURE_TYPES_ARRAYS(immutable_not_str);
 static int fixture_type_is_immutable_not_str(fixture_type_t *type)
 {
-    return !type->is_mutable && type != fixture_type_str;
+    // `type->yp_type != yp_t_str` would be convenient here, but yp_type is not yet initialized.
+    return !type->is_mutable && type != fixture_type_str && type != fixture_type_str_1byte &&
+           type != fixture_type_str_2bytes && type != fixture_type_str_4bytes;
 }
 DEFINE_FIXTURE_TYPES_ARRAYS(immutable_paired);
 static int fixture_type_is_immutable_paired(fixture_type_t *type)
@@ -2714,7 +2998,7 @@ static void initialize_fixture_types(void)
     // The fixture_types_* and param_values_types_* arrays above were sized based on
     // FIXTURE_TYPES_ALL_LEN, so make sure that value is correct.
     if (yp_lengthof_array(fixture_types_all_types) != FIXTURE_TYPES_ALL_LEN + 1) {
-        fprintf(stderr, "Update FIXTURE_TYPES_ALL_LEN in unittest.h to %" PRIssize "\n",
+        fprintf(stderr, "Update FIXTURE_TYPES_ALL_LEN in unittest.c to %" PRIssize "\n",
                 yp_lengthof_array(fixture_types_all_types) - 1);
         abort();
     }
