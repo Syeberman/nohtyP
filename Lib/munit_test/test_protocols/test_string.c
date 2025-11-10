@@ -70,7 +70,7 @@ static void _test_findC(fixture_type_t *type,
     ypObject     *x_1_0;
     ypObject     *empty = type->newN(0);
 
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
     s = type->newN(N(items[0], items[1], items[2]));
     // FIXME Test against different "other" types (the other pair, really)
     x_0_1 = type->newN(N(items[0], items[1]));
@@ -913,7 +913,8 @@ static void _test_startswith(fixture_type_t *type, peer_type_t *peer)
     ypObject       *x_2_1;
     ypObject       *x_2_3;
     ypObject       *x_3;
-    obj_array_fill(items, uq, peer->rand_items);
+    assert_not_null(peer->rand_elems);  // FIXME Update this test.
+    obj_array_fill(items, uq, peer->rand_elems->items);
     s = type->newN(N(items[1], items[2], items[3]));
     x_0 = x_type->newN(N(items[0]));
     x_1 = x_type->newN(N(items[1]));

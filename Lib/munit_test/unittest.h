@@ -883,8 +883,9 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
 extern void pprint(FILE *f, ypObject *obj);
 
 
-typedef struct _fixture_type_t fixture_type_t;
-typedef struct _peer_type_t    peer_type_t;
+typedef struct _fixture_type_t  fixture_type_t;
+typedef struct _rand_elements_t rand_elements_t;
+typedef struct _peer_type_t     peer_type_t;
 typedef ypObject *(*objobjfunc)(ypObject *);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
@@ -905,28 +906,20 @@ typedef struct _fixture_type_t {
 
     rand_obj_supplier_func _new_rand;  // Internal: used by rand_obj/etc.
 
-    objobjfunc   new_;   // The object converter, aka the single-argument constructor.
-    peer_type_t *peers;  // An array of "peer types" (see peer_type_t). Null-terminated.
+    objobjfunc       new_;        // The object converter, aka the single-argument constructor.
+    peer_type_t     *peers;       // An array of "peer types" (see peer_type_t). Null-terminated.
+    rand_elements_t *rand_elems;  // Creates random elements for iterables.
 
-    // Functions for iterables, where rand_items returns objects that can be accepted by newN and
-    // subsequently yielded by yp_iter. (For mappings, newN creates an object with the given keys
-    // and random, unique values.)
-    objvarargfunc  newN;        // Creates a iterable for the given items (i.e. yp_tupleN).
-    rand_objs_func rand_items;  // Fills an array with n random objects.
+    // Creates an iterable for the given items (i.e. yp_tupleN). For mappings, newN creates an
+    // object with the given keys and random, unique values.
+    objvarargfunc newN;
 
-    // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
-    // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys). newK is
+    // Creates an iterable for the given key/value pairs (i.e. yp_frozendictK). newK is
     // also supported for collections that can store key/value pairs (i.e. iter, tuple, and list).
-    objvarargfunc  newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
-    rand_objs_func rand_values;  // Fills an array with n random objects for values.
+    objvarargfunc newK;
 
-    // Similar to rand_items, except the objects returned all support ordered comparisons with each
-    // other, and the items are returned in ascending order (i.e. i[0] < i[1] < ...).
-    rand_objs_func rand_ordered_items;
-
-    // Functions for strings (bytes, str, etc.).
-    // FIXME The string methods that take "peers" all require fellow strings. Which is good!
-    objvarargfunc fromordsCN;  // Creates a string from the int ordinal values.
+    // Creates a string from the int ordinal values.
+    objvarargfunc fromordsCN;
 
     // Flags to describe the properties of the type.
     int is_mutable;
@@ -957,10 +950,24 @@ typedef struct _fixture_type_t {
 // Note that pairs, and the types themselves, are all considered peers, and are all included in
 // fixture_type_t.peers. For example, a tuple can be converted to both a list and a tuple.
 typedef struct _peer_type_t {
-    fixture_type_t *type;         // The peer type.
-    rand_objs_func  rand_items;   // As per fixture_type_t.rand_items; NULL if not supported.
-    rand_objs_func  rand_values;  // As per fixture_type_t.rand_values; NULL if not supported.
+    fixture_type_t *type;  // The peer type.
+
+    // Creates random elements that are suitable for both types; NULL if not supported.
+    rand_elements_t *rand_elems;
 } peer_type_t;
+
+// Functions used to create random elements for iterables.
+typedef struct _rand_elements_t {
+    // Fills an array with n random objects suitable for newN, or for the keys of newK.
+    rand_objs_func items;
+
+    // Fills an array with n random objects suitable for the values of newK.
+    rand_objs_func values;
+
+    // Similar to items, except the objects returned all support ordered comparisons with each
+    // other, and the items are returned in ascending order (i.e. i[0] < i[1] < ...).
+    rand_objs_func items_ordered;
+} rand_elements_t;
 
 // TODO Versions of each of these that build as the mutable type and then freezes, to test that
 // the freezing process still yields a viable object.
@@ -1147,7 +1154,7 @@ extern ypObject *new_faulty_iter(
 //
 //      uniqueness_t *uq = uniqueness_new();
 //      ypObject *items[5];
-//      obj_array_fill(items, uq, type->rand_items);
+//      obj_array_fill(items, uq, type->rand_elems->items);
 #define obj_array_fill(array, uq, filler) (filler)((uq), yp_lengthof_array(array), (array))
 
 // Discards all references in the ypObject* array of length n. Skips NULL elements.

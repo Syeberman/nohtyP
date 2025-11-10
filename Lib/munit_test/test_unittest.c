@@ -51,7 +51,7 @@ static MunitResult test_assert_setlike_helper(const MunitParameter params[], fix
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, fixture_type_frozenset->rand_items);
+    obj_array_fill(items, uq, fixture_type_frozenset->rand_elems->items);
 
     // "mi is exhausted"
     {
@@ -109,8 +109,8 @@ static MunitResult test_assert_mapping_helper(const MunitParameter params[], fix
     uniqueness_t *uq = uniqueness_new();
     ypObject     *keys[2];
     ypObject     *values[2];
-    obj_array_fill(keys, uq, fixture_type_frozendict->rand_items);
-    obj_array_fill(values, uq, fixture_type_frozendict->rand_values);
+    obj_array_fill(keys, uq, fixture_type_frozendict->rand_elems->items);
+    obj_array_fill(values, uq, fixture_type_frozendict->rand_elems->values);
 
     // "mi is exhausted"
     {
@@ -525,8 +525,7 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
         for (peer = type->peers; peer->type != NULL; peer++) {
             peer_type_t *peer_peer = find_peer_type(peer->type->peers, type);
             assert_not_null(peer_peer);
-            assert_ptr(peer_peer->rand_items, ==, peer->rand_items);
-            assert_ptr(peer_peer->rand_values, ==, peer->rand_values);
+            assert_ptr(peer_peer->rand_elems, ==, peer->rand_elems);
         }
     }
 
@@ -535,8 +534,8 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
         ypObject *keys[1];
         ypObject *values[1];
         ypObject *self;
-        obj_array_fill(keys, NULL, type->rand_items);
-        obj_array_fill(values, NULL, type->rand_values);
+        obj_array_fill(keys, NULL, type->rand_elems->items);
+        obj_array_fill(values, NULL, type->rand_elems->values);
         self = new_itemsK(type, fixture_type_tuple, 1, keys[0], values[0]);
         assert_type_is(self, type->yp_type);
         assert_len(self, 1);
@@ -704,10 +703,11 @@ static MunitResult test_rand_obj_uniqueness(const MunitParameter params[], fixtu
     } while (0)
 
     if (type->is_collection) {
-        test_uniqueness_array(type->rand_items);
+        test_uniqueness_array(type->rand_elems->items);
+        test_uniqueness_array(type->rand_elems->items_ordered);
     }
     if (type->is_mapping) {
-        test_uniqueness_array(type->rand_values);
+        test_uniqueness_array(type->rand_elems->values);
     }
 
 #undef test_uniqueness_array

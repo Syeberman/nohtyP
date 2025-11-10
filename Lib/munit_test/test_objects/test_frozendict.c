@@ -41,8 +41,8 @@ static void _test_newK(
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Basic newK.
     {
@@ -121,8 +121,8 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, peer->rand_items);
-    obj_array_fill(values, uq, peer->rand_values);
+    obj_array_fill(keys, uq, peer->rand_elems->items);
+    obj_array_fill(values, uq, peer->rand_elems->values);
 
     // Basic new.
     {
@@ -303,7 +303,7 @@ static MunitResult test_new(const MunitParameter params[], fixture_t *fixture)
     // Shared tests.
     _test_newK(type, newK_to_new, /*test_exception_passthrough=*/FALSE);
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        if (peer->rand_elems->values == NULL) continue;  // Skip peers that don't support newK.
         _test_new(type, peer, new_, /*test_exception_passthrough=*/TRUE);
     }
 
@@ -369,8 +369,8 @@ static void _test_call_type(fixture_type_t *type, peer_type_t *peer)
     ypObject       *str_object = yp_str_frombytesC2(-1, "object");
     ypObject       *keys[4];
     ypObject       *values[4];
-    obj_array_fill(keys, uq, peer->rand_items);
-    obj_array_fill(values, uq, peer->rand_values);
+    obj_array_fill(keys, uq, peer->rand_elems->items);
+    obj_array_fill(values, uq, peer->rand_elems->values);
 
     // Zero arguments.
     {
@@ -507,7 +507,7 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 
     _test_newK(type, newK_to_call_args_type, /*test_exception_passthrough=*/FALSE);
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        if (peer->rand_elems->values == NULL) continue;  // Skip peers that don't support newK.
         _test_new(type, peer, new_to_call_args_type, /*test_exception_passthrough=*/TRUE);
         _test_call_type(type, peer);
     }
@@ -522,8 +522,8 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Basic fromkeysN.
     {
@@ -599,8 +599,8 @@ static void _test_fromkeys(fixture_type_t *type, peer_type_t  *peer,
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, peer->rand_items);
-    obj_array_fill(values, uq, peer->rand_values);
+    obj_array_fill(keys, uq, peer->rand_elems->items);
+    obj_array_fill(values, uq, peer->rand_elems->values);
 
     // Basic fromkeys.
     {
@@ -772,7 +772,7 @@ static MunitResult test_fromkeys(const MunitParameter params[], fixture_t *fixtu
     // Shared tests.
     _test_fromkeysN(type, fromkeysN_to_fromkeys, /*test_exception_passthrough=*/TRUE);
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        if (peer->rand_elems->values == NULL) continue;  // Skip peers that don't support newK.
         _test_fromkeys(type, peer, fromkeys, /*test_exception_passthrough=*/TRUE);
     }
 
@@ -793,8 +793,8 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     uniqueness_t *uq = uniqueness_new();
     ypObject     *keys[4];
     ypObject     *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Corrupted states.
     {
@@ -884,7 +884,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *str_keys[] = obj_array_init(16, rand_obj(uq, fixture_type_str));
     ypObject       *keys[16];
-    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(keys, uq, type->rand_elems->items);
 
     // Ensure that the function object has been validated first. _ypFunction_validate_parameters is
     // called once per object, and always allocates a set; this allocation interferes with our

@@ -7,7 +7,7 @@ static MunitResult test_bool(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[1];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Empty collections are falsy, all others are truthy.
     ead(x, type->newN(1, items[0]), assert_obj(yp_bool(x), is, yp_True));
@@ -23,7 +23,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic contains (and in and not_in).
     {
@@ -94,7 +94,7 @@ static MunitResult test_clear(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[32];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support clear.
     if (!type->is_mutable) {
@@ -154,7 +154,7 @@ tear_down:
 //     fixture_type_t *type = fixture->type;
 //     uniqueness_t   *uq = uniqueness_new();
 //     ypObject       *items[4];
-//     obj_array_fill(items, uq, type->rand_items);
+//     obj_array_fill(items, uq, type->rand_elems->items);
 //
 //     // Basic deepcopy. Recall immortals may not actually be copied, and that newN might return an
 //     // immortal for empty or even single-item collections. But four-item collections are unlikely

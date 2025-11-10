@@ -24,7 +24,7 @@ static void _test_newN(
     uniqueness_t      *uq = uniqueness_new();
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic newN.
     {
@@ -96,7 +96,7 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[2];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Basic new.
     {
@@ -389,7 +389,7 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     define_frozenset_mi_state(keysleft_0_index_0, 0, 0);
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Corrupted states.
     {
@@ -439,7 +439,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[16];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // _ypSet_issubset_withiter
     {

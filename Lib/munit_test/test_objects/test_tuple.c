@@ -7,7 +7,7 @@ static void _test_newN(
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic newN.
     {
@@ -63,7 +63,7 @@ static void _test_new(fixture_type_t *type, fixture_type_t *x_type,
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[2];
-    obj_array_fill(items, uq, x_type->rand_items);  // Note that we use x_type's items.
+    obj_array_fill(items, uq, x_type->rand_elems->items);  // Note that we use x_type's items.
 
     // Basic new. Recall that x_type may not guarantee iteration order.
     {
@@ -341,7 +341,7 @@ static void _test_new_repeatCN(
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic new_repeatCN.
     {
@@ -510,7 +510,7 @@ static MunitResult test_itemarrayCX(const MunitParameter params[], fixture_t *fi
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic itemarrayCX.
     {
@@ -564,7 +564,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[8];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // _ypTuple_copy
     {

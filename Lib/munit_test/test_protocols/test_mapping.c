@@ -37,7 +37,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[2];
-    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(keys, uq, type->rand_elems->items);
 
     // Previously-deleted key.
     if (type->is_mutable) {
@@ -83,8 +83,8 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
     ypObject     *values[2];
     ypObject     *mp;
     ypObject     *empty = type->newK(0);
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
     mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
 
     ead(x, rand_obj(NULL, x_type), assert_obj(any_cmp(mp, x), is, expected));
@@ -115,8 +115,8 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[4];
     ypObject       *values[4];
-    obj_array_fill(keys, uq, peer->rand_items);
-    obj_array_fill(values, uq, peer->rand_values);
+    obj_array_fill(keys, uq, peer->rand_elems->items);
+    obj_array_fill(values, uq, peer->rand_elems->values);
 
     // Non-empty mp.
     {
@@ -238,7 +238,7 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ypObject  *h_values[4];  // hashable values
         ypObject  *mp;
         ypObject  *empty = type->newK(0);
-        obj_array_fill(h_values, uq, type->rand_items);  // use rand_items to get hashable values
+        obj_array_fill(h_values, uq, type->rand_elems->items);  // use items to get hashable values
         mp = type->newK(K(keys[0], h_values[0], keys[1], h_values[1]));
 
         // Run the tests twice: once where mp has not cached the hash, and once where it has.
@@ -356,8 +356,8 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     ypObject       *unhashable;
     ypObject       *mp;
     ypObject       *empty = type->newK(0);
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
     unhashable = rand_obj_any_mutable(uq);
     mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
 
@@ -423,8 +423,8 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     ypObject       *unhashable;
     ypObject       *mp;
     ypObject       *empty = type->newK(0);
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
     unhashable = rand_obj_any_mutable(uq);
     mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
 
@@ -495,8 +495,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[3];
     ypObject       *values[3];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Immutables don't support setitem.
     if (!type->is_mutable) {
@@ -598,8 +598,8 @@ static void _test_delitem(
     uniqueness_t *uq = uniqueness_new();
     ypObject     *keys[3];
     ypObject     *values[3];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Immutables don't support delitem.
     if (!type->is_mutable) {
@@ -715,8 +715,8 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[4];
     ypObject       *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Immutables don't support popvalue.
     if (!type->is_mutable) {
@@ -847,8 +847,8 @@ static MunitResult test_popitem(const MunitParameter params[], fixture_t *fixtur
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[6];
     ypObject       *values[6];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Immutables don't support popitem.
     if (!type->is_mutable) {
@@ -945,8 +945,8 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[3];
     ypObject       *values[3];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Immutables don't support setdefault.
     if (!type->is_mutable) {
@@ -1068,8 +1068,8 @@ static void _test_updateK(fixture_type_t *type,
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *keys[6];
     ypObject          *values[6];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Immutables don't support update.
     if (!type->is_mutable) {
@@ -1202,8 +1202,8 @@ static MunitResult test_updateK(const MunitParameter params[], fixture_t *fixtur
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *keys[6];
     ypObject       *values[6];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Shared tests.
     _test_updateK(type, yp_updateK, /*test_unhashables=*/TRUE);
@@ -1257,8 +1257,8 @@ static void _test_update(fixture_type_t *type, peer_type_t *peer)
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *keys[6];
     ypObject          *values[6];
-    obj_array_fill(keys, uq, peer->rand_items);
-    obj_array_fill(values, uq, peer->rand_values);
+    obj_array_fill(keys, uq, peer->rand_elems->items);
+    obj_array_fill(values, uq, peer->rand_elems->values);
 
     // Immutables don't support update.
     if (!type->is_mutable) {
@@ -1482,7 +1482,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     _test_updateK(type, updateK_to_update_fromiter, /*test_unhashables=*/TRUE);
 
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        if (peer->rand_elems->values == NULL) continue;  // Skip peers that don't support newK.
         _test_update(type, peer);
     }
 

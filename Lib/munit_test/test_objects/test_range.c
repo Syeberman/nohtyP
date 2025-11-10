@@ -21,7 +21,7 @@ static void _test_rangeC(
     yp_int_t      itemsC[8];
     yp_int_t      stepC;
     ypObject     *items[yp_lengthof_array(itemsC)];
-    obj_array_fill(items, uq, fixture_type_range->rand_items);
+    obj_array_fill(items, uq, fixture_type_range->rand_elems->items);
     for (i = 0; i < yp_lengthof_array(itemsC); i++) itemsC[i] = yp_asintC_not_raises(items[i]);
     stepC = itemsC[1] - itemsC[0];
 
@@ -381,7 +381,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, fixture_type_range->rand_items);
+    obj_array_fill(items, uq, fixture_type_range->rand_elems->items);
 
     // range_getslice
     {
