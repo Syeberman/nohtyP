@@ -106,12 +106,11 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
 {
     fixture_type_t *x_type = peer->type;
     uniqueness_t   *uq;
-    ypObject       *items[5];  // items are in ascending order
+    ypObject       *items[6];  // items are in ascending order
 
     // Some types are comparable but don't share items, for example str_1byte and str_4bytes.
     // This is currently limited to string types, where such comparisons are tested in
     // test_protocols/test_string.
-    // FIXME Write those tests.
     if (peer->rand_elems == NULL) {
         ypObject *sq = rand_obj(NULL, type);
         ypObject *x = rand_obj(NULL, x_type);
@@ -133,24 +132,39 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         }                                            \
     } while (0)
 
-    // Two-item sq.
+    // Two-item sq, ascending order.
     {
-        ypObject *sq = type->newN(N(items[1], items[3]));
+        ypObject *sq = type->newN(N(items[1], items[4]));
 
         // x has the same items.
-        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_eq));
+        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_eq));
+
+        // x has the same items, reversed.
+        ead(x, x_type->newN(N(items[4], items[1])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // Both items in x are different.
+        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[3], items[0])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[5])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[0])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[3], items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[2], items[5])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[5], items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // The first item in x is different.
-        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
-        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[4])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[5], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // The second item in x is different.
-        ead(x, x_type->newN(N(items[1], items[2])), assert_obj(any_cmp(sq, x), is, x_gt));
-        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[1], items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1], items[5])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // One-item x.
-        ead(x, x_type->newN(N(items[1])), assert_obj(any_cmp(sq, x), is, x_gt));
         ead(x, x_type->newN(N(items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1])), assert_obj(any_cmp(sq, x), is, x_gt));
         ead(x, x_type->newN(N(items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // Empty x.
@@ -162,7 +176,55 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         // Exception passthrough.
         assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
 
-        assert_sequence(sq, items[1], items[3]);  // sq unchanged.
+        assert_sequence(sq, items[1], items[4]);  // sq unchanged.
+        yp_decrefN(N(sq));
+    }
+
+    // Two-item sq, descending order.
+    {
+        ypObject *sq = type->newN(N(items[4], items[1]));
+
+        // x has the same items.
+        ead(x, x_type->newN(N(items[4], items[1])), assert_obj(any_cmp(sq, x), is, x_eq));
+
+        // x has the same items, reversed.
+        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_gt));
+
+        // Both items in x are different.
+        ead(x, x_type->newN(N(items[3], items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[0])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[5])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[3], items[2])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[2], items[5])), assert_obj(any_cmp(sq, x), is, x_gt));
+
+        // The first item in x is different.
+        ead(x, x_type->newN(N(items[0], items[1])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[3], items[1])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[1])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // The second item in x is different.
+        ead(x, x_type->newN(N(items[4], items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[4], items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[4], items[5])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // One-item x.
+        ead(x, x_type->newN(N(items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[4])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // Empty x.
+        ead(x, x_type->newN(0), assert_obj(any_cmp(sq, x), is, x_gt));
+
+        // x is sq.
+        assert_obj(any_cmp(sq, sq), is, x_eq);
+
+        // Exception passthrough.
+        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+
+        assert_sequence(sq, items[4], items[1]);  // sq unchanged.
         yp_decrefN(N(sq));
     }
 
@@ -178,9 +240,9 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ead(x, x_type->newN(N(items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // Two-item x.
-        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
-        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
-        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[4])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // Empty x.
         ead(x, x_type->newN(0), assert_obj(any_cmp(sq, x), is, x_gt));
@@ -200,7 +262,7 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ypObject *sq = type->newN(0);
 
         // Two-item x.
-        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // One-item x.
         ead(x, x_type->newN(N(items[1])), assert_obj(any_cmp(sq, x), is, x_lt));
@@ -246,15 +308,15 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ypObject  *sq;
         ypObject  *empty = type->newN(0);
         for (i = 0; i < yp_lengthof_array(items); i++) h_items[i] = yp_frozen_deepcopy(items[i]);
-        sq = type->newN(N(h_items[1], h_items[3]));
+        sq = type->newN(N(h_items[1], h_items[4]));
 
         // Run the tests twice: once where sq has not cached the hash, and once where it has.
         for (i = 0; i < 2; i++) {
-            ypObject *x_is_same = x_type->newN(N(items[1], items[3]));
-            ypObject *x_first_is_lt = x_type->newN(N(items[0], items[3]));
-            ypObject *x_first_is_gt = x_type->newN(N(items[2], items[3]));
-            ypObject *x_second_is_lt = x_type->newN(N(items[1], items[2]));
-            ypObject *x_second_is_gt = x_type->newN(N(items[1], items[4]));
+            ypObject *x_is_same = x_type->newN(N(items[1], items[4]));
+            ypObject *x_first_is_lt = x_type->newN(N(items[0], items[4]));
+            ypObject *x_first_is_gt = x_type->newN(N(items[2], items[4]));
+            ypObject *x_second_is_lt = x_type->newN(N(items[1], items[3]));
+            ypObject *x_second_is_gt = x_type->newN(N(items[1], items[5]));
             ypObject *x_only_is_same = x_type->newN(N(items[1]));
             ypObject *x_only_is_lt = x_type->newN(N(items[0]));
             ypObject *x_only_is_gt = x_type->newN(N(items[2]));
