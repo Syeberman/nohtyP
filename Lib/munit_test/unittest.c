@@ -3,10 +3,10 @@
 #pragma GCC diagnostic ignored "-Wunused-function"  // FIXME Remove
 
 
-// TODO We go to the trouble of having rand_items/etc to allow the type to control what types of
-// items are stored inside it. But then we use functions like rand_obj_any_hashability_pair, etc
-// that could return objects that aren't supported by the types under test. If this becomes a
-// problem the tests will fail, but it may become a problem.
+// TODO We go to the trouble of having rand_elems to allow the type to control what types of items
+// are stored inside it. But then we use functions like rand_obj_any_hashability_pair, etc that
+// could return objects that aren't supported by the types under test. If this becomes a problem the
+// tests will fail, but it may become a problem.
 
 
 #define FIXTURE_TYPES_ALL_LEN 30  // Verified in initialize_fixture_types.
@@ -21,8 +21,8 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
     return FALSE;
 }
 
-// FIXME Move to unittest.h?
-#define assert_str_encoding(obj, expected)                                                      \
+// Asserts that obj is a text string in the given, or larger, encoding.
+#define assert_str_min_encoding(obj, expected)                                                  \
     do {                                                                                        \
         ypObject         *_ypmt_STR_ENC_obj = (obj);                                            \
         ypObject         *_ypmt_STR_ENC_expected = (expected);                                  \
@@ -33,8 +33,11 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
                 &_ypmt_STR_ENC_encoded, &_ypmt_STR_ENC_encoding);                               \
         _assert_not_raises(                                                                     \
                 _ypmt_STR_ENC_result, "yp_asencodedCX(%s, &size, &encoded, &encoding)", #obj);  \
-        _assert_obj(_ypmt_STR_ENC_encoding, is, _ypmt_STR_ENC_expected, "<%s encoding>", "%s",  \
-                #obj, #expected);                                                               \
+        if (_ypmt_STR_ENC_encoding == yp_s_ucs_4 || _ypmt_STR_ENC_expected == yp_s_latin_1) {   \
+            /* pass */                                                                          \
+        } else if (_ypmt_STR_ENC_encoding != _ypmt_STR_ENC_expected) {                          \
+            munit_errorf("assertion failed: <%s encoding> >= %s", #obj, #expected);             \
+        }                                                                                       \
     } while (0)
 
 
@@ -1055,9 +1058,9 @@ static ypObject *newK_iter(int k, ...)
 
 // Random elements for types that accept keys and values of any type.
 static rand_elements_t rand_elements_any = {
-        rand_objs_any,         // rand_items
-        rand_objs_any,         // rand_values
-        rand_objs_any_ordered  // rand_items_ordered
+        rand_objs_any,         // items
+        rand_objs_any,         // values
+        rand_objs_any_ordered  // items_ordered
 };
 
 // Shared amongst iter, tuple, and list, as these types work with any given iterable.
@@ -1183,7 +1186,7 @@ static void _rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array, 
         yp_ssize_t i;
         yp_int_t   start = range_rand_start();
         yp_int_t   step = range_rand_step();
-        if (ordered && step < 0) step = -step;  // rand_items_ordered requires ascending values.
+        if (ordered && step < 0) step = -step;  // items_ordered requires ascending values.
 
         for (i = 0; i < n; i++) {
             assert_not_raises(array[i] = yp_intC(start + (i * step)));
@@ -1208,9 +1211,9 @@ static void rand_items_ordered_range(uniqueness_t *uq, yp_ssize_t n, ypObject **
 
 // Random elements for range.
 static rand_elements_t rand_elements_range = {
-        rand_items_range,         // rand_items
-        NULL,                     // rand_values
-        rand_items_ordered_range  // rand_items_ordered
+        rand_items_range,         // items
+        NULL,                     // values
+        rand_items_ordered_range  // items_ordered
 };
 
 static peer_type_t peers_range[] = {{&fixture_type_iter_struct, &rand_elements_range},
@@ -1314,9 +1317,9 @@ static ypObject *fromordsCN_bytes(int n, ...)
 
 // Random elements for bytes.
 static rand_elements_t rand_elements_bytes = {
-        rand_objs_byte,          // rand_items
-        NULL,                    // rand_values
-        rand_objs_byte_ordered,  // rand_items_ordered
+        rand_objs_byte,          // items
+        NULL,                    // values
+        rand_objs_byte_ordered,  // items_ordered
 };
 
 // TODO _Could_ support range here, for ints in range(256) that follow a pattern.
@@ -1554,30 +1557,30 @@ static ypObject *_fromordsCN_chrarray(int n, va_list args)
 
 // Random elements for strs of any element size.
 static rand_elements_t rand_elements_str = {
-        rand_objs_chr,          // rand_items
-        NULL,                   // rand_values
-        rand_objs_chr_ordered,  // rand_items_ordered
+        rand_objs_chr,          // items
+        NULL,                   // values
+        rand_objs_chr_ordered,  // items_ordered
 };
 
 // Random elements for strs with 1-byte elements.
 static rand_elements_t rand_elements_str_1byte = {
-        rand_objs_chr_1byte,          // rand_items
-        NULL,                         // rand_values
-        rand_objs_chr_1byte_ordered,  // rand_items_ordered
+        rand_objs_chr_1byte,          // items
+        NULL,                         // values
+        rand_objs_chr_1byte_ordered,  // items_ordered
 };
 
 // Random elements for strs with 2-byte elements.
 static rand_elements_t rand_elements_str_2bytes = {
-        rand_objs_chr_2bytes,          // rand_items
-        NULL,                          // rand_values
-        rand_objs_chr_2bytes_ordered,  // rand_items_ordered
+        rand_objs_chr_2bytes,          // items
+        NULL,                          // values
+        rand_objs_chr_2bytes_ordered,  // items_ordered
 };
 
 // Random elements for strs with 4-byte elements.
 static rand_elements_t rand_elements_str_4bytes = {
-        rand_objs_chr_4bytes,          // rand_items
-        NULL,                          // rand_values
-        rand_objs_chr_4bytes_ordered,  // rand_items_ordered
+        rand_objs_chr_4bytes,          // items
+        NULL,                          // values
+        rand_objs_chr_4bytes_ordered,  // items_ordered
 };
 
 #define DEFINE_PEERS_STR(name, elems_self, elems_1byte, elems_2bytes, elems_4bytes)                \
@@ -1719,7 +1722,7 @@ static ypObject *new_rand_str_1byte(const rand_obj_supplier_memo_t *memo)
         return yp_str_empty;
     } else {
         ypObject *result = _new_rand_str(rand_ord_1byteC);
-        assert_str_encoding(result, yp_s_latin_1);
+        assert_str_min_encoding(result, yp_s_latin_1);
         return result;
     }
 }
@@ -1728,7 +1731,7 @@ static ypObject *new_str_1byte(ypObject *object)
 {
     ypObject *result;
     assert_not_raises(result = yp_str(object));
-    assert_str_encoding(result, yp_s_latin_1);
+    assert_str_min_encoding(result, yp_s_latin_1);
     return result;
 }
 
@@ -1739,7 +1742,7 @@ static ypObject *newN_str_1byte(int n, ...)
     va_start(args, n);
     result = _newN_str(n, args);  // new ref
     va_end(args);
-    assert_str_encoding(result, yp_s_latin_1);
+    assert_str_min_encoding(result, yp_s_latin_1);
     return result;
 }
 
@@ -1750,7 +1753,7 @@ static ypObject *fromordsCN_str_1byte(int n, ...)
     va_start(args, n);
     result = _fromordsCN_str(n, args);  // new ref
     va_end(args);
-    assert_str_encoding(result, yp_s_latin_1);
+    assert_str_min_encoding(result, yp_s_latin_1);
     return result;
 }
 
@@ -1765,7 +1768,7 @@ static ypObject *new_rand_chrarray_1byte(const rand_obj_supplier_memo_t *memo)
         return yp_chrarray0();
     } else {
         ypObject *result = _new_rand_chrarray(rand_ord_1byteC);
-        assert_str_encoding(result, yp_s_latin_1);
+        assert_str_min_encoding(result, yp_s_latin_1);
         return result;
     }
 }
@@ -1774,7 +1777,7 @@ static ypObject *new_chrarray_1byte(ypObject *object)
 {
     ypObject *result;
     assert_not_raises(result = yp_chrarray(object));
-    assert_str_encoding(result, yp_s_latin_1);
+    assert_str_min_encoding(result, yp_s_latin_1);
     return result;
 }
 
@@ -1785,7 +1788,7 @@ static ypObject *newN_chrarray_1byte(int n, ...)
     va_start(args, n);
     result = _newN_chrarray(n, args);  // new ref
     va_end(args);
-    assert_str_encoding(result, yp_s_latin_1);
+    assert_str_min_encoding(result, yp_s_latin_1);
     return result;
 }
 
@@ -1796,7 +1799,7 @@ static ypObject *fromordsCN_chrarray_1byte(int n, ...)
     va_start(args, n);
     result = _fromordsCN_chrarray(n, args);  // new ref
     va_end(args);
-    assert_str_encoding(result, yp_s_latin_1);
+    assert_str_min_encoding(result, yp_s_latin_1);
     return result;
 }
 
@@ -1807,7 +1810,7 @@ fixture_type_t *fixture_type_chrarray_1byte = &fixture_type_chrarray_1byte_struc
 static ypObject *new_rand_str_2bytes(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = _new_rand_str(rand_ord_2bytesC);
-    assert_str_encoding(result, yp_s_ucs_2);
+    assert_str_min_encoding(result, yp_s_ucs_2);
     return result;
 }
 
@@ -1815,7 +1818,7 @@ static ypObject *new_str_2bytes(ypObject *object)
 {
     ypObject *result;
     assert_not_raises(result = yp_str(object));
-    if (yp_lenC_not_raises(result) > 0) assert_str_encoding(result, yp_s_ucs_2);
+    if (yp_lenC_not_raises(result) > 0) assert_str_min_encoding(result, yp_s_ucs_2);
     return result;
 }
 
@@ -1826,7 +1829,7 @@ static ypObject *newN_str_2bytes(int n, ...)
     va_start(args, n);
     result = _newN_str(n, args);  // new ref
     va_end(args);
-    if (n > 0) assert_str_encoding(result, yp_s_ucs_2);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_2);
     return result;
 }
 
@@ -1837,7 +1840,7 @@ static ypObject *fromordsCN_str_2bytes(int n, ...)
     va_start(args, n);
     result = _fromordsCN_str(n, args);  // new ref
     va_end(args);
-    if (n > 0) assert_str_encoding(result, yp_s_ucs_2);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_2);
     return result;
 }
 
@@ -1850,7 +1853,7 @@ fixture_type_t *fixture_type_str_2bytes = &fixture_type_str_2bytes_struct;
 static ypObject *new_rand_chrarray_2bytes(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = _new_rand_chrarray(rand_ord_2bytesC);
-    assert_str_encoding(result, yp_s_ucs_2);
+    assert_str_min_encoding(result, yp_s_ucs_2);
     return result;
 }
 
@@ -1858,7 +1861,7 @@ static ypObject *new_chrarray_2bytes(ypObject *object)
 {
     ypObject *result;
     assert_not_raises(result = yp_chrarray(object));
-    if (yp_lenC_not_raises(result) > 0) assert_str_encoding(result, yp_s_ucs_2);
+    if (yp_lenC_not_raises(result) > 0) assert_str_min_encoding(result, yp_s_ucs_2);
     return result;
 }
 
@@ -1869,7 +1872,7 @@ static ypObject *newN_chrarray_2bytes(int n, ...)
     va_start(args, n);
     result = _newN_chrarray(n, args);  // new ref
     va_end(args);
-    if (n > 0) assert_str_encoding(result, yp_s_ucs_2);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_2);
     return result;
 }
 
@@ -1880,7 +1883,7 @@ static ypObject *fromordsCN_chrarray_2bytes(int n, ...)
     va_start(args, n);
     result = _fromordsCN_chrarray(n, args);  // new ref
     va_end(args);
-    if (n > 0) assert_str_encoding(result, yp_s_ucs_2);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_2);
     return result;
 }
 
@@ -1891,7 +1894,7 @@ fixture_type_t *fixture_type_chrarray_2bytes = &fixture_type_chrarray_2bytes_str
 static ypObject *new_rand_str_4bytes(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = _new_rand_str(rand_ord_4bytesC);
-    assert_str_encoding(result, yp_s_ucs_4);
+    assert_str_min_encoding(result, yp_s_ucs_4);
     return result;
 }
 
@@ -1899,7 +1902,7 @@ static ypObject *new_str_4bytes(ypObject *object)
 {
     ypObject *result;
     assert_not_raises(result = yp_str(object));
-    if (yp_lenC_not_raises(result) > 0) assert_str_encoding(result, yp_s_ucs_4);
+    if (yp_lenC_not_raises(result) > 0) assert_str_min_encoding(result, yp_s_ucs_4);
     return result;
 }
 
@@ -1910,7 +1913,7 @@ static ypObject *newN_str_4bytes(int n, ...)
     va_start(args, n);
     result = _newN_str(n, args);  // new ref
     va_end(args);
-    if (n > 0) assert_str_encoding(result, yp_s_ucs_4);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_4);
     return result;
 }
 
@@ -1921,7 +1924,7 @@ static ypObject *fromordsCN_str_4bytes(int n, ...)
     va_start(args, n);
     result = _fromordsCN_str(n, args);  // new ref
     va_end(args);
-    if (n > 0) assert_str_encoding(result, yp_s_ucs_4);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_4);
     return result;
 }
 
@@ -1934,7 +1937,7 @@ fixture_type_t *fixture_type_str_4bytes = &fixture_type_str_4bytes_struct;
 static ypObject *new_rand_chrarray_4bytes(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = _new_rand_chrarray(rand_ord_4bytesC);
-    assert_str_encoding(result, yp_s_ucs_4);
+    assert_str_min_encoding(result, yp_s_ucs_4);
     return result;
 }
 
@@ -1942,7 +1945,7 @@ static ypObject *new_chrarray_4bytes(ypObject *object)
 {
     ypObject *result;
     assert_not_raises(result = yp_chrarray(object));
-    if (yp_lenC_not_raises(result) > 0) assert_str_encoding(result, yp_s_ucs_4);
+    if (yp_lenC_not_raises(result) > 0) assert_str_min_encoding(result, yp_s_ucs_4);
     return result;
 }
 
@@ -1953,7 +1956,7 @@ static ypObject *newN_chrarray_4bytes(int n, ...)
     va_start(args, n);
     result = _newN_chrarray(n, args);  // new ref
     va_end(args);
-    if (n > 0) assert_str_encoding(result, yp_s_ucs_4);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_4);
     return result;
 }
 
@@ -1964,7 +1967,7 @@ static ypObject *fromordsCN_chrarray_4bytes(int n, ...)
     va_start(args, n);
     result = _fromordsCN_chrarray(n, args);  // new ref
     va_end(args);
-    if (n > 0) assert_str_encoding(result, yp_s_ucs_4);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_4);
     return result;
 }
 
@@ -2147,9 +2150,9 @@ static ypObject *newK_frozenset(int k, ...)
 
 // Random elements for frozensets.
 static rand_elements_t rand_elements_frozenset = {
-        rand_objs_any_hashable,         // rand_items
-        rand_objs_any_hashable,         // rand_values
-        rand_objs_any_hashable_ordered  // rand_items_ordered
+        rand_objs_any_hashable,         // items
+        rand_objs_any_hashable,         // values
+        rand_objs_any_hashable_ordered  // items_ordered
 };
 
 static peer_type_t peers_frozenset[FIXTURE_TYPES_ALL_LEN + 1] = {0};
@@ -2528,9 +2531,9 @@ static ypObject *new_frozendictN(int n, ...)
 
 // Random elements for frozendicts.
 static rand_elements_t rand_elements_frozendict = {
-        rand_objs_any_hashable,         // rand_items
-        rand_objs_any,                  // rand_values
-        rand_objs_any_hashable_ordered  // rand_items_ordered
+        rand_objs_any_hashable,         // items
+        rand_objs_any,                  // values
+        rand_objs_any_hashable_ordered  // items_ordered
 };
 
 static peer_type_t peers_frozendict[FIXTURE_TYPES_ALL_LEN + 1] = {0};

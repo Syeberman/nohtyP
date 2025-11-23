@@ -969,8 +969,31 @@ typedef struct _rand_elements_t {
     rand_objs_func items_ordered;
 } rand_elements_t;
 
-// TODO Versions of each of these that build as the mutable type and then freezes, to test that
-// the freezing process still yields a viable object.
+
+// The individual types under test. Most of these have "obvious" implementations, but there are
+// exceptions, and some of those exceptions place restrictions on tests that include such types.
+//
+// - fixture_type_range: Constructor arguments must follow a range pattern. To support this,
+//   rand_elems->items returns integers following a range pattern, and constructors should be called
+//   with a slice of rand_elems->items.
+// - fixture_type_str_1byte, etc: These are forms of fixture_type_str/etc stored in specific
+//   encodings at creation (latin-1, ucs-2, or ucs-4) in order to test the interactions of strings
+//   with different in-memory representations. Ideally, the constructors should only be called with
+//   rand_elems->items objects, however this limits the tests that can be written: for example, a
+//   mixed-encoding startswith test would not be able to test the positive case. Furthermore, many
+//   tests expect to be able to create empty objects. As such, the restriction is that the
+//   constructors should be called with **at least one** rand_elems->items object, or no objects;
+//   constructors will assert if the created object is non-empty and has a **smaller** encoding than
+//   expected. While these forms are all peers of each other, some peer relationships have NULL
+//   rand_elems as they have no shared items; tests must therefore use each type's rand_elems
+//   specifically, or skip peers with NULL rand_elems.
+// - fixture_type_frozenset_dirty, fixture_type_frozendict_dirty, etc: These are forms of
+//   fixture_type_frozenset/fixture_type_frozendict/etc which are created with one deleted item,
+//   making their hash tables "dirty". To accomplish this for immutable types, a mutable object is
+//   created and then frozen. There are no restrictions on the constructors for these types.
+//
+// TODO Versions of each of these that build as the mutable type and then freezes, to test that the
+// freezing process still yields a viable object.
 extern fixture_type_t *fixture_type_type;
 extern fixture_type_t *fixture_type_NoneType;
 extern fixture_type_t *fixture_type_bool;
