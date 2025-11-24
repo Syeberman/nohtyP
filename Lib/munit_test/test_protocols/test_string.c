@@ -1,6 +1,8 @@
 
 #include "munit_test/unittest.h"
 
+// FIXME replace copy/paste sq with s.
+
 
 #define O_a_GRAVE 0xE0        // 'à', "a with grave", a non-ascii latin-1 lowercase
 #define O_A_GRAVE 0xC0        // 'À', "A with grave", a non-ascii latin-1 uppercase
@@ -40,6 +42,347 @@ static int isbinary(fixture_type_t *type)
     return type == fixture_type_bytes || type == fixture_type_bytearray;
 }
 
+
+// expected is either the exception which is expected to be raised, or the boolean expected to be
+// returned.
+static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t *x_type,
+        ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject                   *expected)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[2];
+    ypObject     *s;
+    ypObject     *empty = type->newN(0);
+    obj_array_fill(items, uq, type->rand_elems->items);
+    s = type->newN(N(items[0], items[1]));
+
+#define assert_not_supported(expression)      \
+    do {                                      \
+        ypObject *result = (expression);      \
+        if (yp_isexceptionC(expected)) {      \
+            assert_raises(result, expected);  \
+        } else {                              \
+            assert_obj(result, is, expected); \
+        }                                     \
+    } while (0)
+
+    ead(x, rand_obj(NULL, x_type), assert_not_supported(any_cmp(s, x)));
+    ead(x, rand_obj(NULL, x_type), assert_not_supported(any_cmp(empty, x)));
+    ead(x, x_type->newN(0), assert_not_supported(any_cmp(s, x)));
+    ead(x, x_type->newN(0), assert_not_supported(any_cmp(empty, x)));
+
+#undef assert_not_supported
+
+    obj_array_decref(items);
+    yp_decrefN(N(s, empty));
+    uniqueness_dealloc(uq);
+}
+
+// String-specific tests not covered by test_sequence. In particular, this tests peers of differing
+// encodings, for example comparing str_1byte to str_4bytes.
+static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
+        ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_lt, ypObject *x_gt)
+{
+    fixture_type_t *x_type = peer->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *items[6];  // items are in ascending order
+    ypObject       *xc;        // This item must be present when creating x.
+    ypObject       *i1_to_xc;  // One of x_lt or x_gt, when items[1] is compared to xc. Borrowed.
+    ypObject       *i4_to_xc;
+    obj_array_fill(items, uq, type->rand_elems->items_ordered);
+    x_type->rand_elems->items(uq, 1, &xc);
+    i1_to_xc = yp_ltC_not_raises(items[1], xc) ? x_lt : x_gt;
+    i4_to_xc = yp_ltC_not_raises(items[4], xc) ? x_lt : x_gt;
+
+    // Two-item s, ascending order.
+    {
+        ypObject *s = type->newN(N(items[1], items[4]));
+
+        // x has the same items, plus xc.
+        ead(x, x_type->newN(N(items[1], items[4], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // x has the same items, reversed, plus xc.
+        ead(x, x_type->newN(N(items[4], items[1], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // Both items in x are different, plus xc.
+        ead(x, x_type->newN(N(items[0], items[3], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[3], items[0], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[5], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[0], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[2], items[3], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[3], items[2], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[2], items[5], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[5], items[2], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // The first item in x is different, plus xc.
+        ead(x, x_type->newN(N(items[0], items[4], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[4], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[5], items[4], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // The second item in x is different, plus xc.
+        ead(x, x_type->newN(N(items[1], items[0], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1], items[3], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1], items[5], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // One-item x, plus xc.
+        ead(x, x_type->newN(N(items[0], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1], xc)), assert_obj(any_cmp(s, x), is, i4_to_xc));
+        ead(x, x_type->newN(N(items[2], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // x starts with xc.
+        ead(x, x_type->newN(N(xc)), assert_obj(any_cmp(s, x), is, i1_to_xc));
+        ead(x, x_type->newN(N(xc, items[1])), assert_obj(any_cmp(s, x), is, i1_to_xc));
+        ead(x, x_type->newN(N(xc, items[4])), assert_obj(any_cmp(s, x), is, i1_to_xc));
+
+        // "Empty x", "x is s" and "exception passthrough" are tested in test_sequence.
+
+        assert_sequence(s, items[1], items[4]);  // s unchanged.
+        yp_decrefN(N(s));
+    }
+
+    // Two-item s, descending order.
+    {
+        ypObject *s = type->newN(N(items[4], items[1]));
+
+        // x has the same items, plus xc.
+        ead(x, x_type->newN(N(items[4], items[1], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // x has the same items, reversed, plus xc.
+        ead(x, x_type->newN(N(items[1], items[4], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+
+        // Both items in x are different, plus xc.
+        ead(x, x_type->newN(N(items[3], items[0], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[0], items[3], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[0], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[5], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[3], items[2], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[3], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[2], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[2], items[5], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+
+        // The first item in x is different, plus xc.
+        ead(x, x_type->newN(N(items[0], items[1], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[3], items[1], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[1], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // The second item in x is different, plus xc.
+        ead(x, x_type->newN(N(items[4], items[0], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[4], items[2], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[4], items[5], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // One-item x, plus xc.
+        ead(x, x_type->newN(N(items[3], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[4], xc)), assert_obj(any_cmp(s, x), is, i1_to_xc));
+        ead(x, x_type->newN(N(items[5], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // x starts with xc.
+        ead(x, x_type->newN(N(xc)), assert_obj(any_cmp(s, x), is, i4_to_xc));
+        ead(x, x_type->newN(N(xc, items[1])), assert_obj(any_cmp(s, x), is, i4_to_xc));
+        ead(x, x_type->newN(N(xc, items[4])), assert_obj(any_cmp(s, x), is, i4_to_xc));
+
+        // "Empty x", "x is s" and "exception passthrough" are tested in test_sequence.
+
+        assert_sequence(s, items[4], items[1]);  // s unchanged.
+        yp_decrefN(N(s));
+    }
+
+    // One-item s.
+    {
+        ypObject *s = type->newN(N(items[1]));
+
+        // x has the same items, plus xc.
+        ead(x, x_type->newN(N(items[1], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // x has a different item, plus xc.
+        ead(x, x_type->newN(N(items[0], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // Two-item x, plus xc.
+        ead(x, x_type->newN(N(items[1], items[4], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[4], xc)), assert_obj(any_cmp(s, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[4], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // x starts with xc.
+        ead(x, x_type->newN(N(xc)), assert_obj(any_cmp(s, x), is, i1_to_xc));
+        ead(x, x_type->newN(N(xc, items[1])), assert_obj(any_cmp(s, x), is, i1_to_xc));
+        ead(x, x_type->newN(N(xc, items[4])), assert_obj(any_cmp(s, x), is, i1_to_xc));
+
+        // "Empty x", "x is s" and "exception passthrough" are tested in test_sequence.
+
+        assert_sequence(s, items[1]);  // s unchanged.
+        yp_decrefN(N(s));
+    }
+
+    // Empty s.
+    {
+        ypObject *s = type->newN(0);
+
+        // Two-item x, plus xc.
+        ead(x, x_type->newN(N(items[1], items[4], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // One-item x, plus xc.
+        ead(x, x_type->newN(N(items[1], xc)), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // x starts with xc.
+        ead(x, x_type->newN(N(xc)), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(xc, items[1])), assert_obj(any_cmp(s, x), is, x_lt));
+        ead(x, x_type->newN(N(xc, items[4])), assert_obj(any_cmp(s, x), is, x_lt));
+
+        // "Empty x", "x is s" and "exception passthrough" are tested in test_sequence.
+
+        assert_len(s, 0);  // s unchanged.
+        yp_decrefN(N(s));
+    }
+
+#undef assert_cmp_fails
+
+    yp_decref(xc);
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+}
+
+static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    peer_type_t     *peer;
+    fixture_type_t **x_type;
+
+    // lt is only supported for friendly x.
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->type->is_string) {
+            _test_comparisons(type, peer, yp_lt, /*x_lt=*/yp_True, /*x_gt=*/yp_False);
+        } else {
+            _test_comparisons_not_supported(type, peer->type, yp_lt, yp_TypeError);
+        }
+    }
+
+    // Binary strings cannot be compared with text strings.
+    for (x_type = fixture_types_string->types; (*x_type) != NULL; x_type++) {
+        if (isbinary(type) == isbinary(*x_type)) continue;
+        _test_comparisons_not_supported(type, *x_type, yp_lt, yp_TypeError);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    peer_type_t     *peer;
+    fixture_type_t **x_type;
+
+    // le is only supported for friendly x.
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->type->is_string) {
+            _test_comparisons(type, peer, yp_le, /*x_lt=*/yp_True, /*x_gt=*/yp_False);
+        } else {
+            _test_comparisons_not_supported(type, peer->type, yp_le, yp_TypeError);
+        }
+    }
+
+    // Binary strings cannot be compared with text strings.
+    for (x_type = fixture_types_string->types; (*x_type) != NULL; x_type++) {
+        if (isbinary(type) == isbinary(*x_type)) continue;
+        _test_comparisons_not_supported(type, *x_type, yp_le, yp_TypeError);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    peer_type_t     *peer;
+    fixture_type_t **x_type;
+
+    // eq is only supported for friendly x.
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->type->is_string) {
+            _test_comparisons(type, peer, yp_eq, /*x_lt=*/yp_False, /*x_gt=*/yp_False);
+        } else {
+            _test_comparisons_not_supported(type, peer->type, yp_eq, yp_False);
+        }
+    }
+
+    // Binary strings cannot be compared with text strings.
+    for (x_type = fixture_types_string->types; (*x_type) != NULL; x_type++) {
+        if (isbinary(type) == isbinary(*x_type)) continue;
+        _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    peer_type_t     *peer;
+    fixture_type_t **x_type;
+
+    // ne is only supported for friendly x.
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->type->is_string) {
+            _test_comparisons(type, peer, yp_ne, /*x_lt=*/yp_True, /*x_gt=*/yp_True);
+        } else {
+            _test_comparisons_not_supported(type, peer->type, yp_ne, yp_True);
+        }
+    }
+
+    // Binary strings cannot be compared with text strings.
+    for (x_type = fixture_types_string->types; (*x_type) != NULL; x_type++) {
+        if (isbinary(type) == isbinary(*x_type)) continue;
+        _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    peer_type_t     *peer;
+    fixture_type_t **x_type;
+
+    // ge is only supported for friendly x.
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->type->is_string) {
+            _test_comparisons(type, peer, yp_ge, /*x_lt=*/yp_False, /*x_gt=*/yp_True);
+        } else {
+            _test_comparisons_not_supported(type, peer->type, yp_ge, yp_TypeError);
+        }
+    }
+
+    // Binary strings cannot be compared with text strings.
+    for (x_type = fixture_types_string->types; (*x_type) != NULL; x_type++) {
+        if (isbinary(type) == isbinary(*x_type)) continue;
+        _test_comparisons_not_supported(type, *x_type, yp_ge, yp_TypeError);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    peer_type_t     *peer;
+    fixture_type_t **x_type;
+
+    // gt is only supported for friendly x.
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->type->is_string) {
+            _test_comparisons(type, peer, yp_gt, /*x_lt=*/yp_False, /*x_gt=*/yp_True);
+        } else {
+            _test_comparisons_not_supported(type, peer->type, yp_gt, yp_TypeError);
+        }
+    }
+
+    // Binary strings cannot be compared with text strings.
+    for (x_type = fixture_types_string->types; (*x_type) != NULL; x_type++) {
+        if (isbinary(type) == isbinary(*x_type)) continue;
+        _test_comparisons_not_supported(type, *x_type, yp_gt, yp_TypeError);
+    }
+
+    return MUNIT_OK;
+}
 
 // FIXME More string-specific getslice tests...and also setslice and the other methods where we
 // need to convert between character widths.
@@ -1104,7 +1447,10 @@ static MunitResult test_endswith(const MunitParameter params[], fixture_t *fixtu
 static MunitParameterEnum test_string_params[] = {
         {param_key_type, param_values_types_string}, {NULL}};
 
-MunitTest test_string_tests[] = {TEST(test_getslice, test_string_params),
+MunitTest test_string_tests[] = {TEST(test_lt, test_string_params),
+        TEST(test_le, test_string_params), TEST(test_eq, test_string_params),
+        TEST(test_ne, test_string_params), TEST(test_ge, test_string_params),
+        TEST(test_gt, test_string_params), TEST(test_getslice, test_string_params),
         TEST(test_findC, test_string_params), TEST(test_indexC, test_string_params),
         TEST(test_rfindC, test_string_params), TEST(test_rindexC, test_string_params),
         TEST(test_isalnum, test_string_params), TEST(test_isalpha, test_string_params),

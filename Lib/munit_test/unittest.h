@@ -1191,6 +1191,9 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 // yp_lenC, asserting an exception is not raised.
 yp_ssize_t yp_lenC_not_raises(ypObject *container);
 
+// Comparison methods, asserting an exception is not raised.
+int yp_ltC_not_raises(ypObject *x, ypObject *y);
+
 // yp_asintC, asserting an exception is not raised.
 // TODO Most tests should probably be using the "index" version of this, without rounding.
 yp_int_t yp_asintC_not_raises(ypObject *number);

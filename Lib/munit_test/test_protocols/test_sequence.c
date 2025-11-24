@@ -100,6 +100,8 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
 
 // cmp_fails is what to expect when two sequences fail to compare because the corresponding items
 // cannot be compared: either an exception or a bool.
+// FIXME Have I inverted the logic/naming of x_lt/etc? It reads like "expected value when x is less
+// than sq", but it's the opposite. Should these be renamed to sq_lt/etc? Here and elsewhere.
 static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_lt, ypObject *x_eq,
         ypObject *x_gt, ypObject *cmp_fails)

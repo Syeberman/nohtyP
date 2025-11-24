@@ -3106,6 +3106,13 @@ extern yp_ssize_t yp_lenC_not_raises(ypObject *container)
     return result;
 }
 
+extern int yp_ltC_not_raises(ypObject *x, ypObject *y)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_lt(x, y));
+    return result == yp_True;
+}
+
 extern yp_int_t yp_asintC_not_raises(ypObject *number)
 {
     yp_int_t result;
