@@ -79,15 +79,14 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
 
 // String-specific tests not covered by test_sequence. In particular, this tests peers of differing
 // encodings, for example comparing str_1byte to str_4bytes.
-static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
+static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
         ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_lt, ypObject *x_gt)
 {
-    fixture_type_t *x_type = peer->type;
-    uniqueness_t   *uq = uniqueness_new();
-    ypObject       *items[6];  // items are in ascending order
-    ypObject       *xc;        // This item must be present when creating x.
-    ypObject       *i1_to_xc;  // One of x_lt or x_gt, when items[1] is compared to xc. Borrowed.
-    ypObject       *i4_to_xc;
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[6];  // items are in ascending order
+    ypObject     *xc;        // This item must be present when creating x.
+    ypObject     *i1_to_xc;  // One of x_lt or x_gt, when items[1] is compared to xc. Borrowed.
+    ypObject     *i4_to_xc;
     obj_array_fill(items, uq, type->rand_elems->items_ordered);
     x_type->rand_elems->items(uq, 1, &xc);
     i1_to_xc = yp_ltC_not_raises(items[1], xc) ? x_lt : x_gt;
@@ -249,7 +248,7 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
     // lt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
         if (peer->type->is_string) {
-            _test_comparisons(type, peer, yp_lt, /*x_lt=*/yp_True, /*x_gt=*/yp_False);
+            _test_comparisons(type, peer->type, yp_lt, /*x_lt=*/yp_True, /*x_gt=*/yp_False);
         } else {
             _test_comparisons_not_supported(type, peer->type, yp_lt, yp_TypeError);
         }
@@ -273,7 +272,7 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
     // le is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
         if (peer->type->is_string) {
-            _test_comparisons(type, peer, yp_le, /*x_lt=*/yp_True, /*x_gt=*/yp_False);
+            _test_comparisons(type, peer->type, yp_le, /*x_lt=*/yp_True, /*x_gt=*/yp_False);
         } else {
             _test_comparisons_not_supported(type, peer->type, yp_le, yp_TypeError);
         }
@@ -297,7 +296,7 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
     // eq is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
         if (peer->type->is_string) {
-            _test_comparisons(type, peer, yp_eq, /*x_lt=*/yp_False, /*x_gt=*/yp_False);
+            _test_comparisons(type, peer->type, yp_eq, /*x_lt=*/yp_False, /*x_gt=*/yp_False);
         } else {
             _test_comparisons_not_supported(type, peer->type, yp_eq, yp_False);
         }
@@ -321,7 +320,7 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
     // ne is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
         if (peer->type->is_string) {
-            _test_comparisons(type, peer, yp_ne, /*x_lt=*/yp_True, /*x_gt=*/yp_True);
+            _test_comparisons(type, peer->type, yp_ne, /*x_lt=*/yp_True, /*x_gt=*/yp_True);
         } else {
             _test_comparisons_not_supported(type, peer->type, yp_ne, yp_True);
         }
@@ -345,7 +344,7 @@ static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
     // ge is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
         if (peer->type->is_string) {
-            _test_comparisons(type, peer, yp_ge, /*x_lt=*/yp_False, /*x_gt=*/yp_True);
+            _test_comparisons(type, peer->type, yp_ge, /*x_lt=*/yp_False, /*x_gt=*/yp_True);
         } else {
             _test_comparisons_not_supported(type, peer->type, yp_ge, yp_TypeError);
         }
@@ -369,7 +368,7 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
     // gt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
         if (peer->type->is_string) {
-            _test_comparisons(type, peer, yp_gt, /*x_lt=*/yp_False, /*x_gt=*/yp_True);
+            _test_comparisons(type, peer->type, yp_gt, /*x_lt=*/yp_False, /*x_gt=*/yp_True);
         } else {
             _test_comparisons_not_supported(type, peer->type, yp_gt, yp_TypeError);
         }
@@ -384,13 +383,13 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-
-static void _test_concat(fixture_type_t *type, peer_type_t *peer)
+// String-specific tests not covered by test_sequence. In particular, this tests peers of differing
+// encodings, for example concatenating str_1byte with str_4bytes.
+static void _test_concat(fixture_type_t *type, fixture_type_t *x_type)
 {
-    fixture_type_t *x_type = peer->type;
-    uniqueness_t   *uq = uniqueness_new();
-    ypObject       *items[2];
-    ypObject       *x_items[2];
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[2];
+    ypObject     *x_items[2];
     obj_array_fill(items, uq, type->rand_elems->items);
     obj_array_fill(x_items, uq, x_type->rand_elems->items);
 
@@ -416,7 +415,8 @@ static void _test_concat(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(s, x, result));
     }
 
-    // faulty_iter_tests, "x is not an iterable", and "exception passthrough" are in test_sequence.
+    // "Failing iterators", "x is not an iterable", and "exception passthrough" are in
+    // test_sequence.
 
     obj_array_decref(x_items);
     obj_array_decref(items);
@@ -431,7 +431,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     for (peer = type->peers; peer->type != NULL; peer++) {
         // Concatenation with non-string peers is tested in test_sequence.
         if (!peer->type->is_string) continue;
-        _test_concat(type, peer);
+        _test_concat(type, peer->type);
     }
 
     return MUNIT_OK;
@@ -541,6 +541,209 @@ static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixtur
 }
 
 // TODO test_countC, for non-overlapping substrings.
+
+// String-specific tests not covered by test_sequence. In particular, this tests peers of differing
+// encodings, for example setting a slice of str_1byte to a str_4bytes.
+static void _test_setsliceC(fixture_type_t *type, fixture_type_t *x_type)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[6];
+    ypObject     *x_items[32];
+    obj_array_fill(items, uq, type->rand_elems->items);
+    obj_array_fill(x_items, uq, x_type->rand_elems->items);
+
+    // Immutables don't support setslice.
+    if (!type->is_mutable) {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *two = x_type->newN(N(x_items[2]));
+        assert_raises_exc(yp_setsliceC6(s, 0, 1, 1, two, &exc), yp_TypeError);
+        assert_sequence(s, items[0], items[1]);
+        yp_decrefN(N(s, two));
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic slice.
+    {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *two = x_type->newN(N(x_items[2]));
+        ypObject *three = x_type->newN(N(x_items[3]));
+        assert_not_raises_exc(yp_setsliceC6(s, 0, 1, 1, two, &exc));
+        assert_sequence(s, x_items[2], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(s, 1, 2, 1, three, &exc));
+        assert_sequence(s, x_items[2], x_items[3]);
+        yp_decrefN(N(s, two, three));
+    }
+
+    // Negative step.
+    {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *two = x_type->newN(N(x_items[2]));
+        ypObject *three = x_type->newN(N(x_items[3]));
+        assert_not_raises_exc(yp_setsliceC6(s, -1, -2, -1, two, &exc));
+        assert_sequence(s, items[0], x_items[2]);
+        assert_not_raises_exc(yp_setsliceC6(s, -2, -3, -1, three, &exc));
+        assert_sequence(s, x_items[3], x_items[2]);
+        yp_decrefN(N(s, two, three));
+    }
+
+    // Total slice, forward and backward.
+    {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *four_five = x_type->newN(N(x_items[4], x_items[5]));
+        ypObject *six_seven = x_type->newN(N(x_items[6], x_items[7]));
+        assert_not_raises_exc(yp_setsliceC6(s, 0, 2, 1, four_five, &exc));
+        assert_sequence(s, x_items[4], x_items[5]);
+        assert_not_raises_exc(yp_setsliceC6(s, -1, -3, -1, six_seven, &exc));
+        assert_sequence(s, x_items[7], x_items[6]);
+        yp_decrefN(N(s, four_five, six_seven));
+    }
+
+    // Step of 2, -2.
+    {
+        ypObject *s = type->newN(N(items[0], items[1], items[2], items[3], items[4]));
+        ypObject *five_six_seven = x_type->newN(N(x_items[5], x_items[6], x_items[7]));
+        ypObject *eight_nine_ten = x_type->newN(N(x_items[8], x_items[9], x_items[10]));
+        assert_not_raises_exc(yp_setsliceC6(s, 0, 5, 2, five_six_seven, &exc));
+        assert_sequence(s, x_items[5], items[1], x_items[6], items[3], x_items[7]);
+        assert_not_raises_exc(yp_setsliceC6(s, -1, -6, -2, eight_nine_ten, &exc));
+        assert_sequence(s, x_items[10], items[1], x_items[9], items[3], x_items[8]);
+        yp_decrefN(N(s, five_six_seven, eight_nine_ten));
+    }
+
+    // "Empty slices" is tested in test_sequence.
+
+    // yp_SLICE_DEFAULT.
+    {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *two = x_type->newN(N(x_items[2]));
+        ypObject *three = x_type->newN(N(x_items[3]));
+        ypObject *four_five = x_type->newN(N(x_items[4], x_items[5]));
+        ypObject *six = x_type->newN(N(x_items[6]));
+        ypObject *seven = x_type->newN(N(x_items[7]));
+        ypObject *eight_nine = x_type->newN(N(x_items[8], x_items[9]));
+        assert_not_raises_exc(yp_setsliceC6(s, yp_SLICE_DEFAULT, 1, 1, two, &exc));
+        assert_sequence(s, x_items[2], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(s, 1, yp_SLICE_DEFAULT, 1, three, &exc));
+        assert_sequence(s, x_items[2], x_items[3]);
+        assert_not_raises_exc(
+                yp_setsliceC6(s, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1, four_five, &exc));
+        assert_sequence(s, x_items[4], x_items[5]);
+        assert_not_raises_exc(yp_setsliceC6(s, yp_SLICE_DEFAULT, -2, -1, six, &exc));
+        assert_sequence(s, x_items[4], x_items[6]);
+        assert_not_raises_exc(yp_setsliceC6(s, -2, yp_SLICE_DEFAULT, -1, seven, &exc));
+        assert_sequence(s, x_items[7], x_items[6]);
+        assert_not_raises_exc(
+                yp_setsliceC6(s, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1, eight_nine, &exc));
+        assert_sequence(s, x_items[9], x_items[8]);
+        yp_decrefN(N(s, two, three, four_five, six, seven, eight_nine));
+    }
+
+    // yp_SLICE_LAST.
+    {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *empty = x_type->newN(0);
+        ypObject *two = x_type->newN(N(x_items[2]));
+        ypObject *three_four = x_type->newN(N(x_items[3], x_items[4]));
+        assert_not_raises_exc(yp_setsliceC6(s, yp_SLICE_LAST, 2, 1, empty, &exc));
+        assert_sequence(s, items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(s, 1, yp_SLICE_LAST, 1, two, &exc));
+        assert_sequence(s, items[0], x_items[2]);
+        assert_not_raises_exc(yp_setsliceC6(s, yp_SLICE_LAST, yp_SLICE_LAST, 1, empty, &exc));
+        assert_sequence(s, items[0], x_items[2]);
+        assert_not_raises_exc(yp_setsliceC6(s, yp_SLICE_LAST, -3, -1, three_four, &exc));
+        assert_sequence(s, x_items[4], x_items[3]);
+        assert_not_raises_exc(yp_setsliceC6(s, -1, yp_SLICE_LAST, -1, empty, &exc));
+        assert_sequence(s, x_items[4], x_items[3]);
+        assert_not_raises_exc(yp_setsliceC6(s, yp_SLICE_LAST, yp_SLICE_LAST, -1, empty, &exc));
+        assert_sequence(s, x_items[4], x_items[3]);
+        yp_decrefN(N(s, empty, two, three_four));
+    }
+
+    // "Invalid slices" is tested in test_sequence.
+
+    // Regular slices (step==1) can grow and shrink the sequence.
+    {
+        ypObject *s = type->newN(0);
+        ypObject *empty = x_type->newN(0);
+        ypObject *zero_one = x_type->newN(N(x_items[0], x_items[1]));
+        ypObject *two = x_type->newN(N(x_items[2]));
+        ypObject *three = x_type->newN(N(x_items[3]));
+        ypObject *four_five = x_type->newN(N(x_items[4], x_items[5]));
+        ypObject *six_seven_eight = x_type->newN(N(x_items[6], x_items[7], x_items[8]));
+        ypObject *nine = x_type->newN(N(x_items[9]));
+        assert_not_raises_exc(yp_setsliceC6(s, 0, 0, 1, zero_one, &exc));
+        assert_sequence(s, x_items[0], x_items[1]);
+        assert_not_raises_exc(yp_setsliceC6(s, 0, 0, 1, empty, &exc));
+        assert_sequence(s, x_items[0], x_items[1]);
+        assert_not_raises_exc(yp_setsliceC6(s, 0, 0, 1, two, &exc));
+        assert_sequence(s, x_items[2], x_items[0], x_items[1]);
+        assert_not_raises_exc(yp_setsliceC6(s, 1, 2, 1, empty, &exc));
+        assert_sequence(s, x_items[2], x_items[1]);
+        assert_not_raises_exc(yp_setsliceC6(s, 1, 2, 1, three, &exc));
+        assert_sequence(s, x_items[2], x_items[3]);
+        assert_not_raises_exc(yp_setsliceC6(s, 1, 2, 1, four_five, &exc));
+        assert_sequence(s, x_items[2], x_items[4], x_items[5]);
+        assert_not_raises_exc(yp_setsliceC6(s, 0, 3, 1, six_seven_eight, &exc));
+        assert_sequence(s, x_items[6], x_items[7], x_items[8]);
+        assert_not_raises_exc(yp_setsliceC6(s, 0, 3, 1, nine, &exc));
+        assert_sequence(s, x_items[9]);
+        assert_not_raises_exc(yp_setsliceC6(s, 0, 1, 1, empty, &exc));
+        assert_len(s, 0);
+        yp_decrefN(N(s, empty, zero_one, two, three, four_five, six_seven_eight, nine));
+    }
+
+    // "Extended slices cannot grow/shrink" and "x is s" is tested in test_sequence.
+
+    // x is large, growing the sequence (likely triggering a resize).
+    {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *x = x_type->newN(N(x_items[0], x_items[1], x_items[2], x_items[3], x_items[4],
+                x_items[5], x_items[6], x_items[7], x_items[8], x_items[9], x_items[10],
+                x_items[11], x_items[12], x_items[13], x_items[14], x_items[15], x_items[16],
+                x_items[17], x_items[18], x_items[19], x_items[20], x_items[21], x_items[22],
+                x_items[23], x_items[24], x_items[25], x_items[26], x_items[27], x_items[28],
+                x_items[29], x_items[30], x_items[31]));
+        assert_not_raises_exc(yp_setsliceC6(s, 1, 2, 1, x, &exc));
+        assert_sequence(s, items[0], x_items[0], x_items[1], x_items[2], x_items[3], x_items[4],
+                x_items[5], x_items[6], x_items[7], x_items[8], x_items[9], x_items[10],
+                x_items[11], x_items[12], x_items[13], x_items[14], x_items[15], x_items[16],
+                x_items[17], x_items[18], x_items[19], x_items[20], x_items[21], x_items[22],
+                x_items[23], x_items[24], x_items[25], x_items[26], x_items[27], x_items[28],
+                x_items[29], x_items[30], x_items[31]);
+        yp_decrefN(N(s, x));
+    }
+
+    // Duplicates: items[0] is duplicated in s, x_items[1] in x.
+    if (!x_type->is_patterned) {
+        ypObject *s = type->newN(N(items[0], items[2], items[0]));
+        ypObject *x = x_type->newN(N(x_items[2], x_items[1], x_items[1]));
+        assert_not_raises_exc(yp_setsliceC6(s, 1, 1, 1, x, &exc));
+        assert_sequence(s, items[0], x_items[2], x_items[1], x_items[1], items[2], items[0]);
+        yp_decrefN(N(s, x));
+    }
+
+    // "Failing iterators", "x is not an iterable", and "exception passthrough" is tested in
+    // test_sequence.
+
+tear_down:
+    obj_array_decref(x_items);
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+}
+
+static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    peer_type_t    *peer;
+
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        // Set slice with non-string peers is tested in test_sequence.
+        if (!peer->type->is_string) continue;
+        _test_setsliceC(type, peer->type);
+    }
+
+    return MUNIT_OK;
+}
 
 // TODO test_remove and test_discard, for substrings.
 
@@ -1292,25 +1495,23 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
     return MUNIT_OK;
 }
 
-static void _test_startswith(fixture_type_t *type, peer_type_t *peer)
+static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
 {
-    fixture_type_t *x_type = peer->type;
-    uniqueness_t   *uq = uniqueness_new();
-    ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
-    ypObject       *items[6];
-    ypObject       *s;
-    ypObject       *empty = type->newN(0);
-    ypObject       *x_empty = x_type->newN(0);
-    ypObject       *x_0;
-    ypObject       *x_1;
-    ypObject       *x_1_2;
-    ypObject       *x_1_4;
-    ypObject       *x_2;
-    ypObject       *x_2_1;
-    ypObject       *x_2_3;
-    ypObject       *x_3;
-    assert_not_null(peer->rand_elems);  // FIXME Update this test.
-    obj_array_fill(items, uq, peer->rand_elems->items);
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject     *items[6];
+    ypObject     *s;
+    ypObject     *empty = type->newN(0);
+    ypObject     *x_empty = x_type->newN(0);
+    ypObject     *x_0;
+    ypObject     *x_1;
+    ypObject     *x_1_2;
+    ypObject     *x_1_4;
+    ypObject     *x_2;
+    ypObject     *x_2_1;
+    ypObject     *x_2_3;
+    ypObject     *x_3;
+    obj_array_fill(items, uq, type->rand_elems->items);  // FIXME Update this test.
     s = type->newN(N(items[1], items[2], items[3]));
     x_0 = x_type->newN(N(items[0]));
     x_1 = x_type->newN(N(items[1]));
@@ -1484,7 +1685,7 @@ static MunitResult test_startswith(const MunitParameter params[], fixture_t *fix
     for (peer = type->peers; peer->type != NULL; peer++) {
         // FIXME Test that an error is raised on bad type.
         if (!peer->type->is_string) continue;  // Skip peers that are not strings.
-        _test_startswith(type, peer);
+        _test_startswith(type, peer->type);
     }
 
     return MUNIT_OK;
@@ -1506,13 +1707,13 @@ MunitTest test_string_tests[] = {TEST(test_lt, test_string_params),
         TEST(test_gt, test_string_params), TEST(test_concat, test_string_params),
         TEST(test_getslice, test_string_params), TEST(test_findC, test_string_params),
         TEST(test_indexC, test_string_params), TEST(test_rfindC, test_string_params),
-        TEST(test_rindexC, test_string_params), TEST(test_isalnum, test_string_params),
-        TEST(test_isalpha, test_string_params), TEST(test_isascii, test_string_params),
-        TEST(test_isdecimal, test_string_params), TEST(test_isdigit, test_string_params),
-        TEST(test_isidentifier, test_string_params), TEST(test_islower, test_string_params),
-        TEST(test_isnumeric, test_string_params), TEST(test_isprintable, test_string_params),
-        TEST(test_isspace, test_string_params), TEST(test_isupper, test_string_params),
-        TEST(test_latin_1_classifiers, test_string_params),
+        TEST(test_rindexC, test_string_params), TEST(test_setsliceC, test_string_params),
+        TEST(test_isalnum, test_string_params), TEST(test_isalpha, test_string_params),
+        TEST(test_isascii, test_string_params), TEST(test_isdecimal, test_string_params),
+        TEST(test_isdigit, test_string_params), TEST(test_isidentifier, test_string_params),
+        TEST(test_islower, test_string_params), TEST(test_isnumeric, test_string_params),
+        TEST(test_isprintable, test_string_params), TEST(test_isspace, test_string_params),
+        TEST(test_isupper, test_string_params), TEST(test_latin_1_classifiers, test_string_params),
         TEST(test_startswith, test_string_params), TEST(test_endswith, test_string_params), {NULL}};
 
 
