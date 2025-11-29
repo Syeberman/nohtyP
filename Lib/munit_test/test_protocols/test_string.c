@@ -24,7 +24,7 @@ static int ords_non_latin_1[] = {
 #pragma GCC optimize("no-var-tracking")
 #endif
 
-// TODO Ensure yp_startswithC4/yp_endswithC4/yp_replaceC4/yp_lstrip2/yp_splitlines2/yp_encode3/etc
+// FIXME Ensure yp_startswithC4/yp_endswithC4/yp_replaceC4/yp_lstrip2/yp_splitlines2/yp_encode3/etc
 // properly handles exception passthrough, even in cases where one of the arguments would be ignored
 // (e.g. empty str, empty slice).
 // TODO This (exception passthrough) even includes yp_formatN/etc where the argument is never
@@ -505,9 +505,9 @@ static void _test_findC(fixture_type_t *type,
     assert_not_found_exc(any_findC5(s, s, 1, 2, &exc));      // Self, too-small.
     assert_not_found_exc(any_findC5(s, s, 1, 1, &exc));      // Self, empty.
 
-    // TODO That empty slice bug thing.
-    // TODO !forward substrings?
-    // TODO Anything else to add here?
+    // FIXME That empty slice bug thing.
+    // FIXME !forward substrings?
+    // FIXME Anything else to add here?
 
 #undef assert_not_found_exc
 
@@ -540,7 +540,7 @@ static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
-// TODO test_countC, for non-overlapping substrings.
+// FIXME test_countC, for non-overlapping substrings.
 
 // String-specific tests not covered by test_sequence. In particular, this tests peers of differing
 // encodings, for example setting a slice of str_1byte to a str_4bytes.
@@ -722,7 +722,7 @@ static void _test_setsliceC(fixture_type_t *type, fixture_type_t *x_type)
         yp_decrefN(N(s, x));
     }
 
-    // "Failing iterators", "x is not an iterable", and "exception passthrough" is tested in
+    // "Failing iterators", "x is not an iterable", and "exception passthrough" are tested in
     // test_sequence.
 
 tear_down:
@@ -745,7 +745,90 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
     return MUNIT_OK;
 }
 
-// TODO test_remove and test_discard, for substrings.
+// String-specific tests not covered by test_sequence. In particular, this tests peers of differing
+// encodings, for example extending a str_1byte with a str_4bytes.
+static void _test_extend(fixture_type_t *type, fixture_type_t *x_type)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *items[4];
+    ypObject     *x_items[32];
+    obj_array_fill(items, uq, type->rand_elems->items);
+    obj_array_fill(x_items, uq, x_type->rand_elems->items);
+
+    // Immutables don't support extend.
+    if (!type->is_mutable) {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *two = x_type->newN(N(x_items[2]));
+        assert_raises_exc(yp_extend(s, two, &exc), yp_MethodError);
+        assert_sequence(s, items[0], items[1]);
+        yp_decrefN(N(s, two));
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic extend.
+    {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *x = x_type->newN(N(x_items[2], x_items[3]));
+        assert_not_raises_exc(yp_extend(s, x, &exc));
+        assert_sequence(s, items[0], items[1], x_items[2], x_items[3]);
+        yp_decrefN(N(s, x));
+    }
+
+    // "s is empty", "x is empty", "both are empty", "x is s", and "x contains s" are tested in
+    // test_sequence.
+
+    // x is large (likely triggering a resize).
+    {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *x = x_type->newN(N(x_items[0], x_items[1], x_items[2], x_items[3], x_items[4],
+                x_items[5], x_items[6], x_items[7], x_items[8], x_items[9], x_items[10],
+                x_items[11], x_items[12], x_items[13], x_items[14], x_items[15], x_items[16],
+                x_items[17], x_items[18], x_items[19], x_items[20], x_items[21], x_items[22],
+                x_items[23], x_items[24], x_items[25], x_items[26], x_items[27], x_items[28],
+                x_items[29], x_items[30], x_items[31]));
+        assert_not_raises_exc(yp_extend(s, x, &exc));
+        assert_sequence(s, items[0], items[1], x_items[0], x_items[1], x_items[2], x_items[3],
+                x_items[4], x_items[5], x_items[6], x_items[7], x_items[8], x_items[9], x_items[10],
+                x_items[11], x_items[12], x_items[13], x_items[14], x_items[15], x_items[16],
+                x_items[17], x_items[18], x_items[19], x_items[20], x_items[21], x_items[22],
+                x_items[23], x_items[24], x_items[25], x_items[26], x_items[27], x_items[28],
+                x_items[29], x_items[30], x_items[31]);
+        yp_decrefN(N(s, x));
+    }
+
+    // Duplicates: items[0] is duplicated in s, x_items[1] in x.
+    if (!x_type->is_patterned) {
+        ypObject *s = type->newN(N(items[0], items[2], items[0]));
+        ypObject *x = x_type->newN(N(x_items[2], x_items[1], x_items[1]));
+        assert_not_raises_exc(yp_extend(s, x, &exc));
+        assert_sequence(s, items[0], items[2], items[0], x_items[2], x_items[1], x_items[1]);
+        yp_decrefN(N(s, x));
+    }
+
+    // "Failing iterators", "x is not an iterable", and "exception passthrough" are tested in
+    // test_sequence.
+
+tear_down:
+    obj_array_decref(x_items);
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+}
+
+static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    peer_type_t    *peer;
+
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        // Extend with non-string peers is tested in test_sequence.
+        if (!peer->type->is_string) continue;
+        _test_extend(type, peer->type);
+    }
+
+    return MUNIT_OK;
+}
+
+// FIXME test_remove and test_discard, for substrings.
 
 static MunitResult test_isalnum(const MunitParameter params[], fixture_t *fixture)
 {
@@ -1708,12 +1791,13 @@ MunitTest test_string_tests[] = {TEST(test_lt, test_string_params),
         TEST(test_getslice, test_string_params), TEST(test_findC, test_string_params),
         TEST(test_indexC, test_string_params), TEST(test_rfindC, test_string_params),
         TEST(test_rindexC, test_string_params), TEST(test_setsliceC, test_string_params),
-        TEST(test_isalnum, test_string_params), TEST(test_isalpha, test_string_params),
-        TEST(test_isascii, test_string_params), TEST(test_isdecimal, test_string_params),
-        TEST(test_isdigit, test_string_params), TEST(test_isidentifier, test_string_params),
-        TEST(test_islower, test_string_params), TEST(test_isnumeric, test_string_params),
-        TEST(test_isprintable, test_string_params), TEST(test_isspace, test_string_params),
-        TEST(test_isupper, test_string_params), TEST(test_latin_1_classifiers, test_string_params),
+        TEST(test_extend, test_string_params), TEST(test_isalnum, test_string_params),
+        TEST(test_isalpha, test_string_params), TEST(test_isascii, test_string_params),
+        TEST(test_isdecimal, test_string_params), TEST(test_isdigit, test_string_params),
+        TEST(test_isidentifier, test_string_params), TEST(test_islower, test_string_params),
+        TEST(test_isnumeric, test_string_params), TEST(test_isprintable, test_string_params),
+        TEST(test_isspace, test_string_params), TEST(test_isupper, test_string_params),
+        TEST(test_latin_1_classifiers, test_string_params),
         TEST(test_startswith, test_string_params), TEST(test_endswith, test_string_params), {NULL}};
 
 

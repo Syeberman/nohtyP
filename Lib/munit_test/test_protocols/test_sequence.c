@@ -2409,13 +2409,27 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
+// Some types extend but don't share items, for example str_1byte and str_4bytes. Currently limited
+// to string types, which are tested in test_protocols/test_string.
+static void _test_extend_no_peer_elems(fixture_type_t *type, fixture_type_t *x_type)
+{
+    ypObject *sq = rand_obj(NULL, type);
+    ypObject *x = rand_obj(NULL, x_type);
+    if (type->is_mutable) {
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+    } else {
+        assert_raises_exc(yp_extend(sq, x, &exc), yp_MethodError);
+    }
+    assert_true(type->is_string && x_type->is_string);
+    yp_decrefN(N(x, sq));
+}
+
 static void _test_extend(fixture_type_t *type, peer_type_t *peer)
 {
     fixture_type_t *x_type = peer->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *items[32];
-    assert_not_null(peer->rand_elems);  // FIXME Update this test.
     obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Immutables don't support extend.
@@ -2569,7 +2583,11 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     for (peer = type->peers; peer->type != NULL; peer++) {
         // TODO Support once we guarantee the order items are yielded from frozenset/etc.
         if (!peer->type->is_sequence) continue;
-        _test_extend(type, peer);
+        if (peer->rand_elems == NULL) {
+            _test_extend_no_peer_elems(type, peer->type);
+        } else {
+            _test_extend(type, peer);
+        }
     }
 
     return MUNIT_OK;
