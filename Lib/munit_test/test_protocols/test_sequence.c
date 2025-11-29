@@ -98,6 +98,18 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
     uniqueness_dealloc(uq);
 }
 
+// Some types are comparable but don't share items, for example str_1byte and str_4bytes. Currently
+// limited to string types, which are tested in test_protocols/test_string.
+static void _test_comparisons_no_peer_elems(
+        fixture_type_t *type, fixture_type_t *x_type, ypObject *(*any_cmp)(ypObject *, ypObject *))
+{
+    ypObject *sq = rand_obj(NULL, type);
+    ypObject *x = rand_obj(NULL, x_type);
+    assert_not_raises(any_cmp(sq, x));
+    assert_true(type->is_string && x_type->is_string);
+    yp_decrefN(N(x, sq));
+}
+
 // cmp_fails is what to expect when two sequences fail to compare because the corresponding items
 // cannot be compared: either an exception or a bool.
 // FIXME Have I inverted the logic/naming of x_lt/etc? It reads like "expected value when x is less
@@ -107,22 +119,8 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ypObject *x_gt, ypObject *cmp_fails)
 {
     fixture_type_t *x_type = peer->type;
-    uniqueness_t   *uq;
+    uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[6];  // items are in ascending order
-
-    // Some types are comparable but don't share items, for example str_1byte and str_4bytes.
-    // This is currently limited to string types, where such comparisons are tested in
-    // test_protocols/test_string.
-    if (peer->rand_elems == NULL) {
-        ypObject *sq = rand_obj(NULL, type);
-        ypObject *x = rand_obj(NULL, x_type);
-        assert_not_raises(any_cmp(sq, x));
-        assert_true(type->is_string && x_type->is_string);
-        yp_decrefN(N(x, sq));
-        return;
-    }
-
-    uq = uniqueness_new();
     obj_array_fill(items, uq, peer->rand_elems->items_ordered);
 
 #define assert_cmp_fails(expression)                 \
@@ -380,11 +378,13 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
 
     // lt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_lt, yp_TypeError);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_lt);
+        } else {
             _test_comparisons(type, peer, yp_lt, /*x_lt=*/yp_True, /*x_eq=*/yp_False,
                     /*x_gt=*/yp_False, /*cmp_fails=*/yp_TypeError);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_lt, yp_TypeError);
         }
     }
 
@@ -404,11 +404,13 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
 
     // le is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_le, yp_TypeError);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_le);
+        } else {
             _test_comparisons(type, peer, yp_le, /*x_lt=*/yp_True, /*x_eq=*/yp_True,
                     /*x_gt=*/yp_False, /*cmp_fails=*/yp_TypeError);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_le, yp_TypeError);
         }
     }
 
@@ -428,11 +430,13 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
 
     // eq is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_eq, yp_False);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_eq);
+        } else {
             _test_comparisons(type, peer, yp_eq, /*x_lt=*/yp_False, /*x_eq=*/yp_True,
                     /*x_gt=*/yp_False, /*cmp_fails=*/yp_False);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_eq, yp_False);
         }
     }
 
@@ -452,11 +456,13 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
 
     // ne is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_ne, yp_True);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_ne);
+        } else {
             _test_comparisons(type, peer, yp_ne, /*x_lt=*/yp_True, /*x_eq=*/yp_False,
                     /*x_gt=*/yp_True, /*cmp_fails=*/yp_True);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_ne, yp_True);
         }
     }
 
@@ -476,11 +482,13 @@ static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
 
     // ge is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_ge, yp_TypeError);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_ge);
+        } else {
             _test_comparisons(type, peer, yp_ge, /*x_lt=*/yp_False, /*x_eq=*/yp_True,
                     /*x_gt=*/yp_True, /*cmp_fails=*/yp_TypeError);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_ge, yp_TypeError);
         }
     }
 
@@ -500,11 +508,13 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
 
     // gt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_gt, yp_TypeError);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_gt);
+        } else {
             _test_comparisons(type, peer, yp_gt, /*x_lt=*/yp_False, /*x_eq=*/yp_False,
                     /*x_gt=*/yp_True, /*cmp_fails=*/yp_TypeError);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_gt, yp_TypeError);
         }
     }
 
@@ -514,6 +524,18 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
     }
 
     return MUNIT_OK;
+}
+
+// Some types concatenate but don't share items, for example str_1byte and str_4bytes. Currently
+// limited to string types, which are tested in test_protocols/test_string.
+static void _test_concat_no_peer_elems(fixture_type_t *type, fixture_type_t *x_type)
+{
+    ypObject *sq = rand_obj(NULL, type);
+    ypObject *x = rand_obj(NULL, x_type);
+    ypObject *result;
+    assert_not_raises(result = yp_concat(sq, x));
+    assert_true(type->is_string && x_type->is_string);
+    yp_decrefN(N(result, x, sq));
 }
 
 static void _test_concat(fixture_type_t *type, peer_type_t *peer)
@@ -680,7 +702,11 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     for (peer = type->peers; peer->type != NULL; peer++) {
         // TODO Support once we guarantee the order items are yielded from frozenset/etc.
         if (!peer->type->is_sequence) continue;
-        _test_concat(type, peer);
+        if (peer->rand_elems == NULL) {
+            _test_concat_no_peer_elems(type, peer->type);
+        } else {
+            _test_concat(type, peer);
+        }
     }
 
     return MUNIT_OK;

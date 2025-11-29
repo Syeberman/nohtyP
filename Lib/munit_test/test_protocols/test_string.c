@@ -384,6 +384,59 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
+
+static void _test_concat(fixture_type_t *type, peer_type_t *peer)
+{
+    fixture_type_t *x_type = peer->type;
+    uniqueness_t   *uq = uniqueness_new();
+    ypObject       *items[2];
+    ypObject       *x_items[2];
+    obj_array_fill(items, uq, type->rand_elems->items);
+    obj_array_fill(x_items, uq, x_type->rand_elems->items);
+
+    // Basic concatenation.
+    {
+        ypObject *s = type->newN(N(items[0], items[1]));
+        ypObject *x = x_type->newN(N(x_items[0], x_items[1]));
+        ypObject *result = yp_concat(s, x);
+        assert_type_is(result, type->yp_type);
+        assert_sequence(result, items[0], items[1], x_items[0], x_items[1]);
+        assert_sequence(s, items[0], items[1]);  // s unchanged.
+        yp_decrefN(N(s, x, result));
+    }
+
+    // "s is empty", "x is empty", "both are empty", and "x is s" are tested in test_sequence.
+
+    // Duplicates: items[0] is duplicated in s, x_items[1] in x.
+    {
+        ypObject *s = type->newN(N(items[0], items[1], items[0]));
+        ypObject *x = x_type->newN(N(x_items[0], x_items[1], x_items[1]));
+        ypObject *result = yp_concat(s, x);
+        assert_sequence(result, items[0], items[1], items[0], x_items[0], x_items[1], x_items[1]);
+        yp_decrefN(N(s, x, result));
+    }
+
+    // faulty_iter_tests, "x is not an iterable", and "exception passthrough" are in test_sequence.
+
+    obj_array_decref(x_items);
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+}
+
+static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    peer_type_t    *peer;
+
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        // Concatenation with non-string peers is tested in test_sequence.
+        if (!peer->type->is_string) continue;
+        _test_concat(type, peer);
+    }
+
+    return MUNIT_OK;
+}
+
 // FIXME More string-specific getslice tests...and also setslice and the other methods where we
 // need to convert between character widths.
 static MunitResult test_getslice(const MunitParameter params[], fixture_t *fixture)
@@ -1450,15 +1503,16 @@ static MunitParameterEnum test_string_params[] = {
 MunitTest test_string_tests[] = {TEST(test_lt, test_string_params),
         TEST(test_le, test_string_params), TEST(test_eq, test_string_params),
         TEST(test_ne, test_string_params), TEST(test_ge, test_string_params),
-        TEST(test_gt, test_string_params), TEST(test_getslice, test_string_params),
-        TEST(test_findC, test_string_params), TEST(test_indexC, test_string_params),
-        TEST(test_rfindC, test_string_params), TEST(test_rindexC, test_string_params),
-        TEST(test_isalnum, test_string_params), TEST(test_isalpha, test_string_params),
-        TEST(test_isascii, test_string_params), TEST(test_isdecimal, test_string_params),
-        TEST(test_isdigit, test_string_params), TEST(test_isidentifier, test_string_params),
-        TEST(test_islower, test_string_params), TEST(test_isnumeric, test_string_params),
-        TEST(test_isprintable, test_string_params), TEST(test_isspace, test_string_params),
-        TEST(test_isupper, test_string_params), TEST(test_latin_1_classifiers, test_string_params),
+        TEST(test_gt, test_string_params), TEST(test_concat, test_string_params),
+        TEST(test_getslice, test_string_params), TEST(test_findC, test_string_params),
+        TEST(test_indexC, test_string_params), TEST(test_rfindC, test_string_params),
+        TEST(test_rindexC, test_string_params), TEST(test_isalnum, test_string_params),
+        TEST(test_isalpha, test_string_params), TEST(test_isascii, test_string_params),
+        TEST(test_isdecimal, test_string_params), TEST(test_isdigit, test_string_params),
+        TEST(test_isidentifier, test_string_params), TEST(test_islower, test_string_params),
+        TEST(test_isnumeric, test_string_params), TEST(test_isprintable, test_string_params),
+        TEST(test_isspace, test_string_params), TEST(test_isupper, test_string_params),
+        TEST(test_latin_1_classifiers, test_string_params),
         TEST(test_startswith, test_string_params), TEST(test_endswith, test_string_params), {NULL}};
 
 
