@@ -899,10 +899,11 @@ typedef void (*rand_objs_func)(uniqueness_t *, yp_ssize_t, ypObject **);
 // also be used to describe special-purpose objects (i.e. fixture_type_set_dirty is a set containing
 // deleted items).
 typedef struct _fixture_type_t {
-    char           *name;     // The name of the type (i.e. int, bytearray, dict).
-    ypObject       *yp_type;  // The type object (i.e. yp_t_float, yp_t_list).
-    ypObject       *falsy;    // The falsy immortal for this type, or NULL. (Only immutables.)
-    fixture_type_t *pair;     // The other type in this object pair, or points back to this type.
+    char           *name;        // The name of the type (i.e. int, bytearray, dict).
+    ypObject       *yp_type;     // The type object (i.e. yp_t_float, yp_t_list).
+    ypObject       *falsy;       // The falsy immortal for this type, or NULL. (Only immutables.)
+    fixture_type_t *pair;        // The other type in this type pair, or points back to this type.
+    fixture_type_t *variant_of;  // The other type this is a variant of; NULL if not a variant.
 
     rand_obj_supplier_func _new_rand;  // Internal: used by rand_obj/etc.
 
@@ -976,7 +977,7 @@ typedef struct _rand_elements_t {
 // - fixture_type_range: Constructor arguments must follow a range pattern. To support this,
 //   rand_elems->items returns integers following a range pattern, and constructors should be called
 //   with a slice of rand_elems->items.
-// - fixture_type_str_1byte, etc: These are forms of fixture_type_str/etc stored in specific
+// - fixture_type_str_1byte, etc: These are variants of fixture_type_str/etc stored in specific
 //   encodings at creation (latin-1, ucs-2, or ucs-4) in order to test the interactions of strings
 //   with different in-memory representations. Ideally, the constructors should only be called with
 //   rand_elems->items objects, however this limits the tests that can be written: for example, a
@@ -984,10 +985,10 @@ typedef struct _rand_elements_t {
 //   tests expect to be able to create empty objects. As such, the restriction is that the
 //   constructors should be called with **at least one** rand_elems->items object, or no objects;
 //   constructors will assert if the created object is non-empty and has a **smaller** encoding than
-//   expected. While these forms are all peers of each other, some peer relationships have NULL
+//   expected. While these variants are all peers of each other, some peer relationships have NULL
 //   rand_elems as they have no shared items; tests must therefore use each type's rand_elems
 //   specifically, or skip peers with NULL rand_elems.
-// - fixture_type_frozenset_dirty, fixture_type_frozendict_dirty, etc: These are forms of
+// - fixture_type_frozenset_dirty, fixture_type_frozendict_dirty, etc: These are variants of
 //   fixture_type_frozenset/fixture_type_frozendict/etc which are created with one deleted item,
 //   making their hash tables "dirty". To accomplish this for immutable types, a mutable object is
 //   created and then frozen. There are no restrictions on the constructors for these types.
@@ -1056,6 +1057,7 @@ extern fixture_types_t *fixture_types_not_string;
 extern fixture_types_t *fixture_types_not_setlike;
 extern fixture_types_t *fixture_types_not_mapping;
 extern fixture_types_t *fixture_types_not_callable;
+extern fixture_types_t *fixture_types_string_not_variant;
 extern fixture_types_t *fixture_types_immutable_not_str;
 extern fixture_types_t *fixture_types_immutable_paired;
 
@@ -1080,6 +1082,7 @@ extern char *param_values_types_not_string[];
 extern char *param_values_types_not_setlike[];
 extern char *param_values_types_not_mapping[];
 extern char *param_values_types_not_callable[];
+extern char *param_values_types_string_not_variant[];
 extern char *param_values_types_immutable_not_str[];
 extern char *param_values_types_immutable_paired[];
 
@@ -1255,6 +1258,7 @@ SUITE_OF_TESTS_DECLS(test_mapping);
 SUITE_OF_TESTS_DECLS(test_sequence);
 SUITE_OF_TESTS_DECLS(test_setlike);
 SUITE_OF_TESTS_DECLS(test_string);
+SUITE_OF_TESTS_DECLS(test_string_classifier);
 
 
 #ifdef __cplusplus

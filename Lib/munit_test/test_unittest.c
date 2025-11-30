@@ -308,6 +308,10 @@ static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *
             fixture_type_list, fixture_type_frozenset, fixture_type_set,
             fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_function, NULL);
 
+    assert_ssizeC(fixture_types_string_not_variant->len, ==, 4);
+    assert_ptr_array(fixture_types_string_not_variant->types, fixture_type_bytes, fixture_type_bytearray,
+            fixture_type_str, fixture_type_chrarray, NULL);
+
     assert_ssizeC(fixture_types_immutable_not_str->len, ==, 14);
     assert_ptr_array(fixture_types_immutable_not_str->types, fixture_type_type,
             fixture_type_NoneType, fixture_type_bool, fixture_type_int, fixture_type_float,
@@ -387,9 +391,7 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
             fixture_type_bytearray->name, fixture_type_str->name, fixture_type_chrarray->name,
             fixture_type_str_1byte->name, fixture_type_chrarray_1byte->name,
             fixture_type_str_2bytes->name, fixture_type_chrarray_2bytes->name,
-            fixture_type_str_4bytes->name, fixture_type_chrarray_4bytes->name,
-
-            NULL);
+            fixture_type_str_4bytes->name, fixture_type_chrarray_4bytes->name, NULL);
 
     assert_ptr_array(param_values_types_setlike, fixture_type_frozenset->name,
             fixture_type_set->name, fixture_type_frozenset_dirty->name,
@@ -473,6 +475,10 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
             fixture_type_tuple->name, fixture_type_list->name, fixture_type_frozenset->name,
             fixture_type_set->name, fixture_type_frozenset_dirty->name,
             fixture_type_set_dirty->name, fixture_type_function->name, NULL);
+
+    assert_ptr_array(param_values_types_string_not_variant, fixture_type_bytes->name,
+            fixture_type_bytearray->name, fixture_type_str->name, fixture_type_chrarray->name,
+            NULL);
 
     assert_ptr_array(param_values_types_immutable_not_str, fixture_type_type->name,
             fixture_type_NoneType->name, fixture_type_bool->name, fixture_type_int->name,

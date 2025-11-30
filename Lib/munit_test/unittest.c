@@ -703,6 +703,7 @@ static fixture_type_t fixture_type_type_struct = {
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_type_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_type,  // _new_rand
 
@@ -745,6 +746,7 @@ static fixture_type_t fixture_type_NoneType_struct = {
         NULL,                           // type (initialized at runtime)
         NULL,                           // falsy (initialized at runtime, maybe)
         &fixture_type_NoneType_struct,  // pair
+        NULL,                           // variant_of
 
         new_rand_NoneType,  // _new_rand
 
@@ -797,6 +799,7 @@ static fixture_type_t fixture_type_bool_struct = {
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_bool_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_bool,  // _new_rand
 
@@ -849,6 +852,7 @@ static fixture_type_t fixture_type_int_struct = {
         NULL,                           // type (initialized at runtime)
         NULL,                           // falsy (initialized at runtime, maybe)
         &fixture_type_intstore_struct,  // pair
+        NULL,                           // variant_of
 
         new_rand_int,  // _new_rand
 
@@ -890,6 +894,7 @@ static fixture_type_t fixture_type_intstore_struct = {
         NULL,                      // type (initialized at runtime)
         NULL,                      // falsy (initialized at runtime, maybe)
         &fixture_type_int_struct,  // pair
+        NULL,                      // variant_of
 
         new_rand_intstore,  // _new_rand
 
@@ -939,6 +944,7 @@ static fixture_type_t fixture_type_float_struct = {
         NULL,                             // type (initialized at runtime)
         NULL,                             // falsy (initialized at runtime, maybe)
         &fixture_type_floatstore_struct,  // pair
+        NULL,                             // variant_of
 
         new_rand_float,  // _new_rand
 
@@ -980,6 +986,7 @@ static fixture_type_t fixture_type_floatstore_struct = {
         NULL,                        // type (initialized at runtime)
         NULL,                        // falsy (initialized at runtime, maybe)
         &fixture_type_float_struct,  // pair
+        NULL,                        // variant_of
 
         new_rand_floatstore,  // _new_rand
 
@@ -1071,6 +1078,7 @@ static fixture_type_t fixture_type_iter_struct = {
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_iter_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_iter,  // _new_rand
 
@@ -1226,6 +1234,7 @@ static fixture_type_t fixture_type_range_struct = {
         NULL,                        // type (initialized at runtime)
         NULL,                        // falsy (initialized at runtime, maybe)
         &fixture_type_range_struct,  // pair
+        NULL,                        // variant_of
 
         new_rand_range,  // _new_rand
 
@@ -1342,6 +1351,7 @@ static fixture_type_t fixture_type_bytes_struct = {
         NULL,                            // type (initialized at runtime)
         NULL,                            // falsy (initialized at runtime, maybe)
         &fixture_type_bytearray_struct,  // pair
+        NULL,                            // variant_of
 
         new_rand_bytes,  // _new_rand
 
@@ -1418,6 +1428,7 @@ static fixture_type_t fixture_type_bytearray_struct = {
         NULL,                        // type (initialized at runtime)
         NULL,                        // falsy (initialized at runtime, maybe)
         &fixture_type_bytes_struct,  // pair
+        NULL,                        // variant_of
 
         new_rand_bytearray,  // _new_rand
 
@@ -1603,37 +1614,38 @@ static rand_elements_t rand_elements_str_4bytes = {
             {&fixture_type_frozendict_dirty_struct, (elems_self)},                                 \
             {&fixture_type_dict_dirty_struct, (elems_self)}, {NULL}}
 
-#define DEFINE_FIXTURE_TYPE_STR_STRUCT(name, pair_name, peers, rand_elems, is_mutable)      \
-    static fixture_type_t fixture_type_##name##_struct = {                                  \
-            #name,                              /* name */                                  \
-            NULL,                               /* type (initialized at runtime) */         \
-            NULL,                               /* falsy (initialized at runtime, maybe) */ \
-            &fixture_type_##pair_name##_struct, /* pair */                                  \
-                                                                                            \
-            new_rand_##name, /* _new_rand */                                                \
-                                                                                            \
-            new_##name,   /* new_ */                                                        \
-            (peers),      /* peers */                                                       \
-            (rand_elems), /* rand_elems */                                                  \
-                                                                                            \
-            newN_##name, /* newN */                                                         \
-                                                                                            \
-            objvarargfunc_error, /* newK */                                                 \
-                                                                                            \
-            fromordsCN_##name, /* fromordsCN */                                             \
-                                                                                            \
-            (is_mutable), /* is_mutable */                                                  \
-            FALSE,        /* is_numeric */                                                  \
-            TRUE,         /* is_iterable */                                                 \
-            TRUE,         /* is_collection */                                               \
-            TRUE,         /* is_sequence */                                                 \
-            TRUE,         /* is_string */                                                   \
-            FALSE,        /* is_setlike */                                                  \
-            FALSE,        /* is_mapping */                                                  \
-            FALSE,        /* is_callable */                                                 \
-            FALSE,        /* is_patterned */                                                \
-            FALSE,        /* original_object_return */                                      \
-            TRUE,         /* hashable_items_only */                                         \
+#define DEFINE_FIXTURE_TYPE_STR_STRUCT(name, pair_name, variant_of, peers, rand_elems, is_mutable) \
+    static fixture_type_t fixture_type_##name##_struct = {                                         \
+            #name,                              /* name */                                         \
+            NULL,                               /* type (initialized at runtime) */                \
+            NULL,                               /* falsy (initialized at runtime, maybe) */        \
+            &fixture_type_##pair_name##_struct, /* pair */                                         \
+            (variant_of),                       /* variant_of */                                   \
+                                                                                                   \
+            new_rand_##name, /* _new_rand */                                                       \
+                                                                                                   \
+            new_##name,   /* new_ */                                                               \
+            (peers),      /* peers */                                                              \
+            (rand_elems), /* rand_elems */                                                         \
+                                                                                                   \
+            newN_##name, /* newN */                                                                \
+                                                                                                   \
+            objvarargfunc_error, /* newK */                                                        \
+                                                                                                   \
+            fromordsCN_##name, /* fromordsCN */                                                    \
+                                                                                                   \
+            (is_mutable), /* is_mutable */                                                         \
+            FALSE,        /* is_numeric */                                                         \
+            TRUE,         /* is_iterable */                                                        \
+            TRUE,         /* is_collection */                                                      \
+            TRUE,         /* is_sequence */                                                        \
+            TRUE,         /* is_string */                                                          \
+            FALSE,        /* is_setlike */                                                         \
+            FALSE,        /* is_mapping */                                                         \
+            FALSE,        /* is_callable */                                                        \
+            FALSE,        /* is_patterned */                                                       \
+            FALSE,        /* original_object_return */                                             \
+            TRUE,         /* hashable_items_only */                                                \
     }
 
 static ypObject *new_rand_str(const rand_obj_supplier_memo_t *memo)
@@ -1674,7 +1686,7 @@ static ypObject *fromordsCN_str(int n, ...)
 
 DEFINE_PEERS_STR(peers_str, &rand_elements_str, &rand_elements_str_1byte, &rand_elements_str_2bytes,
         &rand_elements_str_4bytes);
-DEFINE_FIXTURE_TYPE_STR_STRUCT(str, chrarray, peers_str, &rand_elements_str, FALSE);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(str, chrarray, NULL, peers_str, &rand_elements_str, FALSE);
 fixture_type_t *fixture_type_str = &fixture_type_str_struct;
 
 static ypObject *new_rand_chrarray(const rand_obj_supplier_memo_t *memo)
@@ -1713,7 +1725,7 @@ static ypObject *fromordsCN_chrarray(int n, ...)
     return result;
 }
 
-DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray, str, peers_str, &rand_elements_str, TRUE);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray, str, NULL, peers_str, &rand_elements_str, TRUE);
 fixture_type_t *fixture_type_chrarray = &fixture_type_chrarray_struct;
 
 static ypObject *new_rand_str_1byte(const rand_obj_supplier_memo_t *memo)
@@ -1758,8 +1770,8 @@ static ypObject *fromordsCN_str_1byte(int n, ...)
 }
 
 DEFINE_PEERS_STR(peers_str_1byte, &rand_elements_str_1byte, &rand_elements_str_1byte, NULL, NULL);
-DEFINE_FIXTURE_TYPE_STR_STRUCT(
-        str_1byte, chrarray_1byte, peers_str_1byte, &rand_elements_str_1byte, FALSE);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(str_1byte, chrarray_1byte, &fixture_type_str_struct, peers_str_1byte,
+        &rand_elements_str_1byte, FALSE);
 fixture_type_t *fixture_type_str_1byte = &fixture_type_str_1byte_struct;
 
 static ypObject *new_rand_chrarray_1byte(const rand_obj_supplier_memo_t *memo)
@@ -1803,8 +1815,8 @@ static ypObject *fromordsCN_chrarray_1byte(int n, ...)
     return result;
 }
 
-DEFINE_FIXTURE_TYPE_STR_STRUCT(
-        chrarray_1byte, str_1byte, peers_str_1byte, &rand_elements_str_1byte, TRUE);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray_1byte, str_1byte, &fixture_type_chrarray_struct,
+        peers_str_1byte, &rand_elements_str_1byte, TRUE);
 fixture_type_t *fixture_type_chrarray_1byte = &fixture_type_chrarray_1byte_struct;
 
 static ypObject *new_rand_str_2bytes(const rand_obj_supplier_memo_t *memo)
@@ -1846,8 +1858,8 @@ static ypObject *fromordsCN_str_2bytes(int n, ...)
 
 DEFINE_PEERS_STR(
         peers_str_2bytes, &rand_elements_str_2bytes, NULL, &rand_elements_str_2bytes, NULL);
-DEFINE_FIXTURE_TYPE_STR_STRUCT(
-        str_2bytes, chrarray_2bytes, peers_str_2bytes, &rand_elements_str_2bytes, FALSE);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(str_2bytes, chrarray_2bytes, &fixture_type_str_struct,
+        peers_str_2bytes, &rand_elements_str_2bytes, FALSE);
 fixture_type_t *fixture_type_str_2bytes = &fixture_type_str_2bytes_struct;
 
 static ypObject *new_rand_chrarray_2bytes(const rand_obj_supplier_memo_t *memo)
@@ -1887,8 +1899,8 @@ static ypObject *fromordsCN_chrarray_2bytes(int n, ...)
     return result;
 }
 
-DEFINE_FIXTURE_TYPE_STR_STRUCT(
-        chrarray_2bytes, str_2bytes, peers_str_2bytes, &rand_elements_str_2bytes, TRUE);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray_2bytes, str_2bytes, &fixture_type_chrarray_struct,
+        peers_str_2bytes, &rand_elements_str_2bytes, TRUE);
 fixture_type_t *fixture_type_chrarray_2bytes = &fixture_type_chrarray_2bytes_struct;
 
 static ypObject *new_rand_str_4bytes(const rand_obj_supplier_memo_t *memo)
@@ -1930,8 +1942,8 @@ static ypObject *fromordsCN_str_4bytes(int n, ...)
 
 DEFINE_PEERS_STR(
         peers_str_4bytes, &rand_elements_str_4bytes, NULL, NULL, &rand_elements_str_4bytes);
-DEFINE_FIXTURE_TYPE_STR_STRUCT(
-        str_4bytes, chrarray_4bytes, peers_str_4bytes, &rand_elements_str_4bytes, FALSE);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(str_4bytes, chrarray_4bytes, &fixture_type_str_struct,
+        peers_str_4bytes, &rand_elements_str_4bytes, FALSE);
 fixture_type_t *fixture_type_str_4bytes = &fixture_type_str_4bytes_struct;
 
 static ypObject *new_rand_chrarray_4bytes(const rand_obj_supplier_memo_t *memo)
@@ -1971,8 +1983,8 @@ static ypObject *fromordsCN_chrarray_4bytes(int n, ...)
     return result;
 }
 
-DEFINE_FIXTURE_TYPE_STR_STRUCT(
-        chrarray_4bytes, str_4bytes, peers_str_4bytes, &rand_elements_str_4bytes, TRUE);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray_4bytes, str_4bytes, &fixture_type_chrarray_struct,
+        peers_str_4bytes, &rand_elements_str_4bytes, TRUE);
 fixture_type_t *fixture_type_chrarray_4bytes = &fixture_type_chrarray_4bytes_struct;
 
 static void initialize_fixture_type_str(void)
@@ -2024,6 +2036,7 @@ static fixture_type_t fixture_type_tuple_struct = {
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_list_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_tuple,  // _new_rand
 
@@ -2084,6 +2097,7 @@ static fixture_type_t fixture_type_list_struct = {
         NULL,                        // type (initialized at runtime)
         NULL,                        // falsy (initialized at runtime, maybe)
         &fixture_type_tuple_struct,  // pair
+        NULL,                        // variant_of
 
         new_rand_list,  // _new_rand
 
@@ -2162,6 +2176,7 @@ static fixture_type_t fixture_type_frozenset_struct = {
         NULL,                      // type (initialized at runtime)
         NULL,                      // falsy (initialized at runtime, maybe)
         &fixture_type_set_struct,  // pair
+        NULL,                      // variant_of
 
         new_rand_frozenset,  // _new_rand
 
@@ -2223,6 +2238,7 @@ static fixture_type_t fixture_type_set_struct = {
         NULL,                            // type (initialized at runtime)
         NULL,                            // falsy (initialized at runtime, maybe)
         &fixture_type_frozenset_struct,  // pair
+        NULL,                            // variant_of
 
         new_rand_set,  // _new_rand
 
@@ -2325,6 +2341,7 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         NULL,                            // type (initialized at runtime)
         NULL,                            // falsy (initialized at runtime, maybe)
         &fixture_type_set_dirty_struct,  // pair
+        &fixture_type_frozenset_struct,  // variant_of
 
         new_rand_frozenset_dirty,  // _new_rand
 
@@ -2400,6 +2417,7 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         NULL,                                  // type (initialized at runtime)
         NULL,                                  // falsy (initialized at runtime, maybe)
         &fixture_type_frozenset_dirty_struct,  // pair
+        &fixture_type_set_struct,              // variant_of
 
         new_rand_set_dirty,  // _new_rand
 
@@ -2543,6 +2561,7 @@ static fixture_type_t fixture_type_frozendict_struct = {
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_dict_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_frozendict,  // _new_rand
 
@@ -2611,6 +2630,7 @@ static fixture_type_t fixture_type_dict_struct = {
         NULL,                             // type (initialized at runtime)
         NULL,                             // falsy (initialized at runtime, maybe)
         &fixture_type_frozendict_struct,  // pair
+        NULL,                             // variant_of
 
         new_rand_dict,  // _new_rand
 
@@ -2717,6 +2737,7 @@ static fixture_type_t fixture_type_frozendict_dirty_struct = {
         NULL,                             // type (initialized at runtime)
         NULL,                             // falsy (initialized at runtime, maybe)
         &fixture_type_dict_dirty_struct,  // pair
+        &fixture_type_frozendict_struct,  // variant_of
 
         new_rand_frozendict_dirty,  // _new_rand
 
@@ -2792,6 +2813,7 @@ static fixture_type_t fixture_type_dict_dirty_struct = {
         NULL,                                   // type (initialized at runtime)
         NULL,                                   // falsy (initialized at runtime, maybe)
         &fixture_type_frozendict_dirty_struct,  // pair
+        &fixture_type_dict_struct,              // variant_of
 
         new_rand_dict_dirty,  // _new_rand
 
@@ -2882,6 +2904,7 @@ static fixture_type_t fixture_type_function_struct = {
         NULL,                           // type (initialized at runtime)
         NULL,                           // falsy (initialized at runtime, maybe)
         &fixture_type_function_struct,  // pair
+        NULL,                           // variant_of
 
         new_rand_function,  // _new_rand
 
@@ -2961,6 +2984,11 @@ DEFINE_FIXTURE_TYPES(setlike, not_setlike);
 DEFINE_FIXTURE_TYPES(mapping, not_mapping);
 DEFINE_FIXTURE_TYPES(callable, not_callable);
 #undef DEFINE_FIXTURE_TYPES
+DEFINE_FIXTURE_TYPES_ARRAYS(string_not_variant);
+static int fixture_type_is_string_not_variant(fixture_type_t *type)
+{
+    return type->is_string && type->variant_of == NULL;
+}
 DEFINE_FIXTURE_TYPES_ARRAYS(immutable_not_str);
 static int fixture_type_is_immutable_not_str(fixture_type_t *type)
 {
@@ -3033,6 +3061,7 @@ static void initialize_fixture_types(void)
     FILL_FIXTURE_TYPES_ARRAYS(not_setlike);
     FILL_FIXTURE_TYPES_ARRAYS(not_mapping);
     FILL_FIXTURE_TYPES_ARRAYS(not_callable);
+    FILL_FIXTURE_TYPES_ARRAYS(string_not_variant);
     FILL_FIXTURE_TYPES_ARRAYS(immutable_not_str);
     FILL_FIXTURE_TYPES_ARRAYS(immutable_paired);
 #undef FILL_FIXTURE_TYPES_ARRAYS
