@@ -1,3 +1,10 @@
+// Tests for objects that support the iterable protocol.
+//
+// These tests are written to include fixture_type_range, which imposes a restriction: constructor
+// arguments must follow a range pattern. To support this, fixture_type_range->rand_elems->items
+// returns integers following a range pattern. As such, constructors in these tests should always be
+// called with a slice of the type's rand_elems->items, or else the constructor will fail the test.
+
 #include "munit_test/unittest.h"
 
 

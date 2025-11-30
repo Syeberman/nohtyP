@@ -1,3 +1,13 @@
+// Tests for objects that support the string protocol.
+//
+// These tests are written such that we can test operations between strings of different encodings.
+// As str and chrarray store their characters in the smallest encoding required by their characters,
+// the choice of characters impacts the encoding of the string. The variants fixture_type_str_1byte
+// et al. enforce a minimum encoding: they require at least one character from the type's
+// rand_elems, but for ease-of-use they allow other characters with smaller or larger encodings.
+// Because of this flexibility, it's possible to accidentally write tests below that do *not*
+// actually test with different encodings. To avoid this, it's important to ensure that at least one
+// of the strings is initialized *only* with the characters from its own rand_elems.
 
 #include "munit_test/unittest.h"
 
@@ -73,6 +83,7 @@ static void _test_comparisons(fixture_type_t *type, fixture_type_t *x_type,
     ypObject     *xc;        // This item must be present when creating x.
     ypObject     *i1_to_xc;  // One of x_lt or x_gt, when items[1] is compared to xc. Borrowed.
     ypObject     *i4_to_xc;
+    // s contains only items; x contains either items or x_items. (See note at top of file.)
     obj_array_fill(items, uq, type->rand_elems->items_ordered);
     x_type->rand_elems->items(uq, 1, &xc);
     i1_to_xc = yp_ltC_not_raises(items[1], xc) ? x_lt : x_gt;
@@ -376,6 +387,7 @@ static void _test_concat(fixture_type_t *type, fixture_type_t *x_type)
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
     ypObject     *x_items[2];
+    // s contains only items; x contains only x_items. (See note at top of file.)
     obj_array_fill(items, uq, type->rand_elems->items);
     obj_array_fill(x_items, uq, x_type->rand_elems->items);
 
@@ -453,7 +465,8 @@ static void _test_findC(fixture_type_t *type,
     ypObject     *x_0_2;
     ypObject     *x_1_0;
     ypObject     *empty = type->newN(0);
-
+    // FIXME Update for cross-encoding tests.
+    // s contains only items; x contains either items or x_items. (See note at top of file.)
     obj_array_fill(items, uq, type->rand_elems->items);
     s = type->newN(N(items[0], items[1], items[2]));
     // FIXME Test against different "other" types (the other pair, really)
@@ -537,6 +550,7 @@ static void _test_setsliceC(fixture_type_t *type, fixture_type_t *x_type)
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[6];
     ypObject     *x_items[32];
+    // s contains only items; x contains only x_items. (See note at top of file.)
     obj_array_fill(items, uq, type->rand_elems->items);
     obj_array_fill(x_items, uq, x_type->rand_elems->items);
 
@@ -743,6 +757,7 @@ static void _test_extend(fixture_type_t *type, fixture_type_t *x_type)
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[4];
     ypObject     *x_items[32];
+    // s contains only items; x contains only x_items. (See note at top of file.)
     obj_array_fill(items, uq, type->rand_elems->items);
     obj_array_fill(x_items, uq, x_type->rand_elems->items);
 
@@ -1029,6 +1044,7 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
     ypObject     *x_2_1;
     ypObject     *x_2_3;
     ypObject     *x_3;
+    // s contains either items or x_items; x contains only x_items. (See note at top of file.)
     obj_array_fill(items, uq, type->rand_elems->items);  // FIXME Update this test.
     s = type->newN(N(items[1], items[2], items[3]));
     x_0 = x_type->newN(N(items[0]));
