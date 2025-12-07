@@ -157,6 +157,10 @@ DEFINE_ARRAY_FROM_VA_LIST_FUNC(array_fromuint8NV, yp_uint8_t, int)
 #define RAND_OBJ_RETURN_FALSY() (RAND_BOOL_FRACTION(1, 50))
 
 #define RAND_OBJ_DEFAULT_DEPTH (3)
+// The maximum length of a random object that does not create sub-objects (range, str).
+#define RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS (256)
+// The maximum length of a random object that **does** create sub-objects (tuple, dict).
+#define RAND_OBJ_MAX_LEN_SUB_OBJECTS (8)
 
 
 static fixture_type_t fixture_type_type_struct;
@@ -416,10 +420,7 @@ static ypObject *rand_obj_int(uniqueness_t *uq) { _return_unique(uq, yp_intC(ran
 
 // XXX Interesting. 0 is a falsy byte, but '\x00' is not a falsy char.
 // FIXME Could also return an intstore?
-static ypObject *rand_obj_byte(uniqueness_t *uq)
-{
-    _return_unique(uq, yp_intC(munit_rand_int_range(0, 255)));
-}
+static ypObject *rand_obj_byte(uniqueness_t *uq) { _return_unique(uq, yp_intC(rand_ord_1byteC())); }
 
 static ypObject *rand_obj_chr_1byte(uniqueness_t *uq)
 {
@@ -1026,7 +1027,14 @@ static void initialize_fixture_type_float(void)
 
 static ypObject *new_rand_iter(const rand_obj_supplier_memo_t *memo)
 {
-    yp_ssize_t n = memo->depth < 1 ? 0 : munit_rand_int_range(0, 16);
+    yp_ssize_t n;
+    if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
+        // iters are always truthy, but we still want empty iters to be more frequent.
+        n = 0;
+    } else {
+        // We use "no sub objects" here because iter only creates objects on iteration.
+        n = munit_rand_int_range(0, RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS);
+    }
     return new_rand_iter3(n, rand_obj_any_memo, memo);
 }
 
@@ -1140,7 +1148,7 @@ static ypObject *new_rand_range(const rand_obj_supplier_memo_t *memo)
         return yp_range_empty;
     } else {
         yp_int_t  start = range_rand_start();
-        yp_int_t  len = (yp_int_t)munit_rand_int_range(1, 256);
+        yp_int_t  len = (yp_int_t)munit_rand_int_range(1, RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS);
         yp_int_t  step = range_rand_step();
         ypObject *result = yp_rangeC3(start, start + (step * len), step);
         assert_not_exception(result);
@@ -1288,7 +1296,7 @@ static ypObject *new_rand_bytes(const rand_obj_supplier_memo_t *memo)
         return yp_bytes_empty;
     } else {
         ypObject  *result;
-        yp_uint8_t source[16];
+        yp_uint8_t source[RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS];
         yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
         munit_rand_memory((size_t)len, source);
         result = yp_bytesC(len, source);
@@ -1387,7 +1395,7 @@ static ypObject *new_rand_bytearray(const rand_obj_supplier_memo_t *memo)
         return yp_bytearray0();
     } else {
         ypObject  *result;
-        yp_uint8_t source[16];
+        yp_uint8_t source[RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS];
         yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
         munit_rand_memory((size_t)len, source);
         result = yp_bytearrayC(len, source);
@@ -1479,7 +1487,7 @@ static ypObject *_new_rand_str(yp_int_t (*rand_ord)(void))
     ypObject  *source;
     ypObject  *result;
 
-    len = munit_rand_int_range(1, 16);
+    len = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS);
     assert_not_raises(source = yp_listN(0));  // new ref
     for (/*len already set*/; len > 0; len--) {
         ypObject *chr = yp_chrC(rand_ord());  // new ref
@@ -1498,7 +1506,7 @@ static ypObject *_new_rand_chrarray(yp_int_t (*rand_ord)(void))
     yp_ssize_t len;
     ypObject  *result;
 
-    len = munit_rand_int_range(1, 16);
+    len = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS);
     assert_not_raises(result = yp_chrarray0());  // new ref
     for (/*len already set*/; len > 0; len--) {
         ypObject *chr = yp_chrC(rand_ord());  // new ref
@@ -2010,7 +2018,7 @@ static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
     if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_tuple_empty;
     } else {
-        yp_ssize_t len = munit_rand_int_range(1, 16);
+        yp_ssize_t len = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(len, rand_obj_any_memo, memo);
         ypObject  *result = yp_tuple(iter);
         yp_decref(iter);
@@ -2071,7 +2079,7 @@ static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
     if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_listN(0);
     } else {
-        yp_ssize_t len = munit_rand_int_range(1, 16);
+        yp_ssize_t len = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(len, rand_obj_any_memo, memo);
         ypObject  *result = yp_list(iter);
         yp_decref(iter);
@@ -2141,7 +2149,7 @@ static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
         return yp_frozenset_empty;
     } else {
         // n may not be the final length, as duplicates are discarded.
-        yp_ssize_t n = munit_rand_int_range(1, 16);
+        yp_ssize_t n = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable_memo, memo);
         ypObject  *result = yp_frozenset(iter);
         yp_decref(iter);
@@ -2212,7 +2220,7 @@ static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
         return yp_setN(0);
     } else {
         // n may not be the final length, as duplicates are discarded.
-        yp_ssize_t n = munit_rand_int_range(1, 16);
+        yp_ssize_t n = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable_memo, memo);
         ypObject  *result = yp_set(iter);
         yp_decref(iter);
@@ -2490,7 +2498,7 @@ static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
         return yp_frozendict_empty;
     } else {
         // n may not be the final length, as duplicate keys are discarded.
-        yp_ssize_t n = munit_rand_int_range(1, 16);
+        yp_ssize_t n = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue_memo, memo);
         ypObject  *result = yp_frozendict(iter);
         yp_decref(iter);
@@ -2597,7 +2605,7 @@ static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
         return yp_dictK(0);
     } else {
         // n may not be the final length, as duplicate keys are discarded.
-        yp_ssize_t n = munit_rand_int_range(1, 16);
+        yp_ssize_t n = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue_memo, memo);
         ypObject  *result = yp_dict(iter);
         yp_decref(iter);
