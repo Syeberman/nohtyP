@@ -3158,7 +3158,7 @@ extern yp_int_t yp_asintC_not_raises(ypObject *number)
 }
 
 
-#define MALLOC_TRACKER_MAX_LEN 6000
+#define MALLOC_TRACKER_MAX_LEN 2000
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {
@@ -3181,32 +3181,32 @@ static void malloc_tracker_push(void *p)
     assert_not_null(p);  // NULL should be handled before push is called.
 
     // Increase the size of the mallocs array as necessary.
-    assert_ssizeC(malloc_tracker.len, <, MALLOC_TRACKER_MAX_LEN);
+    if (malloc_tracker.len >= MALLOC_TRACKER_MAX_LEN) {
+        munit_error("too many allocations to track, increase MALLOC_TRACKER_MAX_LEN");
+    }
 
     // Don't bother deduplicating; that should never happen!
     malloc_tracker.mallocs[malloc_tracker.len] = p;
     malloc_tracker.len++;
 }
 
+// XXX This function used to leave NULLs in place for freed pointers, removing them only once they
+// were the last entry in the array. This left the array full of mostly NULLs: consider how
+// new_dictN allocates a supplier which is freed before the dict itself. So don't do that.
 static void malloc_tracker_pop(void *p)
 {
     yp_ssize_t i;
     assert_not_null(p);  // NULL should be handled before pop is called.
 
-    // Find the pointer and set it to NULL. Ignore unknown pointers: we are only concerned with
-    // allocations during the test.
-    // TODO Report on deep pointers, i.e. that are not deallocated in reverse order.
+    // Find the pointer and replace it with the last entry. Notice that if p is the last entry, it
+    // is replaced with itself, then dropped from the array (len--). Ignore unknown pointers: we are
+    // only concerned with tracking allocations made during the test.
     for (i = malloc_tracker.len - 1; i >= 0; i--) {
         if (malloc_tracker.mallocs[i] == p) {
-            malloc_tracker.mallocs[i] = NULL;
+            malloc_tracker.mallocs[i] = malloc_tracker.mallocs[malloc_tracker.len - 1];
+            malloc_tracker.len--;
             break;
         }
-    }
-
-    // Trim trailing NULL entries from the list.
-    // TODO Report on long runs of NULLs, i.e. that are not deallocated in reverse order.
-    while (malloc_tracker.len > 0 && malloc_tracker.mallocs[malloc_tracker.len - 1] == NULL) {
-        malloc_tracker.len--;
     }
 }
 
@@ -3255,8 +3255,7 @@ extern void malloc_tracker_free(void *p)
 static void malloc_tracker_fixture_tear_down(void)
 {
     if (malloc_tracker.len > 0) {
-        munit_errorf("memory leak: %p",  // GCOVR_EXCL_LINE
-                malloc_tracker.mallocs[malloc_tracker.len - 1]);
+        munit_errorf("memory leak: %p", malloc_tracker.mallocs[0]);  // GCOVR_EXCL_LINE
     }
 }
 
