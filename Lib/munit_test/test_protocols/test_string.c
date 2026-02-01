@@ -20,9 +20,9 @@
 // FIXME Why is ypStringLib_checkenc_delslice on latin-1 not covered?? test_sequence should be
 // sufficient here.
 
-// FIXME Ensure yp_startswithC4/yp_endswithC4/yp_replaceC4/yp_lstrip2/yp_splitlines2/yp_encode3/etc
-// properly handles exception passthrough, even in cases where one of the arguments would be ignored
-// (e.g. empty str, empty slice).
+// FIXME Ensure yp_replaceC4/yp_lstrip2/yp_splitlines2/yp_encode3/etc properly handles exception
+// passthrough, even in cases where one of the arguments would be ignored (e.g. empty str, empty
+// slice).
 // TODO This (exception passthrough) even includes yp_formatN/etc where the argument is never
 // referenced in the format string.
 
@@ -1028,36 +1028,67 @@ static MunitResult test_isupper(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
+// For startswith and endswith.
+static void _test_tailmatch_not_supported(fixture_type_t *type, fixture_type_t *x_type,
+        ypObject *(*any_tailmatch)(ypObject *, ypObject *),
+        ypObject *(*any_tailmatchC4)(ypObject *, ypObject *, yp_ssize_t, yp_ssize_t))
+{
+    ypObject  *items[2];
+    ypObject  *s;
+    ypObject  *empty = type->newN(0);
+    ypObject  *x_values[] = {rand_obj(NULL, x_type), x_type->newN(0), NULL};
+    ypObject **x;
+    obj_array_fill(items, NULL, type->rand_elems->items);
+    s = type->newN(N(items[0], items[1]));
+
+    for (x = x_values; (*x) != NULL; x++) {
+        assert_raises(any_tailmatch(s, *x), yp_TypeError);
+        assert_raises(any_tailmatch(empty, *x), yp_TypeError);
+        assert_raises(any_tailmatchC4(s, *x, 0, 2), yp_TypeError);
+        assert_raises(any_tailmatchC4(s, *x, 0, 0), yp_TypeError);
+        assert_raises(any_tailmatchC4(empty, *x, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT), yp_TypeError);
+        ead(x_tuple, yp_tupleN(N(*x)), assert_raises(any_tailmatch(s, x_tuple), yp_TypeError));
+        ead(x_tuple, yp_tupleN(N(*x, s)), assert_raises(any_tailmatch(s, x_tuple), yp_TypeError));
+
+        // Optimization: early exit if x is a tuple with a match, even if x contains bad types.
+        // FIXME Python 3.13 catches this error. We should too.
+        ead(x_tuple, yp_tupleN(N(s, x)), assert_obj(any_tailmatch(s, x_tuple), is, yp_True));
+    }
+
+    obj_array_decref(x_values);
+    obj_array_decref(items);
+    yp_decrefN(N(s, empty));
+}
+
 static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
-    ypObject     *items[6];
+    ypObject     *items[1];
+    ypObject     *x_items[5];
     ypObject     *s;
     ypObject     *empty = type->newN(0);
     ypObject     *x_empty = x_type->newN(0);
     ypObject     *x_0;
     ypObject     *x_1;
+    ypObject     *x_1_1;
     ypObject     *x_1_2;
     ypObject     *x_1_4;
     ypObject     *x_2;
     ypObject     *x_2_1;
-    ypObject     *x_2_3;
     ypObject     *x_3;
-    // s contains either items or x_items; x contains only x_items. (See note at top of file.)
-    obj_array_fill(items, uq, type->rand_elems->items);  // FIXME Update this test.
-    s = type->newN(N(items[1], items[2], items[3]));
-    x_0 = x_type->newN(N(items[0]));
-    x_1 = x_type->newN(N(items[1]));
-    x_1_2 = x_type->newN(N(items[1], items[2]));
-    x_1_4 = x_type->newN(N(items[0], items[4]));
-    x_2 = x_type->newN(N(items[2]));
-    x_2_1 = x_type->newN(N(items[2], items[1]));
-    x_2_3 = x_type->newN(N(items[2], items[3]));
-    x_3 = x_type->newN(N(items[3]));
-
-    // FIXME Differing str encodings.
-    // FIXME Substring is duplicated in string? Maybe x_1_1?
+    // s contains both items and x_items; x contains only x_items. (See note at top of file.)
+    obj_array_fill(items, uq, type->rand_elems->items);
+    obj_array_fill(x_items, uq, x_type->rand_elems->items);
+    s = type->newN(N(x_items[1], x_items[2], items[0], x_items[3]));
+    x_0 = x_type->newN(N(x_items[0]));
+    x_1 = x_type->newN(N(x_items[1]));
+    x_1_1 = x_type->newN(N(x_items[1], x_items[1]));
+    x_1_2 = x_type->newN(N(x_items[1], x_items[2]));
+    x_1_4 = x_type->newN(N(x_items[0], x_items[4]));
+    x_2 = x_type->newN(N(x_items[2]));
+    x_2_1 = x_type->newN(N(x_items[2], x_items[1]));
+    x_3 = x_type->newN(N(x_items[3]));
 
     // Basic startswith.
     assert_obj(yp_startswith(s, x_1), is, yp_True);
@@ -1069,10 +1100,12 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
 
     // Characters not at start.
     assert_obj(yp_startswith(s, x_2), is, yp_False);
-    assert_obj(yp_startswith(s, x_2_3), is, yp_False);
+    assert_obj(yp_startswith(s, x_3), is, yp_False);
+    ead(x, x_type->newN(N(items[0], x_items[3])), assert_obj(yp_startswith(s, x), is, yp_False));
 
-    // Characters out-of-order.
+    // Characters out-of-order or duplicated.
     assert_obj(yp_startswith(s, x_2_1), is, yp_False);
+    assert_obj(yp_startswith(s, x_1_1), is, yp_False);
 
     // Empty x.
     assert_obj(yp_startswith(s, x_empty), is, yp_True);
@@ -1089,28 +1122,28 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
     assert_obj(yp_startswithC4(s, x_1_2, 1, 2), is, yp_False);
 
     // Negative indicies.
-    assert_obj(yp_startswithC4(s, x_1_2, -3, -1), is, yp_True);
-    assert_obj(yp_startswithC4(s, x_1_2, -1, 3), is, yp_False);
-    assert_obj(yp_startswithC4(s, x_3, -3, -1), is, yp_False);
-    assert_obj(yp_startswithC4(s, x_3, -1, 3), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1_2, -4, -1), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1_2, -1, 4), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_3, -4, -1), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_3, -1, 4), is, yp_True);
 
     // Total slice.
-    assert_obj(yp_startswithC4(s, x_0, 0, 3), is, yp_False);
-    assert_obj(yp_startswithC4(s, x_1, 0, 3), is, yp_True);
-    assert_obj(yp_startswithC4(s, x_1_2, 0, 3), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_0, 0, 4), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_1, 0, 4), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1_2, 0, 4), is, yp_True);
 
     // Total slice, negative indicies.
-    assert_obj(yp_startswithC4(s, x_0, -3, 3), is, yp_False);
-    assert_obj(yp_startswithC4(s, x_1, -3, 3), is, yp_True);
-    assert_obj(yp_startswithC4(s, x_1_2, -3, 3), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_0, -4, 4), is, yp_False);
+    assert_obj(yp_startswithC4(s, x_1, -4, 4), is, yp_True);
+    assert_obj(yp_startswithC4(s, x_1_2, -4, 4), is, yp_True);
 
     // Empty slices.
     {
         slice_args_t slices[] = {
                 // recall step is always 1 for startswith
                 {0, 0, 1},     // typical empty slice
-                {3, 99, 1},    // i>=len(s) (regardless of j)
-                {-99, -4, 1},  // j<-len(s) (regardless of i)
+                {4, 99, 1},    // i>=len(s) (regardless of j)
+                {-99, -5, 1},  // j<-len(s) (regardless of i)
                 {2, 2, 1},     // i=j (regardless of k)
                 {1, 0, 1},     // i>j
                 {-1, -4, 1},   // reverse total slice...but k is always 1
@@ -1148,49 +1181,47 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
     assert_obj(yp_startswithC4(s, x_0, 0, yp_SLICE_LAST), is, yp_False);
     assert_obj(yp_startswithC4(s, x_0, yp_SLICE_LAST, yp_SLICE_LAST), is, yp_False);
 
+    // x equals s.
+    {
+        ypObject *x = x_type->newN(N(x_items[1], x_items[2], items[0], x_items[3]));
+        assert_obj(yp_startswith(s, x), is, yp_True);
+        assert_obj(yp_startswithC4(s, x, 1, 4), is, yp_False);
+        assert_obj(yp_startswithC4(s, x, 0, 4), is, yp_True);
+        yp_decrefN(N(x));
+    }
+
     // x is s.
     assert_obj(yp_startswith(s, s), is, yp_True);
-    assert_obj(yp_startswithC4(s, s, 0, 1), is, yp_False);
-    assert_obj(yp_startswithC4(s, s, 0, 3), is, yp_True);
+    assert_obj(yp_startswithC4(s, s, 0, 3), is, yp_False);
+    assert_obj(yp_startswithC4(s, s, 0, 4), is, yp_True);
 
     // x is a tuple of strings.
     ead(x_tuple, yp_tupleN(N(x_0, x_1)), assert_obj(yp_startswith(s, x_tuple), is, yp_True));
     ead(x_tuple, yp_tupleN(N(x_0, x_1_4)), assert_obj(yp_startswith(s, x_tuple), is, yp_False));
-    ead(x_tuple, yp_tupleN(N(x_1)), assert_obj(yp_startswithC4(s, x_tuple, 0, 3), is, yp_True));
-    ead(x_tuple, yp_tupleN(N(x_1)), assert_obj(yp_startswithC4(s, x_tuple, 1, 3), is, yp_False));
+    ead(x_tuple, yp_tupleN(N(x_1)), assert_obj(yp_startswithC4(s, x_tuple, 0, 4), is, yp_True));
+    ead(x_tuple, yp_tupleN(N(x_1)), assert_obj(yp_startswithC4(s, x_tuple, 1, 4), is, yp_False));
 
     // x is an empty tuple.
     ead(x_tuple, yp_tupleN(0), assert_obj(yp_startswith(s, x_tuple), is, yp_False));
     ead(x_tuple, yp_tupleN(0), assert_obj(yp_startswith(empty, x_tuple), is, yp_False));
     ead(x_tuple, yp_tupleN(0), assert_obj(yp_startswithC4(s, x_tuple, 0, 0), is, yp_False));
 
-    // Binary and text types cannot be mixed. FIXME Parameterize?
+    // x is an item. Supported on text as their x_items are strings.
     if (isbinary(type)) {
-        ead(x, rand_obj(uq, fixture_type_str), assert_raises(yp_startswith(s, x), yp_TypeError));
-        ead(x, rand_obj(uq, fixture_type_chrarray),
-                assert_raises(yp_startswith(s, x), yp_TypeError));
+        assert_raises(yp_startswith(s, x_items[1]), yp_TypeError);
     } else {
-        ead(x, rand_obj(uq, fixture_type_bytes), assert_raises(yp_startswith(s, x), yp_TypeError));
-        ead(x, rand_obj(uq, fixture_type_bytearray),
-                assert_raises(yp_startswith(s, x), yp_TypeError));
+        assert_obj(yp_startswith(s, x_items[1]), is, yp_True);
     }
 
-    // x is an item. Supported on text as their items are strings.
-    if (isbinary(type)) {
-        assert_raises(yp_startswith(s, items[1]), yp_TypeError);
-    } else {
-        assert_obj(yp_startswith(s, items[1]), is, yp_True);
-    }
-
-    // x is a list, which is not supported. TODO Should it be?
+    // x is a list, which is not supported. FIXME Should it be?
     ead(x, yp_listN(N(x_1)), assert_raises(yp_startswith(s, x), yp_TypeError));
 
     // x is not an iterable.
     assert_raises(yp_startswith(s, not_iterable), yp_TypeError);
 
     // Optimization: early exit if x is a tuple with a match, even if x contains bad types.
-    // FIXME This is how Python behaves, but it can hide errors. Should we check remaining items?
-    // FIXME yp_isdisjoint has early exit; is there a counterexample? We should standardize.
+    // FIXME Python 3.13 catches this error. We should too.
+    // FIXME yp_isdisjoint has early exit. We should standardize.
     ead(x_tuple, yp_tupleN(N(x_0, not_iterable)),
             assert_raises(yp_startswith(s, x_tuple), yp_TypeError));
     ead(x_tuple, yp_tupleN(N(x_1, not_iterable)),
@@ -1204,22 +1235,33 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
     assert_raises(yp_startswithC4(empty, yp_SyntaxError, 0, 1), yp_SyntaxError);
     assert_raises(yp_startswithC4(empty, yp_SyntaxError, 0, 0), yp_SyntaxError);
 
-    assert_sequence(s, items[1], items[2], items[3]);  // s unchanged.
+    assert_sequence(s, x_items[1], x_items[2], items[0], x_items[3]);  // s unchanged.
 
+    obj_array_decref(x_items);
     obj_array_decref(items);
     uniqueness_dealloc(uq);
-    yp_decrefN(N(not_iterable, s, empty, x_empty, x_0, x_1, x_1_2, x_1_4, x_2, x_2_1, x_2_3, x_3));
+    yp_decrefN(N(not_iterable, s, empty, x_empty, x_0, x_1, x_1_1, x_1_2, x_1_4, x_2, x_2_1, x_3));
 }
 
 static MunitResult test_startswith(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t *type = fixture->type;
-    peer_type_t    *peer;
+    fixture_type_t  *type = fixture->type;
+    peer_type_t     *peer;
+    fixture_type_t **x_type;
 
     for (peer = type->peers; peer->type != NULL; peer++) {
-        // FIXME Test that an error is raised on bad type.
-        if (!peer->type->is_string) continue;  // Skip peers that are not strings.
-        _test_startswith(type, peer->type);
+        if (peer->type->is_string) {
+            _test_startswith(type, peer->type);
+        } else if (peer->type != fixture_type_tuple) {
+            // Calling with a tuple is tested in _test_startswith and _test_tailmatch_not_supported.
+            _test_tailmatch_not_supported(type, peer->type, yp_startswith, yp_startswithC4);
+        }
+    }
+
+    // Binary strings cannot be compared with text strings.
+    for (x_type = fixture_types_string->types; (*x_type) != NULL; x_type++) {
+        if (isbinary(type) == isbinary(*x_type)) continue;
+        _test_tailmatch_not_supported(type, *x_type, yp_startswith, yp_startswithC4);
     }
 
     return MUNIT_OK;

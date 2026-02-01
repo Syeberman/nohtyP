@@ -8752,6 +8752,16 @@ static ypObject *ypStringLib_isalnum(ypObject *s, yp_uint8_t mask)
 
     if (s_len < 1) return yp_False;
 
+    // FIXME Here and everywhere, this handling of max_char may be frustrating to use. A too-big
+    // encoding will only fail if we don't early exit on False first. We should make this fail
+    // if s_enc->max_char is larger than chardata->max_char instead, so the failures are more
+    // consistent. (Still not perfect: an unexpected 4-byte char can still cause an unexpected
+    // failure. At least that failure is more-likely to occur and be fixed.)
+    // FIXME Alternatively: scan the entire string, flag if anything is over max_char, and early
+    // exit for the rest. That way False can be trusted to be correct, but the caller can choose
+    // to either error on yp_SystemLimitationError or to treat it as "true enough".
+    // FIXME OR, allow a version of chardata that supports latin-1 but doesn't error (or set a
+    // config flag to not treat these as errors.)
     for (i = 0; i < s_len; i++) {
         yp_uint32_t c = s_enc->getindexX(s_data, i);
         if (c > chardata->max_char) return yp_SystemLimitationError;
