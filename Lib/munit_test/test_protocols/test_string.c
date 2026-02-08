@@ -836,7 +836,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
 
 // FIXME test_remove and test_discard, for substrings.
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isalnum(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -851,7 +851,7 @@ static MunitResult test_isalnum(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isalpha(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -866,7 +866,7 @@ static MunitResult test_isalpha(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isascii(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -880,7 +880,7 @@ static MunitResult test_isascii(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isdecimal(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -902,7 +902,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isdigit(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -917,7 +917,7 @@ static MunitResult test_isdigit(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isidentifier(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -939,7 +939,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_islower(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -954,7 +954,7 @@ static MunitResult test_islower(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isnumeric(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -976,7 +976,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isprintable(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -998,7 +998,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isspace(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -1013,7 +1013,7 @@ static MunitResult test_isspace(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
-// Additional tests for specific characters are in test_string_classifier.
+// Additional tests for specific characters are in test_string_char_db.
 static MunitResult test_isupper(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;

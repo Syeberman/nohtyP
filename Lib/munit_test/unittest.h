@@ -1258,7 +1258,7 @@ SUITE_OF_TESTS_DECLS(test_mapping);
 SUITE_OF_TESTS_DECLS(test_sequence);
 SUITE_OF_TESTS_DECLS(test_setlike);
 SUITE_OF_TESTS_DECLS(test_string);
-SUITE_OF_TESTS_DECLS(test_string_classifier);
+SUITE_OF_TESTS_DECLS(test_string_char_db);
 
 
 #ifdef __cplusplus

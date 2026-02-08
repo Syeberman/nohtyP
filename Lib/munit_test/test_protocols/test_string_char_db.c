@@ -1,6 +1,6 @@
-// Tests for the string classifier methods (yp_isalnum et al.). These rely on the properties of
-// specific characters, so are run on the non-variant string types (i.e. fixture_type_str, but not
-// fixture_type_str_1byte).
+// Tests for the string classifier and converter methods (yp_isalnum, yp_lower, et al.). These rely
+// on the properties of specific characters, so are run on the non-variant string types (i.e.
+// fixture_type_str, but not fixture_type_str_1byte).
 
 #include "munit_test/unittest.h"
 
@@ -784,21 +784,21 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
 }
 
 
-static MunitParameterEnum test_string_classifier_params[] = {
+static MunitParameterEnum test_string_char_db_params[] = {
         {param_key_type, param_values_types_string_not_variant}, {NULL}};
 
-MunitTest test_string_classifier_tests[] = {TEST(test_isalnum, test_string_classifier_params),
-        TEST(test_isalpha, test_string_classifier_params),
-        TEST(test_isascii, test_string_classifier_params),
-        TEST(test_isdecimal, test_string_classifier_params),
-        TEST(test_isdigit, test_string_classifier_params),
-        TEST(test_isidentifier, test_string_classifier_params),
-        TEST(test_islower, test_string_classifier_params),
-        TEST(test_isnumeric, test_string_classifier_params),
-        TEST(test_isprintable, test_string_classifier_params),
-        TEST(test_isspace, test_string_classifier_params),
-        TEST(test_isupper, test_string_classifier_params),
-        TEST(test_latin_1_classifiers, test_string_classifier_params), {NULL}};
+MunitTest test_string_char_db_tests[] = {TEST(test_isalnum, test_string_char_db_params),
+        TEST(test_isalpha, test_string_char_db_params),
+        TEST(test_isascii, test_string_char_db_params),
+        TEST(test_isdecimal, test_string_char_db_params),
+        TEST(test_isdigit, test_string_char_db_params),
+        TEST(test_isidentifier, test_string_char_db_params),
+        TEST(test_islower, test_string_char_db_params),
+        TEST(test_isnumeric, test_string_char_db_params),
+        TEST(test_isprintable, test_string_char_db_params),
+        TEST(test_isspace, test_string_char_db_params),
+        TEST(test_isupper, test_string_char_db_params),
+        TEST(test_latin_1_classifiers, test_string_char_db_params), {NULL}};
 
 
-extern void test_string_classifier_initialize(void) {}
+extern void test_string_char_db_initialize(void) {}
