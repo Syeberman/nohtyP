@@ -1077,6 +1077,7 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
     ypObject     *x_2;
     ypObject     *x_2_1;
     ypObject     *x_3;
+    ypObject     *x_4_2;
     // s contains both items and x_items; x contains only x_items. (See note at top of file.)
     obj_array_fill(items, uq, type->rand_elems->items);
     obj_array_fill(x_items, uq, x_type->rand_elems->items);
@@ -1089,6 +1090,7 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
     x_2 = x_type->newN(N(x_items[2]));
     x_2_1 = x_type->newN(N(x_items[2], x_items[1]));
     x_3 = x_type->newN(N(x_items[3]));
+    x_4_2 = x_type->newN(N(x_items[4], x_items[2]));
 
     // Basic startswith.
     assert_obj(yp_startswith(s, x_1), is, yp_True);
@@ -1097,6 +1099,7 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
     // Characters not in string.
     assert_obj(yp_startswith(s, x_0), is, yp_False);
     assert_obj(yp_startswith(s, x_1_4), is, yp_False);
+    assert_obj(yp_startswith(s, x_4_2), is, yp_False);
 
     // Characters not at start.
     assert_obj(yp_startswith(s, x_2), is, yp_False);
@@ -1240,7 +1243,8 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
     obj_array_decref(x_items);
     obj_array_decref(items);
     uniqueness_dealloc(uq);
-    yp_decrefN(N(not_iterable, s, empty, x_empty, x_0, x_1, x_1_1, x_1_2, x_1_4, x_2, x_2_1, x_3));
+    yp_decrefN(N(not_iterable, s, empty, x_empty, x_0, x_1, x_1_1, x_1_2, x_1_4, x_2, x_2_1, x_3,
+            x_4_2));
 }
 
 static MunitResult test_startswith(const MunitParameter params[], fixture_t *fixture)
@@ -1267,9 +1271,213 @@ static MunitResult test_startswith(const MunitParameter params[], fixture_t *fix
     return MUNIT_OK;
 }
 
+static void _test_endswith(fixture_type_t *type, fixture_type_t *x_type)
+{
+    uniqueness_t *uq = uniqueness_new();
+    ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
+    ypObject     *items[1];
+    ypObject     *x_items[5];
+    ypObject     *s;
+    ypObject     *empty = type->newN(0);
+    ypObject     *x_empty = x_type->newN(0);
+    ypObject     *x_0;
+    ypObject     *x_1;
+    ypObject     *x_2;
+    ypObject     *x_2_3;
+    ypObject     *x_2_4;
+    ypObject     *x_3;
+    ypObject     *x_3_2;
+    ypObject     *x_3_3;
+    ypObject     *x_4_3;
+    // s contains both items and x_items; x contains only x_items. (See note at top of file.)
+    obj_array_fill(items, uq, type->rand_elems->items);
+    obj_array_fill(x_items, uq, x_type->rand_elems->items);
+    s = type->newN(N(x_items[1], items[0], x_items[2], x_items[3]));
+    x_0 = x_type->newN(N(x_items[0]));
+    x_1 = x_type->newN(N(x_items[1]));
+    x_2 = x_type->newN(N(x_items[2]));
+    x_2_3 = x_type->newN(N(x_items[2], x_items[3]));
+    x_2_4 = x_type->newN(N(x_items[2], x_items[4]));
+    x_3 = x_type->newN(N(x_items[3]));
+    x_3_2 = x_type->newN(N(x_items[3], x_items[2]));
+    x_3_3 = x_type->newN(N(x_items[3], x_items[3]));
+    x_4_3 = x_type->newN(N(x_items[4], x_items[3]));
+
+    // Basic endswith.
+    assert_obj(yp_endswith(s, x_3), is, yp_True);
+    assert_obj(yp_endswith(s, x_2_3), is, yp_True);
+
+    // Characters not in string.
+    assert_obj(yp_endswith(s, x_0), is, yp_False);
+    assert_obj(yp_endswith(s, x_4_3), is, yp_False);
+    assert_obj(yp_endswith(s, x_2_4), is, yp_False);
+
+    // Characters not at end.
+    assert_obj(yp_endswith(s, x_2), is, yp_False);
+    assert_obj(yp_endswith(s, x_1), is, yp_False);
+    ead(x, x_type->newN(N(x_items[1], items[0])), assert_obj(yp_endswith(s, x), is, yp_False));
+
+    // Characters out-of-order or duplicated.
+    assert_obj(yp_endswith(s, x_3_2), is, yp_False);
+    assert_obj(yp_endswith(s, x_3_3), is, yp_False);
+
+    // Empty x.
+    assert_obj(yp_endswith(s, x_empty), is, yp_True);
+    assert_obj(yp_endswith(empty, x_empty), is, yp_True);
+
+    // Empty s.
+    assert_obj(yp_endswith(empty, x_3), is, yp_False);
+    assert_obj(yp_endswith(empty, x_2_3), is, yp_False);
+
+    // Basic slice.
+    assert_obj(yp_endswithC4(s, x_3, 3, 4), is, yp_True);
+    assert_obj(yp_endswithC4(s, x_3, 2, 3), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_2_3, 3, 4), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_2_3, 2, 3), is, yp_False);
+
+    // Negative indicies.
+    assert_obj(yp_endswithC4(s, x_2_3, -3, 4), is, yp_True);
+    assert_obj(yp_endswithC4(s, x_2_3, -4, -1), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_1, -4, -1), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_1, -4, -3), is, yp_True);
+
+    // Total slice.
+    assert_obj(yp_endswithC4(s, x_0, 0, 4), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_3, 0, 4), is, yp_True);
+    assert_obj(yp_endswithC4(s, x_2_3, 0, 4), is, yp_True);
+
+    // Total slice, negative indicies.
+    assert_obj(yp_endswithC4(s, x_0, -4, 4), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_3, -4, 4), is, yp_True);
+    assert_obj(yp_endswithC4(s, x_2_3, -4, 4), is, yp_True);
+
+    // Empty slices.
+    {
+        slice_args_t slices[] = {
+                // recall step is always 1 for endswith
+                {0, 0, 1},     // typical empty slice
+                {4, 99, 1},    // i>=len(s) (regardless of j)
+                {-99, -5, 1},  // j<-len(s) (regardless of i)
+                {2, 2, 1},     // i=j (regardless of k)
+                {1, 0, 1},     // i>j
+                {-1, -4, 1},   // reverse total slice...but k is always 1
+        };
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(slices); i++) {
+            slice_args_t args = slices[i];
+            assert_obj(yp_endswithC4(s, x_3, args.start, args.stop), is, yp_False);
+            assert_obj(yp_endswithC4(s, x_2_3, args.start, args.stop), is, yp_False);
+            // XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+            assert_obj(yp_endswithC4(s, x_empty, args.start, args.stop), is, yp_True);
+            assert_obj(yp_endswithC4(empty, x_empty, args.start, args.stop), is, yp_True);
+        }
+    }
+
+    // yp_SLICE_DEFAULT.
+    assert_obj(yp_endswithC4(s, x_3, yp_SLICE_DEFAULT, 4), is, yp_True);
+    assert_obj(yp_endswithC4(s, x_3, 3, yp_SLICE_DEFAULT), is, yp_True);
+    assert_obj(yp_endswithC4(s, x_3, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT), is, yp_True);
+    assert_obj(yp_endswithC4(s, x_2, yp_SLICE_DEFAULT, 3), is, yp_True);
+    assert_obj(yp_endswithC4(s, x_2, 3, yp_SLICE_DEFAULT), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_2, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_0, yp_SLICE_DEFAULT, 2), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_0, 1, yp_SLICE_DEFAULT), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_0, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT), is, yp_False);
+
+    // yp_SLICE_LAST.
+    assert_obj(yp_endswithC4(s, x_3, yp_SLICE_LAST, 4), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_3, 3, yp_SLICE_LAST), is, yp_True);
+    assert_obj(yp_endswithC4(s, x_3, yp_SLICE_LAST, yp_SLICE_LAST), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_2, yp_SLICE_LAST, 4), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_2, 3, yp_SLICE_LAST), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_2, yp_SLICE_LAST, yp_SLICE_LAST), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_0, yp_SLICE_LAST, 2), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_0, 0, yp_SLICE_LAST), is, yp_False);
+    assert_obj(yp_endswithC4(s, x_0, yp_SLICE_LAST, yp_SLICE_LAST), is, yp_False);
+
+    // x equals s.
+    {
+        ypObject *x = x_type->newN(N(x_items[1], items[0], x_items[2], x_items[3]));
+        assert_obj(yp_endswith(s, x), is, yp_True);
+        assert_obj(yp_endswithC4(s, x, 0, 3), is, yp_False);
+        assert_obj(yp_endswithC4(s, x, 0, 4), is, yp_True);
+        yp_decrefN(N(x));
+    }
+
+    // x is s.
+    assert_obj(yp_endswith(s, s), is, yp_True);
+    assert_obj(yp_endswithC4(s, s, 1, 4), is, yp_False);
+    assert_obj(yp_endswithC4(s, s, 0, 4), is, yp_True);
+
+    // x is a tuple of strings.
+    ead(x_tuple, yp_tupleN(N(x_0, x_3)), assert_obj(yp_endswith(s, x_tuple), is, yp_True));
+    ead(x_tuple, yp_tupleN(N(x_0, x_4_3)), assert_obj(yp_endswith(s, x_tuple), is, yp_False));
+    ead(x_tuple, yp_tupleN(N(x_3)), assert_obj(yp_endswithC4(s, x_tuple, 0, 4), is, yp_True));
+    ead(x_tuple, yp_tupleN(N(x_3)), assert_obj(yp_endswithC4(s, x_tuple, 0, 3), is, yp_False));
+
+    // x is an empty tuple.
+    ead(x_tuple, yp_tupleN(0), assert_obj(yp_endswith(s, x_tuple), is, yp_False));
+    ead(x_tuple, yp_tupleN(0), assert_obj(yp_endswith(empty, x_tuple), is, yp_False));
+    ead(x_tuple, yp_tupleN(0), assert_obj(yp_endswithC4(s, x_tuple, 0, 0), is, yp_False));
+
+    // x is an item. Supported on text as their x_items are strings.
+    if (isbinary(type)) {
+        assert_raises(yp_endswith(s, x_items[3]), yp_TypeError);
+    } else {
+        assert_obj(yp_endswith(s, x_items[3]), is, yp_True);
+    }
+
+    // x is a list, which is not supported. FIXME Should it be?
+    ead(x, yp_listN(N(x_3)), assert_raises(yp_endswith(s, x), yp_TypeError));
+
+    // x is not an iterable.
+    assert_raises(yp_endswith(s, not_iterable), yp_TypeError);
+
+    // Optimization: early exit if x is a tuple with a match, even if x contains bad types.
+    // FIXME Python 3.13 catches this error. We should too.
+    // FIXME yp_isdisjoint has early exit. We should standardize.
+    ead(x_tuple, yp_tupleN(N(x_0, not_iterable)),
+            assert_raises(yp_endswith(s, x_tuple), yp_TypeError));
+    ead(x_tuple, yp_tupleN(N(x_3, not_iterable)), assert_obj(yp_endswith(s, x_tuple), is, yp_True));
+
+    // Exception passthrough.
+    assert_raises(yp_endswith(s, yp_SyntaxError), yp_SyntaxError);
+    assert_raises(yp_endswithC4(s, yp_SyntaxError, 3, 4), yp_SyntaxError);
+    assert_raises(yp_endswithC4(s, yp_SyntaxError, 4, 4), yp_SyntaxError);
+    assert_raises(yp_endswith(empty, yp_SyntaxError), yp_SyntaxError);
+    assert_raises(yp_endswithC4(empty, yp_SyntaxError, 3, 4), yp_SyntaxError);
+    assert_raises(yp_endswithC4(empty, yp_SyntaxError, 4, 4), yp_SyntaxError);
+
+    assert_sequence(s, x_items[1], items[0], x_items[2], x_items[3]);  // s unchanged.
+
+    obj_array_decref(x_items);
+    obj_array_decref(items);
+    uniqueness_dealloc(uq);
+    yp_decrefN(N(not_iterable, s, empty, x_empty, x_0, x_1, x_2, x_2_3, x_2_4, x_3, x_3_2, x_3_3,
+            x_4_3));
+}
+
 static MunitResult test_endswith(const MunitParameter params[], fixture_t *fixture)
 {
-    // FIXME
+    fixture_type_t  *type = fixture->type;
+    peer_type_t     *peer;
+    fixture_type_t **x_type;
+
+    for (peer = type->peers; peer->type != NULL; peer++) {
+        if (peer->type->is_string) {
+            _test_endswith(type, peer->type);
+        } else if (peer->type != fixture_type_tuple) {
+            // Calling with a tuple is tested in _test_endswith and _test_tailmatch_not_supported.
+            _test_tailmatch_not_supported(type, peer->type, yp_endswith, yp_endswithC4);
+        }
+    }
+
+    // Binary strings cannot be compared with text strings.
+    for (x_type = fixture_types_string->types; (*x_type) != NULL; x_type++) {
+        if (isbinary(type) == isbinary(*x_type)) continue;
+        _test_tailmatch_not_supported(type, *x_type, yp_endswith, yp_endswithC4);
+    }
+
     return MUNIT_OK;
 }
 
