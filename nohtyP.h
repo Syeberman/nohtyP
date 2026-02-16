@@ -1050,7 +1050,8 @@ ypAPI ypObject *yp_lower(ypObject *s);
 ypAPI ypObject *yp_upper(ypObject *s);
 
 // Returns a new reference to a "casefolded" copy of s, for use in caseless matching. The
-// casefolding algorithm is described in section 3.13 of the Unicode Standard.
+// casefolding algorithm is described in section 3.13 of the Unicode Standard. Not supported on
+// binary strings (bytes/bytearray).
 ypAPI ypObject *yp_casefold(ypObject *s);
 
 // Returns a new reference to a copy of s with uppercase characters converted to lowercase and vice

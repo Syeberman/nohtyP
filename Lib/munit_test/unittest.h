@@ -439,28 +439,25 @@ for i in range(1, 35):
     _assert_typeC_raises_exc(                  \
             yp_hash_t, a, op, b, (__VA_ARGS__), PRIssize, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
 
-// value is the expected value, either yp_True or yp_False; not_value is the negation of value.
-#define _assert_bool(obj, value, not_value, obj_fmt, ...)                                        \
+// Asserts that obj is a bool with the expected value. Will fail if expected is not a bool.
+#define _assert_bool(obj, expected, obj_fmt, expected_str, ...)                                  \
     do {                                                                                         \
-        if (obj == value) {                                                                      \
-            /* pass */                                                                           \
-        } else if (obj == not_value) {                                                           \
-            munit_errorf("assertion failed: " obj_fmt " == " #value, __VA_ARGS__);               \
-        } else {                                                                                 \
+        if (yp_type(obj) != yp_t_bool) {                                                         \
             _ypmt_error_exception(obj, "expected a bool or an exception", obj_fmt, __VA_ARGS__); \
+        } else if (obj != expected) {                                                            \
+            munit_errorf("assertion failed: " obj_fmt " == %s", __VA_ARGS__, expected_str);      \
         }                                                                                        \
     } while (0)
+#define _assert_bool_false(obj, obj_fmt, ...) \
+    _assert_bool(obj, yp_False, obj_fmt, "yp_False", __VA_ARGS__)
+#define _assert_bool_true(obj, obj_fmt, ...) \
+    _assert_bool(obj, yp_True, obj_fmt, "yp_True", __VA_ARGS__)
 
-#define assert_falsy(obj)                                                         \
+#define assert_bool(obj, expected)                                                \
     do {                                                                          \
-        ypObject *_ypmt_FALSY_result = yp_bool(obj);                              \
-        _assert_bool(_ypmt_FALSY_result, yp_False, yp_True, "yp_bool(%s)", #obj); \
-    } while (0)
-
-#define assert_truthy(obj)                                                         \
-    do {                                                                           \
-        ypObject *_ypmt_TRUTHY_result = yp_bool(obj);                              \
-        _assert_bool(_ypmt_TRUTHY_result, yp_True, yp_False, "yp_bool(%s)", #obj); \
+        ypObject *_ypmt_BOOL_obj = (obj);                                         \
+        ypObject *_ypmt_BOOL_expected = (expected);                               \
+        _assert_bool(_ypmt_BOOL_obj, _ypmt_BOOL_expected, "%s", #expected, #obj); \
     } while (0)
 
 // Cheeky little hack to make assert_obj(a, is, b) and assert_obj(a, is_not, b) work.
@@ -471,8 +468,7 @@ for i in range(1, 35):
 #define _assert_obj(a, op, b, a_fmt, b_fmt, ...)                                              \
     do {                                                                                      \
         ypObject *_ypmt_OBJ_result = yp_##op(a, b);                                           \
-        _assert_bool(_ypmt_OBJ_result, yp_True, yp_False, "yp_" #op "(" a_fmt ", " b_fmt ")", \
-                __VA_ARGS__);                                                                 \
+        _assert_bool_true(_ypmt_OBJ_result, "yp_" #op "(" a_fmt ", " b_fmt ")", __VA_ARGS__); \
     } while (0)
 
 // op can be: is, is_not, lt, le, eq, ne, ge, gt, contains, in, not_in, isdisjoint, issubset,
