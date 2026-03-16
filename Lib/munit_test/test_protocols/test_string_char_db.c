@@ -790,18 +790,48 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
     return MUNIT_OK;
 }
 
+// Used by test_latin_1_converters, called on each latin-1 character.
+static void char_conv_test(fixture_type_t *type, int ord, int lower0, int lower1, int upper0,
+        int upper1, int casefold0, int casefold1, int swapcase0, int swapcase1, int capitalize0,
+        int capitalize1)
+{
+    ypObject *s = type->fromordsCN(1, ord);
+
+#define assert_conv(expression, expected0, expected1)                                           \
+    do {                                                                                        \
+        ypObject *_ypmt_CONV_expression = (expression);                                         \
+        ypObject *_ypmt_CONV_expected;                                                          \
+        if (isbinary(type) && ord > 0x7F) {                                                     \
+            _ypmt_CONV_expected = yp_incref(_ypmt_CONV_expression);                             \
+        } else {                                                                                \
+            _ypmt_CONV_expected =                                                               \
+                    type->fromordsCN((expected1) < 0 ? 1 : 2, (expected0), (expected1));        \
+        }                                                                                       \
+        _assert_obj(_ypmt_CONV_expression, eq, _ypmt_CONV_expected, "%s /*ord %d*/",            \
+                "<ords %d, %d>", #expression, ord, (expected0), (expected1));                   \
+        _assert_type_is(_ypmt_CONV_expression, type->yp_type, "%s /*ord %d*/", "type->yp_type", \
+                #expression, ord);                                                              \
+        yp_decrefN(N(_ypmt_CONV_expected, _ypmt_CONV_expression));                              \
+    } while (0)
+
+    assert_conv(yp_lower(s), lower0, lower1);
+    assert_conv(yp_upper(s), upper0, upper1);
+    // assert_conv(yp_swapcase(s), swapcase0, swapcase1);
+    // assert_conv(yp_capitalize(s), capitalize0, capitalize1);
+    // if (!isbinary(type)) {
+    //     assert_conv(yp_casefold(s), casefold0, casefold1);
+    // }
+
+#undef assert_conv
+    yp_decrefN(N(s));
+}
+
 // Tests for the string converters for the latin-1 characters. The full Unicode Character Database
 // is an optional feature of nohtyP, but the latin-1 characters are always supported, and mostly
 // share the same conversions between bytes and str.
 static MunitResult test_latin_1_converters(const MunitParameter params[], fixture_t *fixture)
 {
-    // fixture_type_t *type = fixture->type;
-    // ypObject       *expected[] = {yp_False, yp_True, isbinary(type) ? yp_False : yp_True};
-
-    // FIXME This macro is complex and slows things down. Turn this into a function that prints the
-    // ordinal rather than the precise line number?
-    // FIXME casefold doesn't apply to binary.
-    // #define assert_char(ord, lower, upper, casefold, swapcase, capitalize)
+    fixture_type_t *type = fixture->type;
 
     // FIXME In Python, compare bytes to strs for same conversions?
     // FIXME bytes only operates on the ASCII characters
@@ -809,13 +839,280 @@ static MunitResult test_latin_1_converters(const MunitParameter params[], fixtur
     methods = "lower, upper, casefold, swapcase, capitalize"
     def get_expected(x, m):
         ords = [str(ord(c)) for c in getattr(x, m)()]
-        return f"{{{', '.join(ords)}}}"
+        if len(ords) == 1: ords.append(-1)
+        assert len(ords) == 2
+        return f"{ords[0]}, {ords[1]}"
     for i in range(256):
         x = chr(i)
         expected = [get_expected(x, m) for m in methods.split(", ")]
         if i % 32 == 0: print(f"    // {methods}")
-        print(f"    assert_char({i}, {", ".join(expected)});  // {x!r}")
+        print(f"    char_conv_test(type, {i}, {", ".join(expected)});  // {x!r}")
     */
+
+    // lower, upper, casefold, swapcase, capitalize
+    char_conv_test(type, 0, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1);        // '\x00'
+    char_conv_test(type, 1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1);        // '\x01'
+    char_conv_test(type, 2, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1);        // '\x02'
+    char_conv_test(type, 3, 3, -1, 3, -1, 3, -1, 3, -1, 3, -1);        // '\x03'
+    char_conv_test(type, 4, 4, -1, 4, -1, 4, -1, 4, -1, 4, -1);        // '\x04'
+    char_conv_test(type, 5, 5, -1, 5, -1, 5, -1, 5, -1, 5, -1);        // '\x05'
+    char_conv_test(type, 6, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1);        // '\x06'
+    char_conv_test(type, 7, 7, -1, 7, -1, 7, -1, 7, -1, 7, -1);        // '\x07'
+    char_conv_test(type, 8, 8, -1, 8, -1, 8, -1, 8, -1, 8, -1);        // '\x08'
+    char_conv_test(type, 9, 9, -1, 9, -1, 9, -1, 9, -1, 9, -1);        // '\t'
+    char_conv_test(type, 10, 10, -1, 10, -1, 10, -1, 10, -1, 10, -1);  // '\n'
+    char_conv_test(type, 11, 11, -1, 11, -1, 11, -1, 11, -1, 11, -1);  // '\x0b'
+    char_conv_test(type, 12, 12, -1, 12, -1, 12, -1, 12, -1, 12, -1);  // '\x0c'
+    char_conv_test(type, 13, 13, -1, 13, -1, 13, -1, 13, -1, 13, -1);  // '\r'
+    char_conv_test(type, 14, 14, -1, 14, -1, 14, -1, 14, -1, 14, -1);  // '\x0e'
+    char_conv_test(type, 15, 15, -1, 15, -1, 15, -1, 15, -1, 15, -1);  // '\x0f'
+    char_conv_test(type, 16, 16, -1, 16, -1, 16, -1, 16, -1, 16, -1);  // '\x10'
+    char_conv_test(type, 17, 17, -1, 17, -1, 17, -1, 17, -1, 17, -1);  // '\x11'
+    char_conv_test(type, 18, 18, -1, 18, -1, 18, -1, 18, -1, 18, -1);  // '\x12'
+    char_conv_test(type, 19, 19, -1, 19, -1, 19, -1, 19, -1, 19, -1);  // '\x13'
+    char_conv_test(type, 20, 20, -1, 20, -1, 20, -1, 20, -1, 20, -1);  // '\x14'
+    char_conv_test(type, 21, 21, -1, 21, -1, 21, -1, 21, -1, 21, -1);  // '\x15'
+    char_conv_test(type, 22, 22, -1, 22, -1, 22, -1, 22, -1, 22, -1);  // '\x16'
+    char_conv_test(type, 23, 23, -1, 23, -1, 23, -1, 23, -1, 23, -1);  // '\x17'
+    char_conv_test(type, 24, 24, -1, 24, -1, 24, -1, 24, -1, 24, -1);  // '\x18'
+    char_conv_test(type, 25, 25, -1, 25, -1, 25, -1, 25, -1, 25, -1);  // '\x19'
+    char_conv_test(type, 26, 26, -1, 26, -1, 26, -1, 26, -1, 26, -1);  // '\x1a'
+    char_conv_test(type, 27, 27, -1, 27, -1, 27, -1, 27, -1, 27, -1);  // '\x1b'
+    char_conv_test(type, 28, 28, -1, 28, -1, 28, -1, 28, -1, 28, -1);  // '\x1c'
+    char_conv_test(type, 29, 29, -1, 29, -1, 29, -1, 29, -1, 29, -1);  // '\x1d'
+    char_conv_test(type, 30, 30, -1, 30, -1, 30, -1, 30, -1, 30, -1);  // '\x1e'
+    char_conv_test(type, 31, 31, -1, 31, -1, 31, -1, 31, -1, 31, -1);  // '\x1f'
+    // lower, upper, casefold, swapcase, capitalize
+    char_conv_test(type, 32, 32, -1, 32, -1, 32, -1, 32, -1, 32, -1);  // ' '
+    char_conv_test(type, 33, 33, -1, 33, -1, 33, -1, 33, -1, 33, -1);  // '!'
+    char_conv_test(type, 34, 34, -1, 34, -1, 34, -1, 34, -1, 34, -1);  // '"'
+    char_conv_test(type, 35, 35, -1, 35, -1, 35, -1, 35, -1, 35, -1);  // '#'
+    char_conv_test(type, 36, 36, -1, 36, -1, 36, -1, 36, -1, 36, -1);  // '$'
+    char_conv_test(type, 37, 37, -1, 37, -1, 37, -1, 37, -1, 37, -1);  // '%'
+    char_conv_test(type, 38, 38, -1, 38, -1, 38, -1, 38, -1, 38, -1);  // '&'
+    char_conv_test(type, 39, 39, -1, 39, -1, 39, -1, 39, -1, 39, -1);  // "'"
+    char_conv_test(type, 40, 40, -1, 40, -1, 40, -1, 40, -1, 40, -1);  // '('
+    char_conv_test(type, 41, 41, -1, 41, -1, 41, -1, 41, -1, 41, -1);  // ')'
+    char_conv_test(type, 42, 42, -1, 42, -1, 42, -1, 42, -1, 42, -1);  // '*'
+    char_conv_test(type, 43, 43, -1, 43, -1, 43, -1, 43, -1, 43, -1);  // '+'
+    char_conv_test(type, 44, 44, -1, 44, -1, 44, -1, 44, -1, 44, -1);  // ','
+    char_conv_test(type, 45, 45, -1, 45, -1, 45, -1, 45, -1, 45, -1);  // '-'
+    char_conv_test(type, 46, 46, -1, 46, -1, 46, -1, 46, -1, 46, -1);  // '.'
+    char_conv_test(type, 47, 47, -1, 47, -1, 47, -1, 47, -1, 47, -1);  // '/'
+    char_conv_test(type, 48, 48, -1, 48, -1, 48, -1, 48, -1, 48, -1);  // '0'
+    char_conv_test(type, 49, 49, -1, 49, -1, 49, -1, 49, -1, 49, -1);  // '1'
+    char_conv_test(type, 50, 50, -1, 50, -1, 50, -1, 50, -1, 50, -1);  // '2'
+    char_conv_test(type, 51, 51, -1, 51, -1, 51, -1, 51, -1, 51, -1);  // '3'
+    char_conv_test(type, 52, 52, -1, 52, -1, 52, -1, 52, -1, 52, -1);  // '4'
+    char_conv_test(type, 53, 53, -1, 53, -1, 53, -1, 53, -1, 53, -1);  // '5'
+    char_conv_test(type, 54, 54, -1, 54, -1, 54, -1, 54, -1, 54, -1);  // '6'
+    char_conv_test(type, 55, 55, -1, 55, -1, 55, -1, 55, -1, 55, -1);  // '7'
+    char_conv_test(type, 56, 56, -1, 56, -1, 56, -1, 56, -1, 56, -1);  // '8'
+    char_conv_test(type, 57, 57, -1, 57, -1, 57, -1, 57, -1, 57, -1);  // '9'
+    char_conv_test(type, 58, 58, -1, 58, -1, 58, -1, 58, -1, 58, -1);  // ':'
+    char_conv_test(type, 59, 59, -1, 59, -1, 59, -1, 59, -1, 59, -1);  // ';'
+    char_conv_test(type, 60, 60, -1, 60, -1, 60, -1, 60, -1, 60, -1);  // '<'
+    char_conv_test(type, 61, 61, -1, 61, -1, 61, -1, 61, -1, 61, -1);  // '='
+    char_conv_test(type, 62, 62, -1, 62, -1, 62, -1, 62, -1, 62, -1);  // '>'
+    char_conv_test(type, 63, 63, -1, 63, -1, 63, -1, 63, -1, 63, -1);  // '?'
+    // lower, upper, casefold, swapcase, capitalize
+    char_conv_test(type, 64, 64, -1, 64, -1, 64, -1, 64, -1, 64, -1);     // '@'
+    char_conv_test(type, 65, 97, -1, 65, -1, 97, -1, 97, -1, 65, -1);     // 'A'
+    char_conv_test(type, 66, 98, -1, 66, -1, 98, -1, 98, -1, 66, -1);     // 'B'
+    char_conv_test(type, 67, 99, -1, 67, -1, 99, -1, 99, -1, 67, -1);     // 'C'
+    char_conv_test(type, 68, 100, -1, 68, -1, 100, -1, 100, -1, 68, -1);  // 'D'
+    char_conv_test(type, 69, 101, -1, 69, -1, 101, -1, 101, -1, 69, -1);  // 'E'
+    char_conv_test(type, 70, 102, -1, 70, -1, 102, -1, 102, -1, 70, -1);  // 'F'
+    char_conv_test(type, 71, 103, -1, 71, -1, 103, -1, 103, -1, 71, -1);  // 'G'
+    char_conv_test(type, 72, 104, -1, 72, -1, 104, -1, 104, -1, 72, -1);  // 'H'
+    char_conv_test(type, 73, 105, -1, 73, -1, 105, -1, 105, -1, 73, -1);  // 'I'
+    char_conv_test(type, 74, 106, -1, 74, -1, 106, -1, 106, -1, 74, -1);  // 'J'
+    char_conv_test(type, 75, 107, -1, 75, -1, 107, -1, 107, -1, 75, -1);  // 'K'
+    char_conv_test(type, 76, 108, -1, 76, -1, 108, -1, 108, -1, 76, -1);  // 'L'
+    char_conv_test(type, 77, 109, -1, 77, -1, 109, -1, 109, -1, 77, -1);  // 'M'
+    char_conv_test(type, 78, 110, -1, 78, -1, 110, -1, 110, -1, 78, -1);  // 'N'
+    char_conv_test(type, 79, 111, -1, 79, -1, 111, -1, 111, -1, 79, -1);  // 'O'
+    char_conv_test(type, 80, 112, -1, 80, -1, 112, -1, 112, -1, 80, -1);  // 'P'
+    char_conv_test(type, 81, 113, -1, 81, -1, 113, -1, 113, -1, 81, -1);  // 'Q'
+    char_conv_test(type, 82, 114, -1, 82, -1, 114, -1, 114, -1, 82, -1);  // 'R'
+    char_conv_test(type, 83, 115, -1, 83, -1, 115, -1, 115, -1, 83, -1);  // 'S'
+    char_conv_test(type, 84, 116, -1, 84, -1, 116, -1, 116, -1, 84, -1);  // 'T'
+    char_conv_test(type, 85, 117, -1, 85, -1, 117, -1, 117, -1, 85, -1);  // 'U'
+    char_conv_test(type, 86, 118, -1, 86, -1, 118, -1, 118, -1, 86, -1);  // 'V'
+    char_conv_test(type, 87, 119, -1, 87, -1, 119, -1, 119, -1, 87, -1);  // 'W'
+    char_conv_test(type, 88, 120, -1, 88, -1, 120, -1, 120, -1, 88, -1);  // 'X'
+    char_conv_test(type, 89, 121, -1, 89, -1, 121, -1, 121, -1, 89, -1);  // 'Y'
+    char_conv_test(type, 90, 122, -1, 90, -1, 122, -1, 122, -1, 90, -1);  // 'Z'
+    char_conv_test(type, 91, 91, -1, 91, -1, 91, -1, 91, -1, 91, -1);     // '['
+    char_conv_test(type, 92, 92, -1, 92, -1, 92, -1, 92, -1, 92, -1);     // '\\'
+    char_conv_test(type, 93, 93, -1, 93, -1, 93, -1, 93, -1, 93, -1);     // ']'
+    char_conv_test(type, 94, 94, -1, 94, -1, 94, -1, 94, -1, 94, -1);     // '^'
+    char_conv_test(type, 95, 95, -1, 95, -1, 95, -1, 95, -1, 95, -1);     // '_'
+    // lower, upper, casefold, swapcase, capitalize
+    char_conv_test(type, 96, 96, -1, 96, -1, 96, -1, 96, -1, 96, -1);        // '`'
+    char_conv_test(type, 97, 97, -1, 65, -1, 97, -1, 65, -1, 65, -1);        // 'a'
+    char_conv_test(type, 98, 98, -1, 66, -1, 98, -1, 66, -1, 66, -1);        // 'b'
+    char_conv_test(type, 99, 99, -1, 67, -1, 99, -1, 67, -1, 67, -1);        // 'c'
+    char_conv_test(type, 100, 100, -1, 68, -1, 100, -1, 68, -1, 68, -1);     // 'd'
+    char_conv_test(type, 101, 101, -1, 69, -1, 101, -1, 69, -1, 69, -1);     // 'e'
+    char_conv_test(type, 102, 102, -1, 70, -1, 102, -1, 70, -1, 70, -1);     // 'f'
+    char_conv_test(type, 103, 103, -1, 71, -1, 103, -1, 71, -1, 71, -1);     // 'g'
+    char_conv_test(type, 104, 104, -1, 72, -1, 104, -1, 72, -1, 72, -1);     // 'h'
+    char_conv_test(type, 105, 105, -1, 73, -1, 105, -1, 73, -1, 73, -1);     // 'i'
+    char_conv_test(type, 106, 106, -1, 74, -1, 106, -1, 74, -1, 74, -1);     // 'j'
+    char_conv_test(type, 107, 107, -1, 75, -1, 107, -1, 75, -1, 75, -1);     // 'k'
+    char_conv_test(type, 108, 108, -1, 76, -1, 108, -1, 76, -1, 76, -1);     // 'l'
+    char_conv_test(type, 109, 109, -1, 77, -1, 109, -1, 77, -1, 77, -1);     // 'm'
+    char_conv_test(type, 110, 110, -1, 78, -1, 110, -1, 78, -1, 78, -1);     // 'n'
+    char_conv_test(type, 111, 111, -1, 79, -1, 111, -1, 79, -1, 79, -1);     // 'o'
+    char_conv_test(type, 112, 112, -1, 80, -1, 112, -1, 80, -1, 80, -1);     // 'p'
+    char_conv_test(type, 113, 113, -1, 81, -1, 113, -1, 81, -1, 81, -1);     // 'q'
+    char_conv_test(type, 114, 114, -1, 82, -1, 114, -1, 82, -1, 82, -1);     // 'r'
+    char_conv_test(type, 115, 115, -1, 83, -1, 115, -1, 83, -1, 83, -1);     // 's'
+    char_conv_test(type, 116, 116, -1, 84, -1, 116, -1, 84, -1, 84, -1);     // 't'
+    char_conv_test(type, 117, 117, -1, 85, -1, 117, -1, 85, -1, 85, -1);     // 'u'
+    char_conv_test(type, 118, 118, -1, 86, -1, 118, -1, 86, -1, 86, -1);     // 'v'
+    char_conv_test(type, 119, 119, -1, 87, -1, 119, -1, 87, -1, 87, -1);     // 'w'
+    char_conv_test(type, 120, 120, -1, 88, -1, 120, -1, 88, -1, 88, -1);     // 'x'
+    char_conv_test(type, 121, 121, -1, 89, -1, 121, -1, 89, -1, 89, -1);     // 'y'
+    char_conv_test(type, 122, 122, -1, 90, -1, 122, -1, 90, -1, 90, -1);     // 'z'
+    char_conv_test(type, 123, 123, -1, 123, -1, 123, -1, 123, -1, 123, -1);  // '{'
+    char_conv_test(type, 124, 124, -1, 124, -1, 124, -1, 124, -1, 124, -1);  // '|'
+    char_conv_test(type, 125, 125, -1, 125, -1, 125, -1, 125, -1, 125, -1);  // '}'
+    char_conv_test(type, 126, 126, -1, 126, -1, 126, -1, 126, -1, 126, -1);  // '~'
+    char_conv_test(type, 127, 127, -1, 127, -1, 127, -1, 127, -1, 127, -1);  // '\x7f'
+    // lower, upper, casefold, swapcase, capitalize
+    char_conv_test(type, 128, 128, -1, 128, -1, 128, -1, 128, -1, 128, -1);  // '\x80'
+    char_conv_test(type, 129, 129, -1, 129, -1, 129, -1, 129, -1, 129, -1);  // '\x81'
+    char_conv_test(type, 130, 130, -1, 130, -1, 130, -1, 130, -1, 130, -1);  // '\x82'
+    char_conv_test(type, 131, 131, -1, 131, -1, 131, -1, 131, -1, 131, -1);  // '\x83'
+    char_conv_test(type, 132, 132, -1, 132, -1, 132, -1, 132, -1, 132, -1);  // '\x84'
+    char_conv_test(type, 133, 133, -1, 133, -1, 133, -1, 133, -1, 133, -1);  // '\x85'
+    char_conv_test(type, 134, 134, -1, 134, -1, 134, -1, 134, -1, 134, -1);  // '\x86'
+    char_conv_test(type, 135, 135, -1, 135, -1, 135, -1, 135, -1, 135, -1);  // '\x87'
+    char_conv_test(type, 136, 136, -1, 136, -1, 136, -1, 136, -1, 136, -1);  // '\x88'
+    char_conv_test(type, 137, 137, -1, 137, -1, 137, -1, 137, -1, 137, -1);  // '\x89'
+    char_conv_test(type, 138, 138, -1, 138, -1, 138, -1, 138, -1, 138, -1);  // '\x8a'
+    char_conv_test(type, 139, 139, -1, 139, -1, 139, -1, 139, -1, 139, -1);  // '\x8b'
+    char_conv_test(type, 140, 140, -1, 140, -1, 140, -1, 140, -1, 140, -1);  // '\x8c'
+    char_conv_test(type, 141, 141, -1, 141, -1, 141, -1, 141, -1, 141, -1);  // '\x8d'
+    char_conv_test(type, 142, 142, -1, 142, -1, 142, -1, 142, -1, 142, -1);  // '\x8e'
+    char_conv_test(type, 143, 143, -1, 143, -1, 143, -1, 143, -1, 143, -1);  // '\x8f'
+    char_conv_test(type, 144, 144, -1, 144, -1, 144, -1, 144, -1, 144, -1);  // '\x90'
+    char_conv_test(type, 145, 145, -1, 145, -1, 145, -1, 145, -1, 145, -1);  // '\x91'
+    char_conv_test(type, 146, 146, -1, 146, -1, 146, -1, 146, -1, 146, -1);  // '\x92'
+    char_conv_test(type, 147, 147, -1, 147, -1, 147, -1, 147, -1, 147, -1);  // '\x93'
+    char_conv_test(type, 148, 148, -1, 148, -1, 148, -1, 148, -1, 148, -1);  // '\x94'
+    char_conv_test(type, 149, 149, -1, 149, -1, 149, -1, 149, -1, 149, -1);  // '\x95'
+    char_conv_test(type, 150, 150, -1, 150, -1, 150, -1, 150, -1, 150, -1);  // '\x96'
+    char_conv_test(type, 151, 151, -1, 151, -1, 151, -1, 151, -1, 151, -1);  // '\x97'
+    char_conv_test(type, 152, 152, -1, 152, -1, 152, -1, 152, -1, 152, -1);  // '\x98'
+    char_conv_test(type, 153, 153, -1, 153, -1, 153, -1, 153, -1, 153, -1);  // '\x99'
+    char_conv_test(type, 154, 154, -1, 154, -1, 154, -1, 154, -1, 154, -1);  // '\x9a'
+    char_conv_test(type, 155, 155, -1, 155, -1, 155, -1, 155, -1, 155, -1);  // '\x9b'
+    char_conv_test(type, 156, 156, -1, 156, -1, 156, -1, 156, -1, 156, -1);  // '\x9c'
+    char_conv_test(type, 157, 157, -1, 157, -1, 157, -1, 157, -1, 157, -1);  // '\x9d'
+    char_conv_test(type, 158, 158, -1, 158, -1, 158, -1, 158, -1, 158, -1);  // '\x9e'
+    char_conv_test(type, 159, 159, -1, 159, -1, 159, -1, 159, -1, 159, -1);  // '\x9f'
+    // lower, upper, casefold, swapcase, capitalize
+    char_conv_test(type, 160, 160, -1, 160, -1, 160, -1, 160, -1, 160, -1);  // '\xa0'
+    char_conv_test(type, 161, 161, -1, 161, -1, 161, -1, 161, -1, 161, -1);  // '¡'
+    char_conv_test(type, 162, 162, -1, 162, -1, 162, -1, 162, -1, 162, -1);  // '¢'
+    char_conv_test(type, 163, 163, -1, 163, -1, 163, -1, 163, -1, 163, -1);  // '£'
+    char_conv_test(type, 164, 164, -1, 164, -1, 164, -1, 164, -1, 164, -1);  // '¤'
+    char_conv_test(type, 165, 165, -1, 165, -1, 165, -1, 165, -1, 165, -1);  // '¥'
+    char_conv_test(type, 166, 166, -1, 166, -1, 166, -1, 166, -1, 166, -1);  // '¦'
+    char_conv_test(type, 167, 167, -1, 167, -1, 167, -1, 167, -1, 167, -1);  // '§'
+    char_conv_test(type, 168, 168, -1, 168, -1, 168, -1, 168, -1, 168, -1);  // '¨'
+    char_conv_test(type, 169, 169, -1, 169, -1, 169, -1, 169, -1, 169, -1);  // '©'
+    char_conv_test(type, 170, 170, -1, 170, -1, 170, -1, 170, -1, 170, -1);  // 'ª'
+    char_conv_test(type, 171, 171, -1, 171, -1, 171, -1, 171, -1, 171, -1);  // '«'
+    char_conv_test(type, 172, 172, -1, 172, -1, 172, -1, 172, -1, 172, -1);  // '¬'
+    char_conv_test(type, 173, 173, -1, 173, -1, 173, -1, 173, -1, 173, -1);  // '\xad'
+    char_conv_test(type, 174, 174, -1, 174, -1, 174, -1, 174, -1, 174, -1);  // '®'
+    char_conv_test(type, 175, 175, -1, 175, -1, 175, -1, 175, -1, 175, -1);  // '¯'
+    char_conv_test(type, 176, 176, -1, 176, -1, 176, -1, 176, -1, 176, -1);  // '°'
+    char_conv_test(type, 177, 177, -1, 177, -1, 177, -1, 177, -1, 177, -1);  // '±'
+    char_conv_test(type, 178, 178, -1, 178, -1, 178, -1, 178, -1, 178, -1);  // '²'
+    char_conv_test(type, 179, 179, -1, 179, -1, 179, -1, 179, -1, 179, -1);  // '³'
+    char_conv_test(type, 180, 180, -1, 180, -1, 180, -1, 180, -1, 180, -1);  // '´'
+    char_conv_test(type, 181, 181, -1, 924, -1, 956, -1, 924, -1, 924, -1);  // 'µ'
+    char_conv_test(type, 182, 182, -1, 182, -1, 182, -1, 182, -1, 182, -1);  // '¶'
+    char_conv_test(type, 183, 183, -1, 183, -1, 183, -1, 183, -1, 183, -1);  // '·'
+    char_conv_test(type, 184, 184, -1, 184, -1, 184, -1, 184, -1, 184, -1);  // '¸'
+    char_conv_test(type, 185, 185, -1, 185, -1, 185, -1, 185, -1, 185, -1);  // '¹'
+    char_conv_test(type, 186, 186, -1, 186, -1, 186, -1, 186, -1, 186, -1);  // 'º'
+    char_conv_test(type, 187, 187, -1, 187, -1, 187, -1, 187, -1, 187, -1);  // '»'
+    char_conv_test(type, 188, 188, -1, 188, -1, 188, -1, 188, -1, 188, -1);  // '¼'
+    char_conv_test(type, 189, 189, -1, 189, -1, 189, -1, 189, -1, 189, -1);  // '½'
+    char_conv_test(type, 190, 190, -1, 190, -1, 190, -1, 190, -1, 190, -1);  // '¾'
+    char_conv_test(type, 191, 191, -1, 191, -1, 191, -1, 191, -1, 191, -1);  // '¿'
+    // lower, upper, casefold, swapcase, capitalize
+    char_conv_test(type, 192, 224, -1, 192, -1, 224, -1, 224, -1, 192, -1);  // 'À'
+    char_conv_test(type, 193, 225, -1, 193, -1, 225, -1, 225, -1, 193, -1);  // 'Á'
+    char_conv_test(type, 194, 226, -1, 194, -1, 226, -1, 226, -1, 194, -1);  // 'Â'
+    char_conv_test(type, 195, 227, -1, 195, -1, 227, -1, 227, -1, 195, -1);  // 'Ã'
+    char_conv_test(type, 196, 228, -1, 196, -1, 228, -1, 228, -1, 196, -1);  // 'Ä'
+    char_conv_test(type, 197, 229, -1, 197, -1, 229, -1, 229, -1, 197, -1);  // 'Å'
+    char_conv_test(type, 198, 230, -1, 198, -1, 230, -1, 230, -1, 198, -1);  // 'Æ'
+    char_conv_test(type, 199, 231, -1, 199, -1, 231, -1, 231, -1, 199, -1);  // 'Ç'
+    char_conv_test(type, 200, 232, -1, 200, -1, 232, -1, 232, -1, 200, -1);  // 'È'
+    char_conv_test(type, 201, 233, -1, 201, -1, 233, -1, 233, -1, 201, -1);  // 'É'
+    char_conv_test(type, 202, 234, -1, 202, -1, 234, -1, 234, -1, 202, -1);  // 'Ê'
+    char_conv_test(type, 203, 235, -1, 203, -1, 235, -1, 235, -1, 203, -1);  // 'Ë'
+    char_conv_test(type, 204, 236, -1, 204, -1, 236, -1, 236, -1, 204, -1);  // 'Ì'
+    char_conv_test(type, 205, 237, -1, 205, -1, 237, -1, 237, -1, 205, -1);  // 'Í'
+    char_conv_test(type, 206, 238, -1, 206, -1, 238, -1, 238, -1, 206, -1);  // 'Î'
+    char_conv_test(type, 207, 239, -1, 207, -1, 239, -1, 239, -1, 207, -1);  // 'Ï'
+    char_conv_test(type, 208, 240, -1, 208, -1, 240, -1, 240, -1, 208, -1);  // 'Ð'
+    char_conv_test(type, 209, 241, -1, 209, -1, 241, -1, 241, -1, 209, -1);  // 'Ñ'
+    char_conv_test(type, 210, 242, -1, 210, -1, 242, -1, 242, -1, 210, -1);  // 'Ò'
+    char_conv_test(type, 211, 243, -1, 211, -1, 243, -1, 243, -1, 211, -1);  // 'Ó'
+    char_conv_test(type, 212, 244, -1, 212, -1, 244, -1, 244, -1, 212, -1);  // 'Ô'
+    char_conv_test(type, 213, 245, -1, 213, -1, 245, -1, 245, -1, 213, -1);  // 'Õ'
+    char_conv_test(type, 214, 246, -1, 214, -1, 246, -1, 246, -1, 214, -1);  // 'Ö'
+    char_conv_test(type, 215, 215, -1, 215, -1, 215, -1, 215, -1, 215, -1);  // '×'
+    char_conv_test(type, 216, 248, -1, 216, -1, 248, -1, 248, -1, 216, -1);  // 'Ø'
+    char_conv_test(type, 217, 249, -1, 217, -1, 249, -1, 249, -1, 217, -1);  // 'Ù'
+    char_conv_test(type, 218, 250, -1, 218, -1, 250, -1, 250, -1, 218, -1);  // 'Ú'
+    char_conv_test(type, 219, 251, -1, 219, -1, 251, -1, 251, -1, 219, -1);  // 'Û'
+    char_conv_test(type, 220, 252, -1, 220, -1, 252, -1, 252, -1, 220, -1);  // 'Ü'
+    char_conv_test(type, 221, 253, -1, 221, -1, 253, -1, 253, -1, 221, -1);  // 'Ý'
+    char_conv_test(type, 222, 254, -1, 222, -1, 254, -1, 254, -1, 222, -1);  // 'Þ'
+    char_conv_test(type, 223, 223, -1, 83, 83, 115, 115, 83, 83, 83, 115);   // 'ß'
+    // lower, upper, casefold, swapcase, capitalize
+    char_conv_test(type, 224, 224, -1, 192, -1, 224, -1, 192, -1, 192, -1);  // 'à'
+    char_conv_test(type, 225, 225, -1, 193, -1, 225, -1, 193, -1, 193, -1);  // 'á'
+    char_conv_test(type, 226, 226, -1, 194, -1, 226, -1, 194, -1, 194, -1);  // 'â'
+    char_conv_test(type, 227, 227, -1, 195, -1, 227, -1, 195, -1, 195, -1);  // 'ã'
+    char_conv_test(type, 228, 228, -1, 196, -1, 228, -1, 196, -1, 196, -1);  // 'ä'
+    char_conv_test(type, 229, 229, -1, 197, -1, 229, -1, 197, -1, 197, -1);  // 'å'
+    char_conv_test(type, 230, 230, -1, 198, -1, 230, -1, 198, -1, 198, -1);  // 'æ'
+    char_conv_test(type, 231, 231, -1, 199, -1, 231, -1, 199, -1, 199, -1);  // 'ç'
+    char_conv_test(type, 232, 232, -1, 200, -1, 232, -1, 200, -1, 200, -1);  // 'è'
+    char_conv_test(type, 233, 233, -1, 201, -1, 233, -1, 201, -1, 201, -1);  // 'é'
+    char_conv_test(type, 234, 234, -1, 202, -1, 234, -1, 202, -1, 202, -1);  // 'ê'
+    char_conv_test(type, 235, 235, -1, 203, -1, 235, -1, 203, -1, 203, -1);  // 'ë'
+    char_conv_test(type, 236, 236, -1, 204, -1, 236, -1, 204, -1, 204, -1);  // 'ì'
+    char_conv_test(type, 237, 237, -1, 205, -1, 237, -1, 205, -1, 205, -1);  // 'í'
+    char_conv_test(type, 238, 238, -1, 206, -1, 238, -1, 206, -1, 206, -1);  // 'î'
+    char_conv_test(type, 239, 239, -1, 207, -1, 239, -1, 207, -1, 207, -1);  // 'ï'
+    char_conv_test(type, 240, 240, -1, 208, -1, 240, -1, 208, -1, 208, -1);  // 'ð'
+    char_conv_test(type, 241, 241, -1, 209, -1, 241, -1, 209, -1, 209, -1);  // 'ñ'
+    char_conv_test(type, 242, 242, -1, 210, -1, 242, -1, 210, -1, 210, -1);  // 'ò'
+    char_conv_test(type, 243, 243, -1, 211, -1, 243, -1, 211, -1, 211, -1);  // 'ó'
+    char_conv_test(type, 244, 244, -1, 212, -1, 244, -1, 212, -1, 212, -1);  // 'ô'
+    char_conv_test(type, 245, 245, -1, 213, -1, 245, -1, 213, -1, 213, -1);  // 'õ'
+    char_conv_test(type, 246, 246, -1, 214, -1, 246, -1, 214, -1, 214, -1);  // 'ö'
+    char_conv_test(type, 247, 247, -1, 247, -1, 247, -1, 247, -1, 247, -1);  // '÷'
+    char_conv_test(type, 248, 248, -1, 216, -1, 248, -1, 216, -1, 216, -1);  // 'ø'
+    char_conv_test(type, 249, 249, -1, 217, -1, 249, -1, 217, -1, 217, -1);  // 'ù'
+    char_conv_test(type, 250, 250, -1, 218, -1, 250, -1, 218, -1, 218, -1);  // 'ú'
+    char_conv_test(type, 251, 251, -1, 219, -1, 251, -1, 219, -1, 219, -1);  // 'û'
+    char_conv_test(type, 252, 252, -1, 220, -1, 252, -1, 220, -1, 220, -1);  // 'ü'
+    char_conv_test(type, 253, 253, -1, 221, -1, 253, -1, 221, -1, 221, -1);  // 'ý'
+    char_conv_test(type, 254, 254, -1, 222, -1, 254, -1, 222, -1, 222, -1);  // 'þ'
+    char_conv_test(type, 255, 255, -1, 376, -1, 255, -1, 376, -1, 376, -1);  // 'ÿ'
 
     return MUNIT_OK;
 }

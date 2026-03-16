@@ -1978,6 +1978,8 @@ typedef struct _yp_character_database_t {
     // "Default Identifiers" definition), and 0 if it's not.
     int (*isxid)(yp_uint32_t c);
 
+    // FIXME Ensure where these are called, the returned chars are within ypStringLib_MAX_UNICODE.
+
     // Writes the lowercase form of c to converted and returns the number of characters written. If
     // c is not cased it is written to converted unchanged. len is the allocated length of
     // converted; if converted is not large enough -1 is returned.

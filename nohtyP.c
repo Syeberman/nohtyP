@@ -1902,7 +1902,7 @@ static yp_ssize_t yp_chardata_binary_tolower(yp_uint32_t c, yp_ssize_t len, yp_u
 {
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
     if (len < 1) return -1;
-    converted[0] = c < ypStringLib_MAX_ASCII ? _yp_chardata_tolower[c] : c;
+    converted[0] = c <= ypStringLib_MAX_ASCII ? _yp_chardata_tolower[c] : c;
     return 1;
 }
 
@@ -1910,7 +1910,7 @@ static yp_ssize_t yp_chardata_binary_toupper(yp_uint32_t c, yp_ssize_t len, yp_u
 {
     yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
     if (len < 1) return -1;
-    converted[0] = c < ypStringLib_MAX_ASCII ? _yp_chardata_toupper[c] : c;
+    converted[0] = c <= ypStringLib_MAX_ASCII ? _yp_chardata_toupper[c] : c;
     return 1;
 }
 
@@ -7190,6 +7190,15 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, yp
 #define ypStringLib_PAIR_CODE_FROM_ENC(enc) \
     (enc == ypStringLib_enc_bytes ? ypBytes_CODE : ypStr_CODE)
 
+// Returns the minimal str encoding suitable for the given ordinal value.
+#define ypStr_ENC_FROM_ORD(i)                   \
+    (i > 0xFFFFu      ? ypStringLib_enc_ucs_4 : \
+            i > 0xFFu ? ypStringLib_enc_ucs_2 : \
+                        ypStringLib_enc_latin_1)
+// As per ypStr_ENC_FROM_ORD, but assumes the ordinal value is larger than latin_1.
+#define ypStr_ENC_FROM_ORD_NOT_LATIN_1(i) \
+    (i > 0xFFFFu ? ypStringLib_enc_ucs_4 : ypStringLib_enc_ucs_2)
+
 // Debug-only macro to verify that bytes/str instances are stored as we expect
 #define ypStringLib_ASSERT_INVARIANTS(s)                                                         \
     do {                                                                                         \
@@ -7253,11 +7262,12 @@ typedef void (*ypStringLib_setindexXfunc)(void *dest, yp_ssize_t dest_i, yp_uint
 // vice-versa.
 // XXX max_char may be larger than ypStringLib_MAX_UNICODE
 typedef struct {
-    yp_uint8_t                     code;       // The ypStringLib_ENC_CODE_* value of the encoding
-    yp_uint8_t                     sizeshift;  // len<<sizeshift gives the size in bytes
-    yp_ssize_t                     elemsize;   // The size (in bytes) of one character
-    yp_uint32_t                    max_char;   // Largest character value that encoding can store
-    ypObject                      *name;  // Immortal str of the encoding name (ie yp_s_latin_1)
+    yp_uint8_t  code;       // The ypStringLib_ENC_CODE_* value of the encoding
+    yp_uint8_t  sizeshift;  // len<<sizeshift gives the size in bytes
+    yp_ssize_t  elemsize;   // The size (in bytes) of one character
+    yp_uint32_t max_char;   // Largest character value that encoding can store
+    ypObject   *name;       // Immortal str of the encoding name (ie yp_s_latin_1)
+
     ypStringLib_getindexXfunc      getindexX;  // Gets the ordinal at src[src_i]
     ypStringLib_setindexXfunc      setindexX;  // Sets dest[dest_i] to value
     const yp_character_database_t *chardata;   // Character classifiers and converters
@@ -7812,23 +7822,19 @@ static yp_uint8_t _ypBytes_asuint8C(ypObject *x, ypObject **exc)
     return retval;
 }
 
-// Sets *x_asitem to the character that x represents, and *x_enc to the encoding for that character,
-// returning yp_None. If x is not of the appropriate type for an item of the target string (i.e. int
-// for bytes, str for str, etc), returns yp_TypeError. If the value of x is out of range for the
-// target string, returns yp_ValueError. On error, *x_asitem and *x_enc are undefined.
-typedef ypObject *(*ypStringLib_asitemCfunc)(
-        ypObject *x, yp_uint32_t *x_asitem, const ypStringLib_encinfo **x_enc);
+// Sets *x_asitem to the character that x represents and returns yp_None. If x is not of the
+// appropriate type for an item of the target string (i.e. int for bytes, str for str, etc), returns
+// yp_TypeError. If the value of x is out of range for the target string, returns yp_ValueError. On
+// error, *x_asitem is undefined.
+typedef ypObject *(*ypStringLib_asitemCfunc)(ypObject *x, yp_uint32_t *x_asitem);
 
-static ypObject *_ypBytes_asitemC(
-        ypObject *x, yp_uint32_t *x_asitem, const ypStringLib_encinfo **x_enc)
+static ypObject *_ypBytes_asitemC(ypObject *x, yp_uint32_t *x_asitem)
 {
     ypObject *exc = yp_None;
-    *x_enc = ypStringLib_enc_bytes;
     *x_asitem = _ypBytes_asuint8C(x, &exc);
     return exc;
 }
-static ypObject *_ypStr_asitemC(
-        ypObject *x, yp_uint32_t *x_asitem, const ypStringLib_encinfo **x_enc)
+static ypObject *_ypStr_asitemC(ypObject *x, yp_uint32_t *x_asitem)
 {
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) {
         return_yp_BAD_TYPE(x);
@@ -7837,8 +7843,7 @@ static ypObject *_ypStr_asitemC(
         // ValueError for a bytearray. ValueError seems like the correct option.
         return yp_ValueError;
     } else {
-        *x_enc = ypStringLib_ENC(x);
-        *x_asitem = (*x_enc)->getindexX(ypStringLib_DATA(x), 0);
+        *x_asitem = ypStringLib_ENC(x)->getindexX(ypStringLib_DATA(x), 0);
         return yp_None;
     }
 }
@@ -8020,23 +8025,26 @@ static ypObject *_ypStringLib_grow_onextend(
 }
 
 // Appends x to s, updating the length. Never writes the null-terminator.
-static ypObject *ypStringLib_push(
-        ypObject *s, yp_uint32_t x, const ypStringLib_encinfo *x_enc, yp_ssize_t extra)
+static ypObject *ypStringLib_push(ypObject *s, yp_uint32_t x, yp_ssize_t extra)
 {
     yp_ssize_t                 newLen;
     const ypStringLib_encinfo *newEnc;
 
-    // TODO Assert that x_enc matches s?
+    yp_ASSERT1(x <= ypStringLib_MAX_UNICODE);
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(s) != ypBytes_CODE || x <= 0xFFu);
 
     if (ypStringLib_LEN(s) > ypStringLib_LEN_MAX - 1) return yp_MemorySizeOverflowError;
     newLen = ypStringLib_LEN(s) + 1;
 
     newEnc = ypStringLib_ENC(s);
-    if (newEnc->sizeshift < x_enc->sizeshift) newEnc = x_enc;
+    if (x > newEnc->max_char) {
+        // s is, at a minimum, latin_1. If x is greater than max_char, then it can't be latin_1.
+        yp_ASSERT1(x > 0xFFu);
+        newEnc = ypStr_ENC_FROM_ORD_NOT_LATIN_1(x);
+    }
 
     if (ypStringLib_ALLOCLEN(s) - 1 < newLen || ypStringLib_ENC(s) != newEnc) {
         // Recall _ypStringLib_grow_onextend adjusts alloclen and enc.
-        // TODO Overallocate?
         ypObject *result = _ypStringLib_grow_onextend(s, newLen, extra, newEnc);
         if (yp_isexceptionC(result)) return result;
     }
@@ -8056,11 +8064,10 @@ static ypObject *ypStringLib_push(
 // extra allocation we'd like to avoid. So we are intentially different than Python here.
 static ypObject *_ypStringLib_extend_fromiter(ypObject *s, ypObject *mi, yp_uint64_t *mi_state)
 {
-    ypObject                  *x;
-    ypStringLib_asitemCfunc    asitem = ypStringLib_ASITEM_FUNC(s);
-    ypObject                  *result;
-    yp_uint32_t                x_asitem;
-    const ypStringLib_encinfo *x_enc;
+    ypObject               *x;
+    ypStringLib_asitemCfunc asitem = ypStringLib_ASITEM_FUNC(s);
+    ypObject               *result;
+    yp_uint32_t             x_asitem;
     // Ignore errors. Recall yp_miniiter_length_hintC returns zero on error.
     // FIXME How does this handle excessively-large length hints?
     // FIXME Rewrite similarly to _ypSet_fromiterable?
@@ -8072,12 +8079,12 @@ static ypObject *_ypStringLib_extend_fromiter(ypObject *s, ypObject *mi, yp_uint
             if (yp_isexceptionC2(x, yp_StopIteration)) break;
             return x;
         }
-        result = asitem(x, &x_asitem, &x_enc);
+        result = asitem(x, &x_asitem);
         yp_decref(x);
         if (yp_isexceptionC(result)) return result;
         if (length_hint > 0) length_hint -= 1;
 
-        result = ypStringLib_push(s, x_asitem, x_enc, length_hint);
+        result = ypStringLib_push(s, x_asitem, length_hint);
         if (yp_isexceptionC(result)) return result;
     }
 
@@ -8854,6 +8861,86 @@ static ypObject *ypStringLib_isidentifier(ypObject *s)
     return yp_True;
 }
 
+// Converts c with convert, and appends the resulting characters to newS, updating the length. Never
+// writes the null character. type_max_char is the maximum ordinal supported by the type, used to
+// ensure convert doesn't give us out-of-range characters.
+// FIXME Review again.
+static ypObject *_ypStringLib_convert_append(ypObject *newS, yp_uint32_t           c,
+        yp_ssize_t (*convert)(yp_uint32_t, yp_ssize_t, yp_uint32_t *), yp_uint32_t type_max_char,
+        yp_ssize_t extra)
+{
+    yp_uint32_t converted[3];
+    yp_ssize_t  written;
+    yp_ssize_t  i;
+
+    written = convert(c, yp_lengthof_array(converted), converted);
+    yp_ASSERT(written != 0, "yp_character_database_t converter returned zero characters");
+    if (written < 0) return yp_SystemLimitationError;  // Indicates array size should increase.
+
+    // TODO Python automatically allocates three times the memory at ucs4 in a temporary buffer,
+    // then downconverts. We build (and upconvert) in-place. Contribute back to Python?
+
+    // TODO How much extra memory should we allocate to account for the converter returning multiple
+    // characters? Python allocates three times the memory in case all characters map to three, but
+    // there are only about a hundred characters that convert to more than one character (and very
+    // few convert to three). That doesn't seem like a lot.
+    for (i = 0; i < written; i++) {
+        if (converted[i] > type_max_char) return yp_SystemError;  // Bad data from converter.
+        ypObject *result = ypStringLib_push(newS, converted[i], extra + (written - i - 1));
+        if (yp_isexceptionC(result)) return result;
+    }
+
+    return yp_None;
+}
+
+// FIXME Review again.
+static ypObject *_ypStringLib_upper_or_lower(ypObject *s, int lower)
+{
+    // FIXME Make type_max_char a macro? Or a field in encinfo? And use elsewhere?
+    void                          *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                     s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo     *s_enc = ypStringLib_ENC(s);
+    const yp_character_database_t *chardata = s_enc->chardata;
+    yp_ssize_t (*convert)(yp_uint32_t, yp_ssize_t, yp_uint32_t *) =
+            lower ? chardata->tolower : chardata->toupper;
+    yp_uint32_t type_max_char;
+    ypObject   *newS;
+    yp_ssize_t  i;
+
+    if (s_len < 1) return ypStringLib_new_empty(ypObject_TYPE_CODE(s));
+
+    // FIXME We can't just assume that the converted string will be in the same encoding as the
+    // source string. If we start with an empty object we can use the small inline buffer to get the
+    // first few characters, which can inform the final encoding.
+    // FIXME Make this bit of code common?
+    // FIXME Are there other areas where we assume the translated string is the same enc?
+    if (ypObject_TYPE_PAIR_CODE(s) == ypBytes_CODE) {
+        type_max_char = 0xFFu;
+        newS = _ypBytes_new(ypObject_TYPE_CODE(s), s_len, /*alloclen_fixed=*/FALSE);  // new ref
+    } else {
+        type_max_char = ypStringLib_MAX_UNICODE;
+        newS = _ypStr_new_latin_1(
+                ypObject_TYPE_CODE(s), s_len, /*alloclen_fixed=*/FALSE);  // new ref
+    }
+    if (yp_isexceptionC(newS)) return newS;
+
+    for (i = 0; i < s_len; i++) {
+        ypObject   *result;
+        yp_uint32_t c = s_enc->getindexX(s_data, i);
+        if (c > chardata->max_char) return yp_SystemLimitationError;
+        result = _ypStringLib_convert_append(newS, c, convert, type_max_char, s_len - i - 1);
+        if (yp_isexceptionC(result)) {
+            yp_decref(newS);
+            return result;
+        }
+    }
+
+    // FIXME A common function to null-terminate a string?
+    ypStringLib_ENC(newS)->setindexX(ypStringLib_DATA(newS), ypStringLib_LEN(newS), '\0');
+    ypStringLib_ASSERT_INVARIANTS(newS);
+    return newS;
+}
+
 // There are some efficiencies we can exploit if iterable/x is a fellow string object
 // TODO Is this really a scenario for which we should be optimizing? How typical is ''.join('')?
 static ypObject *_ypStringLib_join_fromstring(ypObject *s, ypObject *x)
@@ -9481,17 +9568,17 @@ Return:
 // current encoding. This will up-convert dest to an encoding that can fit ch, then append ch.
 // dest will have space for requiredLen characters plus the null terminator (make sure this
 // includes room for ch).
-// TODO Rewrite to call ypStringLib_push?
+// FIXME Rewrite to call ypStringLib_push?
 static ypObject *_ypStringLib_decode_utf_8_grow_encoding(
         ypObject *dest, yp_uint32_t ch, yp_ssize_t requiredLen)
 {
     const ypStringLib_encinfo *newEnc;
     ypObject                  *result;
-    yp_ASSERT(ch > 0xFFu, "only call when _ypStringLib_decode_utf_8_inner_loop can't fit the "
-                          "decoded character");
     yp_ASSERT(requiredLen - ypStringLib_LEN(dest) > 0, "not enough room given to write ch");
 
-    newEnc = ch > 0xFFFFu ? ypStringLib_enc_ucs_4 : ypStringLib_enc_ucs_2;
+    yp_ASSERT(ch > 0xFFu, "only call when _ypStringLib_decode_utf_8_inner_loop can't fit the "
+                          "decoded character");
+    newEnc = ypStr_ENC_FROM_ORD_NOT_LATIN_1(ch);
     yp_ASSERT(newEnc->elemsize > ypStringLib_ENC(dest)->elemsize,
             "function called without actually needing to grow the encoding");
 
@@ -10086,6 +10173,7 @@ static ypObject *_yp_codecs_normalize_encoding_name(ypObject *encoding)
     yp_uint8_t *norm_data;
 
     // Only latin-1 names are accepted
+    // FIXME ...or is it specifically ascii?
     if (ypStringLib_ENC_CODE(encoding) != ypStringLib_ENC_CODE_LATIN_1) return yp_ValueError;
 
     // encoding may already be normalized, in which case: do nothing
@@ -10111,7 +10199,8 @@ convert:
         yp_ssize_t  chs_len = tolower(data[i], yp_lengthof_array(chs), chs);
         if (chs_len != 1 || chs[0] > ypStringLib_MAX_LATIN_1) {
             // tolower should only return single characters for latin-1.
-            // FIXME ...or use our built-in tolower directly? Or handle this case?
+            // FIXME FIXME...or use our built-in tolower directly? Or handle this case?
+            // FIXME Yes, because if this is all of latin-1, there's that 'ss' character...
             yp_decref(norm);
             return yp_SystemError;
         } else if (chs[0] == ' ' || chs[0] == '_') {
@@ -10759,7 +10848,7 @@ static ypObject *bytearray_push(ypObject *b, ypObject *x)
     if (yp_isexceptionC(exc)) return exc;
 
     // TODO Overallocate?
-    result = ypStringLib_push(b, x_asitem, ypStringLib_enc_bytes, 0);
+    result = ypStringLib_push(b, x_asitem, 0);
     ypBytes_DATA(b)[ypBytes_LEN(b)] = '\0';
 
     ypBytes_ASSERT_INVARIANTS(b);
@@ -10880,16 +10969,6 @@ static ypObject *bytes_endswith(ypObject *b, ypObject *suffix, yp_ssize_t start,
 {
     return _bytes_startswith_or_endswith(b, suffix, start, end, yp_FIND_REVERSE);
 }
-
-static ypObject *bytes_lower(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_upper(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_casefold(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_swapcase(ypObject *b) { return yp_NotImplementedError; }
-
-static ypObject *bytes_capitalize(ypObject *b) { return yp_NotImplementedError; }
 
 static ypObject *bytes_ljust(ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar)
 {
@@ -11579,7 +11658,7 @@ static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
     yp_uint32_t                x_asitem;
     const ypStringLib_encinfo *x_enc;
 
-    result = _ypStr_asitemC(x, &x_asitem, &x_enc);
+    result = _ypStr_asitemC(x, &x_asitem);
     if (yp_isexceptionC(result)) return result;
 
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
@@ -11589,6 +11668,7 @@ static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
     // It's possible we will need to either upconvert or downconvert s in order to replace s[i]
     // with x. The logic to do this is already implemented in ypStringLib_setslice_fromstring.
     // FIXME Do we want a setslice that asserts the slice arguments are already adjusted?
+    x_enc = ypStr_ENC_FROM_ORD(x_asitem);
     return ypStringLib_setslice_fromstring7(s, i, i + 1, 1, &x_asitem, 1, x_enc);
 }
 
@@ -11622,15 +11702,14 @@ static ypObject *chrarray_setslice(
 
 static ypObject *chrarray_push(ypObject *s, ypObject *x)
 {
-    ypObject                  *result;
-    yp_uint32_t                x_asitem;
-    const ypStringLib_encinfo *x_enc;
+    ypObject   *result;
+    yp_uint32_t x_asitem;
 
-    result = _ypStr_asitemC(x, &x_asitem, &x_enc);
+    result = _ypStr_asitemC(x, &x_asitem);
     if (yp_isexceptionC(result)) return result;
 
     // TODO Overallocate?
-    result = ypStringLib_push(s, x_asitem, x_enc, 0);
+    result = ypStringLib_push(s, x_asitem, 0);
     ypStr_ENC(s)->setindexX(ypStr_DATA(s), ypStr_LEN(s), '\0');
 
     ypStr_ASSERT_INVARIANTS(s);
@@ -11709,11 +11788,12 @@ static ypObject *chrarray_insert(ypObject *s, yp_ssize_t i, ypObject *x)
 
     // Recall that insert behaves like s[i:i]=[x], but i can't be yp_SLICE_DEFAULT.
     if (i == yp_SLICE_DEFAULT) return yp_TypeError;
-    result = _ypStr_asitemC(x, &x_asitem, &x_enc);
+    result = _ypStr_asitemC(x, &x_asitem);
     if (yp_isexceptionC(result)) return result;
 
     // It's possible we will need to either upconvert or downconvert s in order to insert x. The
     // logic to do this is already implemented in ypStringLib_setslice_fromstring.
+    x_enc = ypStr_ENC_FROM_ORD(x_asitem);
     return ypStringLib_setslice_fromstring7(s, i, i, 1, &x_asitem, 1, x_enc);
 }
 
@@ -11902,16 +11982,6 @@ static ypObject *str_endswith(ypObject *s, ypObject *suffix, yp_ssize_t start, y
 {
     return _str_startswith_or_endswith(s, suffix, start, end, yp_FIND_REVERSE);
 }
-
-static ypObject *str_lower(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_upper(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_casefold(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_swapcase(ypObject *s) { return yp_NotImplementedError; }
-
-static ypObject *str_capitalize(ypObject *s) { return yp_NotImplementedError; }
 
 static ypObject *str_ljust(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar)
 {
@@ -12484,11 +12554,7 @@ static ypObject *_yp_chrC(int type, yp_int_t i)
 
     if (i < 0 || i > ypStringLib_MAX_UNICODE) return yp_ValueError;
 
-    // clang-format off
-    newS_enc = i > 0xFFFFu ? ypStringLib_enc_ucs_4 :
-               i > 0xFFu   ? ypStringLib_enc_ucs_2 :
-               ypStringLib_enc_latin_1;
-    // clang-format on
+    newS_enc = ypStr_ENC_FROM_ORD(i);
 
     newS = _ypStr_new(type, 1, /*alloclen_fixed=*/TRUE, newS_enc);
     if (yp_isexceptionC(newS)) return newS;
@@ -12661,15 +12727,35 @@ ypObject *yp_endswith(ypObject *s, ypObject *suffix)
     return yp_endswithC4(s, suffix, 0, yp_SLICE_LAST);
 }
 
-ypObject *yp_lower(ypObject *s) { _ypStringLib_REDIRECT1(s, lower, (s)); }
+ypObject *yp_lower(ypObject *s)
+{
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return _ypStringLib_upper_or_lower(s, /*lower=*/TRUE);
+}
 
-ypObject *yp_upper(ypObject *s) { _ypStringLib_REDIRECT1(s, upper, (s)); }
+ypObject *yp_upper(ypObject *s)
+{
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return _ypStringLib_upper_or_lower(s, /*lower=*/FALSE);
+}
 
-ypObject *yp_casefold(ypObject *s) { _ypStringLib_REDIRECT1(s, casefold, (s)); }
+ypObject *yp_casefold(ypObject *s)
+{
+    if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_METHOD_ERR(s);
+    return yp_NotImplementedError;
+}
 
-ypObject *yp_swapcase(ypObject *s) { _ypStringLib_REDIRECT1(s, swapcase, (s)); }
+ypObject *yp_swapcase(ypObject *s)
+{
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return yp_NotImplementedError;
+}
 
-ypObject *yp_capitalize(ypObject *s) { _ypStringLib_REDIRECT1(s, capitalize, (s)); }
+ypObject *yp_capitalize(ypObject *s)
+{
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
+    return yp_NotImplementedError;
+}
 
 ypObject *yp_ljustC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar)
 {
