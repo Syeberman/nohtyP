@@ -816,7 +816,7 @@ static void char_conv_test(fixture_type_t *type, int ord, int lower0, int lower1
 
     assert_conv(yp_lower(s), lower0, lower1);
     assert_conv(yp_upper(s), upper0, upper1);
-    // assert_conv(yp_swapcase(s), swapcase0, swapcase1);
+    assert_conv(yp_swapcase(s), swapcase0, swapcase1);
     // assert_conv(yp_capitalize(s), capitalize0, capitalize1);
     // if (!isbinary(type)) {
     //     assert_conv(yp_casefold(s), casefold0, casefold1);

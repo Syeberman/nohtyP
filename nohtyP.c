@@ -8953,6 +8953,54 @@ static ypObject *_ypStringLib_upper_or_lower(ypObject *s, int lower)
     return newS;
 }
 
+// FIXME Review again.
+static ypObject *_ypStringLib_swapcase(ypObject *s)
+{
+    // FIXME Make type_max_char a macro? Or a field in encinfo? And use elsewhere?
+    void                          *s_data = ypStringLib_DATA(s);
+    yp_ssize_t                     s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo     *s_enc = ypStringLib_ENC(s);
+    const yp_character_database_t *chardata = s_enc->chardata;
+    yp_uint32_t                    type_max_char;
+    ypObject                      *newS;
+    yp_ssize_t                     i;
+
+    if (s_len < 1) return ypStringLib_new_empty(ypObject_TYPE_CODE(s));
+
+    // FIXME We can't just assume that the converted string will be in the same encoding as the
+    // source string. If we start with an empty object we can use the small inline buffer to get the
+    // first few characters, which can inform the final encoding.
+    // FIXME Make this bit of code common?
+    // FIXME Are there other areas where we assume the translated string is the same enc?
+    if (ypObject_TYPE_PAIR_CODE(s) == ypBytes_CODE) {
+        type_max_char = ypStringLib_MAX_BINARY;
+        newS = _ypBytes_new(ypObject_TYPE_CODE(s), s_len, /*alloclen_fixed=*/FALSE);  // new ref
+    } else {
+        type_max_char = ypStringLib_MAX_UNICODE;
+        newS = _ypStr_new_latin_1(
+                ypObject_TYPE_CODE(s), s_len, /*alloclen_fixed=*/FALSE);  // new ref
+    }
+    if (yp_isexceptionC(newS)) return newS;
+
+    for (i = 0; i < s_len; i++) {
+        yp_ssize_t (*convert)(yp_uint32_t, yp_ssize_t, yp_uint32_t *);
+        ypObject   *result;
+        yp_uint32_t c = s_enc->getindexX(s_data, i);
+        if (c > chardata->max_char) return yp_SystemLimitationError;
+        convert = chardata->iscased(c) & yp_CASED_LOWER ? chardata->toupper : chardata->tolower;
+        result = _ypStringLib_convert_append(newS, c, convert, type_max_char, s_len - i - 1);
+        if (yp_isexceptionC(result)) {
+            yp_decref(newS);
+            return result;
+        }
+    }
+
+    // FIXME A common function to null-terminate a string?
+    ypStringLib_ENC(newS)->setindexX(ypStringLib_DATA(newS), ypStringLib_LEN(newS), '\0');
+    ypStringLib_ASSERT_INVARIANTS(newS);
+    return newS;
+}
+
 // There are some efficiencies we can exploit if iterable/x is a fellow string object
 // TODO Is this really a scenario for which we should be optimizing? How typical is ''.join('')?
 static ypObject *_ypStringLib_join_fromstring(ypObject *s, ypObject *x)
@@ -12760,7 +12808,7 @@ ypObject *yp_casefold(ypObject *s)
 ypObject *yp_swapcase(ypObject *s)
 {
     if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
-    return yp_NotImplementedError;
+    return _ypStringLib_swapcase(s);
 }
 
 ypObject *yp_capitalize(ypObject *s)
