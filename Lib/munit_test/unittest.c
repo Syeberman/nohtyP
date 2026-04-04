@@ -1,7 +1,8 @@
 
 #include "munit_test/unittest.h"
+#if defined(__GNUC__)
 #pragma GCC diagnostic ignored "-Wunused-function"  // FIXME Remove
-
+#endif
 
 // TODO We go to the trouble of having rand_elems to allow the type to control what types of items
 // are stored inside it. But then we use functions like rand_obj_any_hashability_pair, etc that
