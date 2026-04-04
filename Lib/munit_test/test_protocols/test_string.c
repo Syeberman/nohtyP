@@ -1052,7 +1052,7 @@ static void _test_tailmatch_not_supported(fixture_type_t *type, fixture_type_t *
 
         // Optimization: early exit if x is a tuple with a match, even if x contains bad types.
         // FIXME Python 3.13 catches this error. We should too.
-        ead(x_tuple, yp_tupleN(N(s, x)), assert_obj(any_tailmatch(s, x_tuple), is, yp_True));
+        ead(x_tuple, yp_tupleN(N(s, *x)), assert_obj(any_tailmatch(s, x_tuple), is, yp_True));
     }
 
     obj_array_decref(x_values);
