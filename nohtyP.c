@@ -1940,6 +1940,7 @@ static const yp_character_database_t yp_chardata_binary = {
         yp_chardata_binary_tolower,          // tolower
         yp_chardata_binary_toupper,          // totitle
         yp_chardata_binary_toupper,          // toupper
+        yp_chardata_binary_tolower,          // tocasefold
 };
 
 
@@ -2075,6 +2076,27 @@ static yp_ssize_t yp_chardata_latin_1_toupper(yp_uint32_t c, yp_ssize_t len, yp_
     }
 }
 
+static yp_ssize_t yp_chardata_latin_1_tocasefold(
+        yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    yp_ASSERT1(c <= ypStringLib_MAX_LATIN_1);
+    // https://en.wikipedia.org/wiki/Duplicate_characters_in_Unicode
+    if (c == 0xB5u) {  // 'µ'
+        if (len < 1) return -1;
+        converted[0] = 0x3BC;  // 'μ'
+        return 1;
+    } else if (c == 0xDFu) {  // 'ß'
+        if (len < 2) return -1;
+        converted[0] = 's';
+        converted[1] = 's';
+        return 2;
+    } else {
+        if (len < 1) return -1;
+        converted[0] = c <= ypStringLib_MAX_LATIN_1 ? _yp_chardata_tolower[c] : c;
+        return 1;
+    }
+}
+
 static const yp_character_database_t yp_chardata_latin_1 = {
         yp_sizeof(yp_character_database_t),  // sizeof_struct
         ypStringLib_MAX_LATIN_1,             // max_char
@@ -2087,6 +2109,7 @@ static const yp_character_database_t yp_chardata_latin_1 = {
         yp_chardata_latin_1_tolower,         // tolower
         yp_chardata_latin_1_totitle,         // totitle
         yp_chardata_latin_1_toupper,         // toupper
+        yp_chardata_latin_1_tocasefold,      // tocasefold
 };
 
 #pragma endregion character_databases
@@ -8972,12 +8995,11 @@ static yp_ssize_t _ypStringLib_convert_char_upper(const yp_character_database_t 
     return chardata->toupper(c, len, converted);
 }
 
-// FIXME implement
-// static yp_ssize_t _ypStringLib_convert_char_casefold(const yp_character_database_t *chardata,
-//     yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
-// {
-//     return chardata->toupper(c, len, converted);
-// }
+static yp_ssize_t _ypStringLib_convert_char_casefold(const yp_character_database_t *chardata,
+        yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    return chardata->tocasefold(c, len, converted);
+}
 
 static yp_ssize_t _ypStringLib_convert_char_swapcase(const yp_character_database_t *chardata,
         yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
@@ -12803,7 +12825,7 @@ ypObject *yp_upper(ypObject *s)
 ypObject *yp_casefold(ypObject *s)
 {
     if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_METHOD_ERR(s);
-    return yp_NotImplementedError;
+    return _ypStringLib_convert(s, _ypStringLib_convert_char_casefold);
 }
 
 ypObject *yp_swapcase(ypObject *s)
@@ -21960,6 +21982,7 @@ static void ypStringLib_initialize(const yp_initialize_parameters_t *args)
     chardata.tolower = args_chardata->tolower;
     chardata.totitle = args_chardata->totitle;
     chardata.toupper = args_chardata->toupper;
+    chardata.tocasefold = args_chardata->tocasefold;
 
     yp_ASSERT1(ypStringLib_encs[1].code == ypStringLib_ENC_CODE_LATIN_1);
     ypStringLib_encs[1].chardata = &chardata;

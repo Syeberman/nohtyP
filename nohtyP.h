@@ -1431,7 +1431,7 @@ ypAPI yp_float_t yp_truedivLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_floordivLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_modLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI void       yp_divmodLF(
-              yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc);
+        yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc);
 ypAPI yp_float_t yp_powLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_negLF(yp_float_t x, ypObject **exc);
 ypAPI yp_float_t yp_posLF(yp_float_t x, ypObject **exc);
@@ -1766,7 +1766,7 @@ ypAPI void yp_i2s_setitemC5(
 //      value = yp_getitem(o, s_mykey);
 ypAPI ypObject *yp_s2o_getitemC3(ypObject *container, yp_ssize_t key_len, const yp_uint8_t *key);
 ypAPI void      yp_s2o_setitemC5(ypObject *container, yp_ssize_t key_len, const yp_uint8_t *key,
-             ypObject *x, ypObject **exc);
+        ypObject *x, ypObject **exc);
 
 // Operations on containers that map strs to integers.
 ypAPI yp_int_t yp_s2i_getitemC4(
@@ -1928,7 +1928,6 @@ typedef struct _yp_memory_allocator_t {
 
     // Frees memory returned by malloc and malloc_resize. May abort on error.
     void (*free)(void *p);
-
 } yp_memory_allocator_t;
 
 // The default memory allocation APIs, exposed to allow them to be called by custom hooks.
@@ -1989,6 +1988,8 @@ typedef struct _yp_character_database_t {
     // Similar to tolower, except converts to uppercase.
     yp_ssize_t (*toupper)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
 
+    // Similar to tolower, except converts to casefold.
+    yp_ssize_t (*tocasefold)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
 } yp_character_database_t;
 
 // yp_initialize accepts a number of parameters to customize nohtyP behaviour.
@@ -2016,7 +2017,6 @@ typedef struct _yp_initialize_parameters_t {
     // XXX Use this option carefully, and profile to ensure it actually provides a benefit!
     // FIXME Remove.
     int everything_immortal;
-
 } yp_initialize_parameters_t;
 
 
