@@ -1056,12 +1056,10 @@ ypAPI ypObject *yp_casefold(ypObject *s);
 
 // Returns a new reference to a copy of s with uppercase characters converted to lowercase and vice
 // versa.
-// FIXME Do we need this?
 ypAPI ypObject *yp_swapcase(ypObject *s);
 
-// Returns a new reference to a copy of s with its first character capitalized and the rest
+// Returns a new reference to a copy of s with its first character titlecased and the rest
 // lowercased.
-// FIXME Do we need this?
 ypAPI ypObject *yp_capitalize(ypObject *s);
 
 // Returns a new reference to s left-justified in a string of length width. Padding is done using

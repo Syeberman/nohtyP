@@ -644,57 +644,57 @@ DEFINE_GENERIC_METHODS(ExceptionMethod, x);  // for exception objects; returns "
 
 // TODO Is this yp_MethodError vs yp_TypeError distinction important to nohtyP? In Python it comes
 // down to the historical choices of if it was implemented as a function, as syntax, or as a method.
-#define DEFINE_GENERIC_PROTOCOL_METHODS(prefix, methodErrorName, typeErrorName)      \
-    static ypNumberMethods yp_UNUSED   prefix##_NumberMethods[1] = {{                \
+#define DEFINE_GENERIC_PROTOCOL_METHODS(prefix, methodErrorName, typeErrorName)    \
+    static ypNumberMethods yp_UNUSED   prefix##_NumberMethods[1] = {{              \
             *methodErrorName##_objproc /* _placeholder */                          \
     }};                                                                            \
-    static ypSequenceMethods yp_UNUSED prefix##_SequenceMethods[1] = {{              \
-            *typeErrorName##_objobjproc,        /* tp_concat */                      \
-            *typeErrorName##_objssizeproc,      /* tp_repeat */                      \
-            *typeErrorName##_objssizeobjproc,   /* tp_getindex */                    \
-            *typeErrorName##_objsliceproc,      /* tp_getslice */                    \
-            *methodErrorName##_findfunc,        /* tp_find */                        \
-            *methodErrorName##_countfunc,       /* tp_count */                       \
-            *typeErrorName##_objssizeobjproc,   /* tp_setindex */                    \
-            *typeErrorName##_objsliceobjproc,   /* tp_setslice */                    \
-            *typeErrorName##_objssizeintproc,   /* tp_delindex */                    \
-            *typeErrorName##_objsliceproc,      /* tp_delslice */                    \
-            *methodErrorName##_objobjproc,      /* tp_append */                      \
-            *methodErrorName##_objobjproc,      /* tp_extend */                      \
-            *typeErrorName##_objssizeproc,      /* tp_irepeat */                     \
-            *methodErrorName##_objssizeobjproc, /* tp_insert */                      \
-            *methodErrorName##_objssizeproc,    /* tp_popindex */                    \
-            *methodErrorName##_objproc,         /* tp_reverse */                     \
-            *methodErrorName##_objobjobjproc    /* tp_sort */                        \
-    }};                                                                              \
-    static ypSetMethods yp_UNUSED      prefix##_SetMethods[1] = {{                   \
-            *methodErrorName##_objobjproc /* tp_isdisjoint */,                  \
-            *methodErrorName##_objobjproc /* tp_issubset */,                    \
-            *methodErrorName##_objobjproc /* tp_issuperset */,                  \
-            *methodErrorName##_objobjproc /* tp_union */,                       \
-            *methodErrorName##_objobjproc /* tp_intersection */,                \
-            *methodErrorName##_objobjproc /* tp_difference */,                  \
-            *methodErrorName##_objobjproc /* tp_symmetric_difference */,        \
-            *methodErrorName##_objobjproc /* tp_intersection_update */,         \
-            *methodErrorName##_objobjproc /* tp_difference_update */,           \
-            *methodErrorName##_objobjproc /* tp_symmetric_difference_update */, \
-            *methodErrorName##_objobjproc /* tp_pushunique */                   \
-    }};                                                                         \
-    static ypMappingMethods yp_UNUSED  prefix##_MappingMethods[1] = {{               \
-            *methodErrorName##_miniiterfunc,          /* tp_miniiter_keys */        \
-            *methodErrorName##_miniiterfunc,          /* tp_miniiter_values */      \
-            *methodErrorName##_miniiterfunc,          /* tp_miniiter_items */       \
-            *typeErrorName##_miniiter_items_nextfunc, /* tp_miniiter_items_next */  \
-            *methodErrorName##_objproc,               /* tp_iter_keys */            \
-            *methodErrorName##_objproc,               /* tp_iter_values */          \
-            *methodErrorName##_objproc,               /* tp_iter_items */           \
-            *methodErrorName##_objobjobjproc,         /* tp_popvalue */             \
-            *methodErrorName##_objpobjpobjproc,       /* tp_popitem */              \
-            *methodErrorName##_objobjobjproc,         /* tp_setdefault */           \
-            *methodErrorName##_objvalistproc,         /* tp_updateK */              \
-    }};                                                                             \
-    static ypCallableMethods yp_UNUSED prefix##_CallableMethods[1] = {{              \
-            *typeErrorName##_objpobjpobjproc /* tp_call */                           \
+    static ypSequenceMethods yp_UNUSED prefix##_SequenceMethods[1] = {{            \
+            *typeErrorName##_objobjproc,        /* tp_concat */                    \
+            *typeErrorName##_objssizeproc,      /* tp_repeat */                    \
+            *typeErrorName##_objssizeobjproc,   /* tp_getindex */                  \
+            *typeErrorName##_objsliceproc,      /* tp_getslice */                  \
+            *methodErrorName##_findfunc,        /* tp_find */                      \
+            *methodErrorName##_countfunc,       /* tp_count */                     \
+            *typeErrorName##_objssizeobjproc,   /* tp_setindex */                  \
+            *typeErrorName##_objsliceobjproc,   /* tp_setslice */                  \
+            *typeErrorName##_objssizeintproc,   /* tp_delindex */                  \
+            *typeErrorName##_objsliceproc,      /* tp_delslice */                  \
+            *methodErrorName##_objobjproc,      /* tp_append */                    \
+            *methodErrorName##_objobjproc,      /* tp_extend */                    \
+            *typeErrorName##_objssizeproc,      /* tp_irepeat */                   \
+            *methodErrorName##_objssizeobjproc, /* tp_insert */                    \
+            *methodErrorName##_objssizeproc,    /* tp_popindex */                  \
+            *methodErrorName##_objproc,         /* tp_reverse */                   \
+            *methodErrorName##_objobjobjproc    /* tp_sort */                      \
+    }};                                                                            \
+    static ypSetMethods yp_UNUSED      prefix##_SetMethods[1] = {{                 \
+            *methodErrorName##_objobjproc /* tp_isdisjoint */,                     \
+            *methodErrorName##_objobjproc /* tp_issubset */,                       \
+            *methodErrorName##_objobjproc /* tp_issuperset */,                     \
+            *methodErrorName##_objobjproc /* tp_union */,                          \
+            *methodErrorName##_objobjproc /* tp_intersection */,                   \
+            *methodErrorName##_objobjproc /* tp_difference */,                     \
+            *methodErrorName##_objobjproc /* tp_symmetric_difference */,           \
+            *methodErrorName##_objobjproc /* tp_intersection_update */,            \
+            *methodErrorName##_objobjproc /* tp_difference_update */,              \
+            *methodErrorName##_objobjproc /* tp_symmetric_difference_update */,    \
+            *methodErrorName##_objobjproc /* tp_pushunique */                      \
+    }};                                                                            \
+    static ypMappingMethods yp_UNUSED  prefix##_MappingMethods[1] = {{             \
+            *methodErrorName##_miniiterfunc,          /* tp_miniiter_keys */       \
+            *methodErrorName##_miniiterfunc,          /* tp_miniiter_values */     \
+            *methodErrorName##_miniiterfunc,          /* tp_miniiter_items */      \
+            *typeErrorName##_miniiter_items_nextfunc, /* tp_miniiter_items_next */ \
+            *methodErrorName##_objproc,               /* tp_iter_keys */           \
+            *methodErrorName##_objproc,               /* tp_iter_values */         \
+            *methodErrorName##_objproc,               /* tp_iter_items */          \
+            *methodErrorName##_objobjobjproc,         /* tp_popvalue */            \
+            *methodErrorName##_objpobjpobjproc,       /* tp_popitem */             \
+            *methodErrorName##_objobjobjproc,         /* tp_setdefault */          \
+            *methodErrorName##_objvalistproc,         /* tp_updateK */             \
+    }};                                                                            \
+    static ypCallableMethods yp_UNUSED prefix##_CallableMethods[1] = {{            \
+            *typeErrorName##_objpobjpobjproc /* tp_call */                         \
     }}
 DEFINE_GENERIC_PROTOCOL_METHODS(Unsupported, MethodError, TypeError);
 DEFINE_GENERIC_PROTOCOL_METHODS(InvalidatedError, InvalidatedError, InvalidatedError);
@@ -1443,7 +1443,7 @@ ypObject *const      yp_tuple_empty = yp_CONST_REF(yp_tuple_empty);
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypSetObject    _yp_frozenset_empty_struct = {
         {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
-                   ypObject_HASH_INVALID, _yp_frozenset_empty_data},
+                ypObject_HASH_INVALID, _yp_frozenset_empty_data},
         0};
 ypObject *const yp_frozenset_empty = yp_CONST_REF(yp_frozenset_empty);
 
@@ -8873,32 +8873,44 @@ static ypObject *ypStringLib_isidentifier(ypObject *s)
     return yp_True;
 }
 
-// Converts c with convert, and appends the resulting characters to newS, updating the length. Never
-// writes the null character. type_max_char is the maximum ordinal supported by the type, used to
-// ensure convert doesn't give us out-of-range characters.
+// Signature of a function accepted by _ypStringLib_convert. Writes the converted form of c to
+// converted and returns the number of characters written. len is the allocated length of converted;
+// if converted is not large enough -1 is returned. i is the index of c in the string (used by
+// capitalize). Assumes `c <= chardata->max_char`.
+typedef yp_ssize_t (*_ypStringLib_char_converter)(const yp_character_database_t *chardata,
+        yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
+
 // FIXME Review again.
-static ypObject *_ypStringLib_convert_append(ypObject *newS, yp_uint32_t           c,
-        yp_ssize_t (*convert)(yp_uint32_t, yp_ssize_t, yp_uint32_t *), yp_uint32_t type_max_char,
-        yp_ssize_t extra)
+static ypObject *_ypStringLib_convert_char(ypObject *s, yp_ssize_t s_i,
+        _ypStringLib_char_converter convert, yp_uint32_t type_max_char, ypObject *newS)
 {
-    yp_uint32_t converted[3];
-    yp_ssize_t  written;
-    yp_ssize_t  i;
+    yp_uint32_t s_c;
+    yp_uint32_t out[3];
+    yp_ssize_t  out_len;
+    yp_ssize_t  extra;
+    yp_ssize_t  out_i;
 
-    written = convert(c, yp_lengthof_array(converted), converted);
-    yp_ASSERT(written != 0, "yp_character_database_t converter returned zero characters");
-    if (written < 0) return yp_SystemLimitationError;  // Indicates array size should increase.
+    s_c = ypStringLib_ENC(s)->getindexX(ypStringLib_DATA(s), s_i);
+    if (s_c > ypStringLib_ENC(s)->chardata->max_char) return yp_SystemLimitationError;
 
-    // TODO Python automatically allocates three times the memory at ucs4 in a temporary buffer,
-    // then downconverts. We build (and upconvert) in-place. Contribute back to Python?
+    out_len = convert(ypStringLib_ENC(s)->chardata, s_i, s_c, yp_lengthof_array(out), out);
+    yp_ASSERT(out_len != 0, "yp_character_database_t converter returned zero characters");
+    if (out_len < 0) return yp_SystemLimitationError;  // Indicates array size should increase.
 
     // TODO How much extra memory should we allocate to account for the converter returning multiple
     // characters? Python allocates three times the memory in case all characters map to three, but
     // there are only about a hundred characters that convert to more than one character (and very
     // few convert to three). That doesn't seem like a lot.
-    for (i = 0; i < written; i++) {
-        if (converted[i] > type_max_char) return yp_SystemError;  // Bad data from converter.
-        ypObject *result = ypStringLib_push(newS, converted[i], extra + (written - i - 1));
+    // TODO ...but we've pre-allocated newS with at least len characters. Extra is only used when a
+    // realloc needs to happen. A realloc happens to increase alloclen or increase the encoding. If
+    // we hit the alloclen case, allocating 3x for the remaining characters could be appropriate:
+    // it's either a small number (most of the string was already converted), or it's a crafted
+    // string where everything expands to three. What about the encoding case...are we smart enough
+    // do discount extra if alloclen holds the existing characters?
+    extra = ypStringLib_LEN(s) - s_i - 1;  // FIXME Improve extra allocations
+    for (out_i = 0; out_i < out_len; out_i++) {
+        if (out[out_i] > type_max_char) return yp_SystemError;  // Bad data from converter.
+        ypObject *result = ypStringLib_push(newS, out[out_i], extra + (out_len - out_i - 1));
         if (yp_isexceptionC(result)) return result;
     }
 
@@ -8906,25 +8918,21 @@ static ypObject *_ypStringLib_convert_append(ypObject *newS, yp_uint32_t        
 }
 
 // FIXME Review again.
-static ypObject *_ypStringLib_upper_or_lower(ypObject *s, int lower)
+// TODO Python automatically allocates three times the memory at ucs4 in a temporary buffer, then
+// downconverts. We build (and upconvert) in-place. Contribute back to Python?
+static ypObject *_ypStringLib_convert(ypObject *s, _ypStringLib_char_converter convert)
 {
     // FIXME Make type_max_char a macro? Or a field in encinfo? And use elsewhere?
-    void                          *s_data = ypStringLib_DATA(s);
-    yp_ssize_t                     s_len = ypStringLib_LEN(s);
-    const ypStringLib_encinfo     *s_enc = ypStringLib_ENC(s);
-    const yp_character_database_t *chardata = s_enc->chardata;
-    yp_ssize_t (*convert)(yp_uint32_t, yp_ssize_t, yp_uint32_t *) =
-            lower ? chardata->tolower : chardata->toupper;
+    yp_ssize_t  s_len = ypStringLib_LEN(s);
     yp_uint32_t type_max_char;
     ypObject   *newS;
-    yp_ssize_t  i;
+    yp_ssize_t  s_i;
 
     if (s_len < 1) return ypStringLib_new_empty(ypObject_TYPE_CODE(s));
 
     // FIXME We can't just assume that the converted string will be in the same encoding as the
     // source string. If we start with an empty object we can use the small inline buffer to get the
     // first few characters, which can inform the final encoding.
-    // FIXME Make this bit of code common?
     // FIXME Are there other areas where we assume the translated string is the same enc?
     if (ypObject_TYPE_PAIR_CODE(s) == ypBytes_CODE) {
         type_max_char = ypStringLib_MAX_BINARY;
@@ -8936,11 +8944,8 @@ static ypObject *_ypStringLib_upper_or_lower(ypObject *s, int lower)
     }
     if (yp_isexceptionC(newS)) return newS;
 
-    for (i = 0; i < s_len; i++) {
-        ypObject   *result;
-        yp_uint32_t c = s_enc->getindexX(s_data, i);
-        if (c > chardata->max_char) return yp_SystemLimitationError;
-        result = _ypStringLib_convert_append(newS, c, convert, type_max_char, s_len - i - 1);
+    for (s_i = 0; s_i < s_len; s_i++) {
+        ypObject *result = _ypStringLib_convert_char(s, s_i, convert, type_max_char, newS);
         if (yp_isexceptionC(result)) {
             yp_decref(newS);
             return result;
@@ -8953,52 +8958,48 @@ static ypObject *_ypStringLib_upper_or_lower(ypObject *s, int lower)
     return newS;
 }
 
-// FIXME Review again.
-static ypObject *_ypStringLib_swapcase(ypObject *s)
+static yp_ssize_t _ypStringLib_convert_char_lower(const yp_character_database_t *chardata,
+        yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
 {
-    // FIXME Make type_max_char a macro? Or a field in encinfo? And use elsewhere?
-    void                          *s_data = ypStringLib_DATA(s);
-    yp_ssize_t                     s_len = ypStringLib_LEN(s);
-    const ypStringLib_encinfo     *s_enc = ypStringLib_ENC(s);
-    const yp_character_database_t *chardata = s_enc->chardata;
-    yp_uint32_t                    type_max_char;
-    ypObject                      *newS;
-    yp_ssize_t                     i;
+    yp_ASSERT(c <= chardata->max_char, "missed a max_char check");
+    return chardata->tolower(c, len, converted);
+}
 
-    if (s_len < 1) return ypStringLib_new_empty(ypObject_TYPE_CODE(s));
+static yp_ssize_t _ypStringLib_convert_char_upper(const yp_character_database_t *chardata,
+        yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    yp_ASSERT(c <= chardata->max_char, "missed a max_char check");
+    return chardata->toupper(c, len, converted);
+}
 
-    // FIXME We can't just assume that the converted string will be in the same encoding as the
-    // source string. If we start with an empty object we can use the small inline buffer to get the
-    // first few characters, which can inform the final encoding.
-    // FIXME Make this bit of code common?
-    // FIXME Are there other areas where we assume the translated string is the same enc?
-    if (ypObject_TYPE_PAIR_CODE(s) == ypBytes_CODE) {
-        type_max_char = ypStringLib_MAX_BINARY;
-        newS = _ypBytes_new(ypObject_TYPE_CODE(s), s_len, /*alloclen_fixed=*/FALSE);  // new ref
+// FIXME implement
+// static yp_ssize_t _ypStringLib_convert_char_casefold(const yp_character_database_t *chardata,
+//     yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+// {
+//     return chardata->toupper(c, len, converted);
+// }
+
+static yp_ssize_t _ypStringLib_convert_char_swapcase(const yp_character_database_t *chardata,
+        yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    yp_ASSERT(c <= chardata->max_char, "missed a max_char check");
+    if (chardata->iscased(c) & yp_CASED_LOWER) {
+        return chardata->toupper(c, len, converted);
     } else {
-        type_max_char = ypStringLib_MAX_UNICODE;
-        newS = _ypStr_new_latin_1(
-                ypObject_TYPE_CODE(s), s_len, /*alloclen_fixed=*/FALSE);  // new ref
+        return chardata->tolower(c, len, converted);
     }
-    if (yp_isexceptionC(newS)) return newS;
+}
 
-    for (i = 0; i < s_len; i++) {
-        yp_ssize_t (*convert)(yp_uint32_t, yp_ssize_t, yp_uint32_t *);
-        ypObject   *result;
-        yp_uint32_t c = s_enc->getindexX(s_data, i);
-        if (c > chardata->max_char) return yp_SystemLimitationError;
-        convert = chardata->iscased(c) & yp_CASED_LOWER ? chardata->toupper : chardata->tolower;
-        result = _ypStringLib_convert_append(newS, c, convert, type_max_char, s_len - i - 1);
-        if (yp_isexceptionC(result)) {
-            yp_decref(newS);
-            return result;
-        }
+static yp_ssize_t _ypStringLib_convert_char_capitalize(const yp_character_database_t *chardata,
+        yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
+{
+    yp_ASSERT(c <= chardata->max_char, "missed a max_char check");
+    // The first character is titlecased and the rest are lowercased.
+    if (i == 0) {
+        return chardata->totitle(c, len, converted);
+    } else {
+        return chardata->tolower(c, len, converted);
     }
-
-    // FIXME A common function to null-terminate a string?
-    ypStringLib_ENC(newS)->setindexX(ypStringLib_DATA(newS), ypStringLib_LEN(newS), '\0');
-    ypStringLib_ASSERT_INVARIANTS(newS);
-    return newS;
 }
 
 // There are some efficiencies we can exploit if iterable/x is a fellow string object
@@ -10377,7 +10378,7 @@ static void yp_codecs_strict_errors(
 yp_IMMORTAL_STR_LATIN_1(yp_codecs_replace_errors_onencode, "?");
 static ypObject *yp_codecs_replace_errors_ondecode = NULL;  // TODO Need yp_IMMORTAL_STR_UCS_2
 static void      yp_codecs_replace_errors(
-             yp_codecs_error_handler_params_t *params, ypObject **replacement, yp_ssize_t *new_position)
+        yp_codecs_error_handler_params_t *params, ypObject **replacement, yp_ssize_t *new_position)
 {
     if (yp_isexceptionC2(params->exc, yp_UnicodeEncodeError)) {
         yp_ssize_t replacement_len = params->end - params->start;
@@ -12790,13 +12791,13 @@ ypObject *yp_endswith(ypObject *s, ypObject *suffix)
 ypObject *yp_lower(ypObject *s)
 {
     if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
-    return _ypStringLib_upper_or_lower(s, /*lower=*/TRUE);
+    return _ypStringLib_convert(s, _ypStringLib_convert_char_lower);
 }
 
 ypObject *yp_upper(ypObject *s)
 {
     if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
-    return _ypStringLib_upper_or_lower(s, /*lower=*/FALSE);
+    return _ypStringLib_convert(s, _ypStringLib_convert_char_upper);
 }
 
 ypObject *yp_casefold(ypObject *s)
@@ -12808,13 +12809,13 @@ ypObject *yp_casefold(ypObject *s)
 ypObject *yp_swapcase(ypObject *s)
 {
     if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
-    return _ypStringLib_swapcase(s);
+    return _ypStringLib_convert(s, _ypStringLib_convert_char_swapcase);
 }
 
 ypObject *yp_capitalize(ypObject *s)
 {
     if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
-    return yp_NotImplementedError;
+    return _ypStringLib_convert(s, _ypStringLib_convert_char_capitalize);
 }
 
 ypObject *yp_ljustC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar)
