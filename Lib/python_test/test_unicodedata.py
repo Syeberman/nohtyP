@@ -16,7 +16,7 @@ from python_test.support import (open_urlresource, requires_resource, script_hel
                           cpython_only, check_disallow_instantiation)
 
 
-@yp_unittest.skip_str_unicode_db
+@yp_unittest.skip_str_big_chars
 class UnicodeMethodsTest(yp_unittest.TestCase):
 
     # update this, if the database changes
@@ -66,7 +66,7 @@ class UnicodeMethodsTest(yp_unittest.TestCase):
         result = h.hexdigest()
         self.assertEqual(result, self.expectedchecksum)
 
-@yp_unittest.skip_str_unicode_db
+@yp_unittest.skip_str_big_chars
 class UnicodeDatabaseTest(yp_unittest.TestCase):
     db = unicodedata
 
@@ -318,7 +318,7 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
                 self.assertEqual(len(lines), 1,
                                  r"\u%.4x should not be a linebreak" % i)
 
-@yp_unittest.skip_str_unicode_db
+@yp_unittest.skip_str_big_chars
 class NormalizationTest(yp_unittest.TestCase):
     @staticmethod
     def check_version(testfile):

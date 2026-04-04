@@ -575,6 +575,9 @@ yp_func(c_ypObject_p, "yp_isalnum", ((c_ypObject_p, "s"), ))
 # ypObject *yp_isalpha(ypObject *s);
 yp_func(c_ypObject_p, "yp_isalpha", ((c_ypObject_p, "s"), ))
 
+# ypObject *yp_isascii(ypObject *s);
+yp_func(c_ypObject_p, "yp_isascii", ((c_ypObject_p, "s"), ))
+
 # ypObject *yp_isdecimal(ypObject *s);
 yp_func(c_ypObject_p, "yp_isdecimal", ((c_ypObject_p, "s"), ))
 
@@ -1091,6 +1094,8 @@ class ypObject(c_ypObject_p):
     def isalnum(self): return _yp_isalnum(self)
 
     def isalpha(self): return _yp_isalpha(self)
+
+    def isascii(self): return _yp_isascii(self)
 
     def isdecimal(self): return _yp_isdecimal(self)
 
