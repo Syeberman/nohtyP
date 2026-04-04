@@ -265,6 +265,7 @@ munit_errorf_ex(const char* filename, int line, const char* format, ...) {
 #  define MUNIT_STRERROR_LEN 80
 #endif
 
+#if !defined(MUNIT_NO_BUFFER) || !defined(MUNIT_NO_FORK)
 static void
 munit_log_errno(MunitLogLevel level, FILE* fp, const char* msg) {
 #if defined(MUNIT_NO_STRERROR_R) || (defined(__MINGW32__) && !defined(MINGW_HAS_SECURE_API))
@@ -282,6 +283,7 @@ munit_log_errno(MunitLogLevel level, FILE* fp, const char* msg) {
   munit_logf_internal(level, fp, "%s: %s (%d)", msg, munit_error_str, errno);
 #endif
 }
+#endif
 
 /*** Memory allocation ***/
 
@@ -1350,6 +1352,7 @@ munit_test_runner_run_test_with_params(MunitTestRunner* runner, const MunitTest*
   fflush(MUNIT_OUTPUT_FILE);
 
   stderr_buf = NULL;
+#if !defined(MUNIT_NO_BUFFER) || !defined(MUNIT_NO_FORK)
 #if !defined(_WIN32) || defined(__MINGW32__)
   stderr_buf = tmpfile();
 #else
@@ -1361,6 +1364,7 @@ munit_test_runner_run_test_with_params(MunitTestRunner* runner, const MunitTest*
     result = MUNIT_ERROR;
     goto print_result;
   }
+#endif
 
 #if !defined(MUNIT_NO_FORK)
   if (runner->fork) {
