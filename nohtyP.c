@@ -8932,8 +8932,9 @@ static ypObject *_ypStringLib_convert_char(ypObject *s, yp_ssize_t s_i,
     // do discount extra if alloclen holds the existing characters?
     extra = ypStringLib_LEN(s) - s_i - 1;  // FIXME Improve extra allocations
     for (out_i = 0; out_i < out_len; out_i++) {
+        ypObject *result;
         if (out[out_i] > type_max_char) return yp_SystemError;  // Bad data from converter.
-        ypObject *result = ypStringLib_push(newS, out[out_i], extra + (out_len - out_i - 1));
+        result = ypStringLib_push(newS, out[out_i], extra + (out_len - out_i - 1));
         if (yp_isexceptionC(result)) return result;
     }
 
