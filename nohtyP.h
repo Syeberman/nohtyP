@@ -2060,7 +2060,7 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **
 // null characters and *encoded will point to a null-terminated string. On error, sets *size to zero
 // (if size is not NULL), *encoded to NULL, *encoding to the exception, and returns the exception.
 // FIXME Document byte ordering, absence of BOM, etc.
-// FIXME Go away from encoding, and instead return the elemet size (1, 2, or 4) as an integer.
+// FIXME Or go away from encoding, and instead return the element size (1, 2, or 4) as an integer.
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding);
 

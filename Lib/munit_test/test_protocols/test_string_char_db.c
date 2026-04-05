@@ -790,6 +790,8 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
     return MUNIT_OK;
 }
 
+// FIXME Test the other converters.
+
 // Used by test_latin_1_converters, called on each latin-1 character.
 static void char_conv_test(fixture_type_t *type, int ord, int lower0, int lower1, int upper0,
         int upper1, int casefold0, int casefold1, int swapcase0, int swapcase1, int capitalize0,

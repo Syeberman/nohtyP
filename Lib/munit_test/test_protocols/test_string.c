@@ -1481,6 +1481,138 @@ static MunitResult test_endswith(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
+// Additional tests for specific characters are in test_string_char_db.
+static MunitResult test_lower(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic lower.
+    // FIXME This raises yp_SystemLimitationError on *_2bytes and *_4bytes. Fix.
+    // FIXME Tests that the original object is not modified.
+    // {
+    //     ypObject *s = rand_obj(NULL, type);
+    //     ead(result, yp_lower(s), assert_not_exception(result));
+    //     yp_decrefN(N(s));
+    // }
+
+    // Empty s.
+    {
+        ypObject *s = type->newN(0);
+        ead(result, yp_lower(s), assert_len(result, 0));
+        assert_len(s, 0); // s unchanged.
+        yp_decrefN(N(s));
+    }
+
+    return MUNIT_OK;
+}
+
+// Additional tests for specific characters are in test_string_char_db.
+static MunitResult test_upper(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic upper.
+    // FIXME This raises yp_SystemLimitationError on *_2bytes and *_4bytes. Fix.
+    // FIXME Tests that the original object is not modified.
+    // {
+    //     ypObject *s = rand_obj(NULL, type);
+    //     ead(result, yp_upper(s), assert_not_exception(result));
+    //     yp_decrefN(N(s));
+    // }
+
+    // Empty s.
+    {
+        ypObject *s = type->newN(0);
+        ead(result, yp_upper(s), assert_len(result, 0));
+        assert_len(s, 0); // s unchanged.
+        yp_decrefN(N(s));
+    }
+
+    return MUNIT_OK;
+}
+
+// Additional tests for specific characters are in test_string_char_db.
+static MunitResult test_casefold(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // casefold is not supported on binary types.
+    if (isbinary(type)) {
+        ead(s, rand_obj(NULL, type), assert_raises(yp_casefold(s), yp_MethodError));
+        goto tear_down;
+    }
+
+    // Basic casefold.
+    // FIXME This raises yp_SystemLimitationError on *_2bytes and *_4bytes. Fix.
+    // FIXME Tests that the original object is not modified.
+    // {
+    //     ypObject *s = rand_obj(NULL, type);
+    //     ead(result, yp_casefold(s), assert_not_exception(result));
+    //     yp_decrefN(N(s));
+    // }
+
+    // Empty s.
+    {
+        ypObject *s = type->newN(0);
+        ead(result, yp_casefold(s), assert_len(result, 0));
+        assert_len(s, 0); // s unchanged.
+        yp_decrefN(N(s));
+    }
+
+tear_down:
+    return MUNIT_OK;
+}
+
+// Additional tests for specific characters are in test_string_char_db.
+static MunitResult test_swapcase(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic swapcase.
+    // FIXME This raises yp_SystemLimitationError on *_2bytes and *_4bytes. Fix.
+    // FIXME Tests that the original object is not modified.
+    // {
+    //     ypObject *s = rand_obj(NULL, type);
+    //     ead(result, yp_swapcase(s), assert_not_exception(result));
+    //     yp_decrefN(N(s));
+    // }
+
+    // Empty s.
+    {
+        ypObject *s = type->newN(0);
+        ead(result, yp_swapcase(s), assert_len(result, 0));
+        assert_len(s, 0); // s unchanged.
+        yp_decrefN(N(s));
+    }
+
+    return MUNIT_OK;
+}
+
+// Additional tests for specific characters are in test_string_char_db.
+static MunitResult test_capitalize(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic capitalize.
+    // FIXME This raises yp_SystemLimitationError on *_2bytes and *_4bytes. Fix.
+    // FIXME Tests that the original object is not modified.
+    // {
+    //     ypObject *s = rand_obj(NULL, type);
+    //     ead(result, yp_capitalize(s), assert_not_exception(result));
+    //     yp_decrefN(N(s));
+    // }
+
+    // Empty s.
+    {
+        ypObject *s = type->newN(0);
+        ead(result, yp_capitalize(s), assert_len(result, 0));
+        assert_len(s, 0); // s unchanged.
+        yp_decrefN(N(s));
+    }
+
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_string_params[] = {
         {param_key_type, param_values_types_string}, {NULL}};
@@ -1498,7 +1630,10 @@ MunitTest test_string_tests[] = {TEST(test_lt, test_string_params),
         TEST(test_isidentifier, test_string_params), TEST(test_islower, test_string_params),
         TEST(test_isnumeric, test_string_params), TEST(test_isprintable, test_string_params),
         TEST(test_isspace, test_string_params), TEST(test_isupper, test_string_params),
-        TEST(test_startswith, test_string_params), TEST(test_endswith, test_string_params), {NULL}};
+        TEST(test_startswith, test_string_params), TEST(test_endswith, test_string_params),
+        TEST(test_lower, test_string_params), TEST(test_upper, test_string_params),
+        TEST(test_casefold, test_string_params), TEST(test_swapcase, test_string_params),
+        TEST(test_capitalize, test_string_params), {NULL}};
 
 
 extern void test_string_initialize(void) {}
