@@ -17,7 +17,9 @@ image:
   - macOS-Sonoma
   - Visual Studio 2022
   - Visual Studio 2019
-  - Ubuntu
+  # Apr 2025 Emailed support to ask about the status of GCC 8 and 7 on the Ubuntu image, which are
+  # currently missing. Disabling for now as these are the only versions used on this image.
+  # - Ubuntu
   - Visual Studio 2017
   - Visual Studio 2015
 
@@ -96,11 +98,14 @@ for:
 
 # XXX On Visual Studio 2017 (and 2015?), environment variables are not shared between pwsh's.
 install:
+  # ` ; [void]$true` after a command silently resets $?, which Get-ChildItem sets on unknown paths.
+  - pwsh: |
+      Get-ChildItem -Force -ErrorAction Ignore -Path "/usr/bin/", "C:/Python*", "${HOME}/venv*" > Build/.Get-ChildItem.log ; [void]$true
   # TODO The Visual Studio 2017 and 2015 images stop at Python 3.8...which is EOL.
   - pwsh: |
       if (! (Test-Path ".venv/bin/Activate.ps1")) {
         Write-Output "Creating virtual environment"
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -Path .venv
+        Remove-Item -Recurse -Force -ErrorAction Ignore -Path .venv
         if (${isWindows}) {
           if (Test-Path "C:/Python312-x64/python") {
             & "C:/Python312-x64/python" -m venv .venv
@@ -164,6 +169,8 @@ build_script:
   - pwsh: |
       try { Build/.appveyor.ps1 build }
       catch {
+        7z a build.log.zip Build/*.log Build/site_toolsconfig.py
+        appveyor PushArtifact build.log.zip
         Write-Error ${PSItem}
         throw "build failed"
       }
