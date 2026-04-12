@@ -17,9 +17,6 @@ image:
   - macOS-Sonoma
   - Visual Studio 2022
   - Visual Studio 2019
-  # Apr 2025 Emailed support to ask about the status of GCC 8 and 7 on the Ubuntu image, which are
-  # currently missing. Disabling for now as these are the only versions used on this image.
-  # - Ubuntu
   - Visual Studio 2017
   - Visual Studio 2015
 
@@ -39,8 +36,6 @@ matrix:
       platform: x86
     # TODO Are there any 32-bit compilers on the Ubuntu images?
     - image: Ubuntu2204
-      platform: x86
-    - image: Ubuntu
       platform: x86
 
 # Secure values are generated at https://ci.appveyor.com/tools/encrypt.
@@ -76,11 +71,6 @@ for:
         - image: Visual Studio 2019
     environment:
       YP_COMPILER_OSES: msvs_16:win32
-  - matrix:
-      only:
-        - image: Ubuntu
-    environment:
-      YP_COMPILER_OSES: gcc_8:posix gcc_7:posix
   - matrix:
       only:
         - image: Visual Studio 2017
