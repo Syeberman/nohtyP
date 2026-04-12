@@ -51,7 +51,7 @@ for:
       only:
         - image: Ubuntu2204
     environment:
-      YP_COMPILER_OSES: gcc_11:posix gcc_10:posix gcc_9:posix
+      YP_COMPILER_OSES: gcc_13:posix gcc_12:posix gcc_11:posix gcc_10:posix gcc_9:posix
       YP_CI_CODECOV_UPLOAD: true
   - matrix:
       only:
