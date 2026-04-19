@@ -809,12 +809,12 @@ static MunitResult test_lower(const MunitParameter params[], fixture_t *fixture)
     // All lowercase characters.
     eead(s, type->fromordsCN(N('a', 'b')), r, yp_lower(s), assert_string(r, 'a', 'b'));
 
-    // Non-ascii characters are non-cased in binary strings.
-    eead(s, type->fromordsCN(N('a', O_A_GRAVE)), r, yp_lower(s),
+    // Latin-1 characters are non-cased in binary strings.
+    eead(s, type->fromordsCN(N('A', O_A_GRAVE)), r, yp_lower(s),
             assert_string(r, 'a', isbinary(type) ? O_A_GRAVE : O_a_GRAVE));
-    eead(s, type->fromordsCN(N('a', O_a_GRAVE)), r, yp_lower(s), assert_string(r, 'a', O_a_GRAVE));
+    eead(s, type->fromordsCN(N('A', O_a_GRAVE)), r, yp_lower(s), assert_string(r, 'a', O_a_GRAVE));
 
-    // Specific non-ascii characters with unique properties.
+    // Specific latin-1 characters with unique properties.
     if (!isbinary(type)) {
         eead(s, type->fromordsCN(N(O_y_DIAER, 'A', 'B')), r, yp_lower(s),
                 assert_string(r, O_y_DIAER, 'a', 'b'));
@@ -825,19 +825,18 @@ static MunitResult test_lower(const MunitParameter params[], fixture_t *fixture)
         eead(s, type->fromordsCN(N('A', 'B', O_MICRO)), r, yp_lower(s),
                 assert_string(r, 'a', 'b', O_MICRO));
         eead(s, type->fromordsCN(N(O_SHARP_s, 'A', 'B')), r, yp_lower(s),
-                assert_string(r, 's', 's', 'a', 'b'));
+                assert_string(r, O_SHARP_s, 'a', 'b'));
         eead(s, type->fromordsCN(N('A', 'B', O_SHARP_s)), r, yp_lower(s),
-                assert_string(r, 'a', 'b', 's', 's'));
+                assert_string(r, 'a', 'b', O_SHARP_s));
     }
 
     // Non-cased characters are ignored.
     eead(s, type->fromordsCN(N('A', '1', ' ', '\t', '!', '\0')), r, yp_lower(s),
             assert_string(r, 'a', '1', ' ', '\t', '!', '\0'));
-    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', 'B', '\0', O_a_GRAVE, O_SUPER1, O_1OVER4)), r,
-            yp_lower(s),
-            assert_string(r, '1', ' ', '\t', '!', 'b', '\0', O_a_GRAVE, O_SUPER1, O_1OVER4));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', 'B', '\0', O_SUPER1, O_1OVER4)), r, yp_lower(s),
+            assert_string(r, '1', ' ', '\t', '!', 'b', '\0', O_SUPER1, O_1OVER4));
 
-    // No cased characters. Non-ascii characters are non-cased in binary strings.
+    // No cased characters. Latin-1 characters are non-cased in binary strings.
     eead(s, type->fromordsCN(0), r, yp_lower(s), assert_len(r, 0));
     eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0')), r, yp_lower(s),
             assert_string(r, '1', ' ', '\t', '!', '\0'));
@@ -854,6 +853,67 @@ static MunitResult test_lower(const MunitParameter params[], fixture_t *fixture)
         for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
             ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
                     assert_raises(yp_lower(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_upper(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic upper.
+    eead(s, type->fromordsCN(N('A', 'b')), r, yp_upper(s), assert_string(r, 'A', 'B'));
+    eead(s, type->fromordsCN(N('a', 'b')), r, yp_upper(s), assert_string(r, 'A', 'B'));
+
+    // All uppercase characters.
+    eead(s, type->fromordsCN(N('A', 'B')), r, yp_upper(s), assert_string(r, 'A', 'B'));
+
+    // Latin-1 characters are non-cased in binary strings.
+    eead(s, type->fromordsCN(N('a', O_a_GRAVE)), r, yp_upper(s),
+            assert_string(r, 'A', isbinary(type) ? O_a_GRAVE : O_A_GRAVE));
+    eead(s, type->fromordsCN(N('a', O_A_GRAVE)), r, yp_upper(s), assert_string(r, 'A', O_A_GRAVE));
+
+    // Specific latin-1 characters with unique properties.
+    if (!isbinary(type)) {
+        eead(s, type->fromordsCN(N(O_y_DIAER, 'a', 'b')), r, yp_upper(s),
+                assert_string(r, O_Y_DIAER, 'A', 'B'));
+        eead(s, type->fromordsCN(N('a', 'b', O_y_DIAER)), r, yp_upper(s),
+                assert_string(r, 'A', 'B', O_Y_DIAER));
+        eead(s, type->fromordsCN(N(O_MICRO, 'a', 'b')), r, yp_upper(s),
+                assert_string(r, O_GREEK_MU, 'A', 'B'));
+        eead(s, type->fromordsCN(N('a', 'b', O_MICRO)), r, yp_upper(s),
+                assert_string(r, 'A', 'B', O_GREEK_MU));
+        eead(s, type->fromordsCN(N(O_SHARP_s, 'a', 'b')), r, yp_upper(s),
+                assert_string(r, 'S', 'S', 'A', 'B'));
+        eead(s, type->fromordsCN(N('a', 'b', O_SHARP_s)), r, yp_upper(s),
+                assert_string(r, 'A', 'B', 'S', 'S'));
+    }
+
+    // Non-cased characters are ignored.
+    eead(s, type->fromordsCN(N('a', '1', ' ', '\t', '!', '\0')), r, yp_upper(s),
+            assert_string(r, 'A', '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', 'b', '\0', O_SUPER1, O_1OVER4)), r, yp_upper(s),
+            assert_string(r, '1', ' ', '\t', '!', 'B', '\0', O_SUPER1, O_1OVER4));
+
+    // No cased characters. Latin-1 characters are non-cased in binary strings.
+    eead(s, type->fromordsCN(0), r, yp_upper(s), assert_len(r, 0));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0')), r, yp_upper(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4)), r, yp_upper(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4));
+    eead(s, type->fromordsCN(N('1', O_a_GRAVE)), r, yp_upper(s),
+            assert_string(r, '1', isbinary(type) ? O_a_GRAVE : O_A_GRAVE));
+
+    // FIXME Return original object if no changes? Python _doesn't_ do this.
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_upper(s), yp_SystemLimitationError));
         }
     }
 
@@ -1204,7 +1264,7 @@ MunitTest test_string_char_db_tests[] = {TEST(test_isalnum, test_string_char_db_
         TEST(test_isspace, test_string_char_db_params),
         TEST(test_isupper, test_string_char_db_params),
         TEST(test_latin_1_classifiers, test_string_char_db_params),
-        TEST(test_lower, test_string_char_db_params),
+        TEST(test_lower, test_string_char_db_params), TEST(test_upper, test_string_char_db_params),
         TEST(test_latin_1_converters, test_string_char_db_params), {NULL}};
 
 
