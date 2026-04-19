@@ -274,7 +274,7 @@ def ApplyGCCOptions(env, version):
     def addCppDefines(*args):
         env.AppendUnique(CPPDEFINES=list(args))
 
-    if env["CONFIGURATION"] in ("debug", "coverage"):
+    if env["CONFIGURATION"] == "debug":
         addCppDefines("_DEBUG")
     else:
         addCppDefines("NDEBUG")
@@ -325,7 +325,7 @@ def ApplyGCCOptions(env, version):
             # TODO Not supported on MinGW/Windows, apparently
             # "-fmudflap",
         )
-    if env["CONFIGURATION"] == "coverage":
+    elif env["CONFIGURATION"] == "coverage":
         addLinkFlags(
             # Disable all optimizations
             "-O0",
