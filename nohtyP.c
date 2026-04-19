@@ -1765,6 +1765,7 @@ for m in ("lower", "upper"):
     sys.stdout.write("\n};\n\n")
 */
 
+// FIXME Only two characters, and only for toupper, need the 16 bits; reduce these to 8 bits?
 const yp_uint16_t _yp_chardata_tolower[256] = {
     0x000, 0x001, 0x002, 0x003, 0x004, 0x005, 0x006, 0x007,
     0x008, 0x009, 0x00a, 0x00b, 0x00c, 0x00d, 0x00e, 0x00f,

@@ -6,16 +6,24 @@
 
 // FIXME replace copy/paste sq with s.
 
-#define O_a_GRAVE 0xE0        // 'à', "a with grave", a non-ascii latin-1 lowercase
-#define O_A_GRAVE 0xC0        // 'À', "A with grave", a non-ascii latin-1 uppercase
-#define O_SUPER1 0xb9         // '¹', "superscript 1", a non-ascii latin-1 non-decimal digit
-#define O_1OVER4 0xbc         // '¼', "fraction 1/4", a non-ascii latin-1 non-digit numeric
-#define O_BIG_LOWER 0x101     // 'ā', "a with macron", a non-latin-1 lowercase
-#define O_BIG_TITLE 0x1C5     // 'ǅ', "D with z with caron", a non-latin-1 titlecase
-#define O_BIG_UPPER 0x100     // 'Ā', "A with macron", a non-latin-1 uppercase
+#define O_a_GRAVE 0xE0  // 'à', "a with grave", a non-ascii latin-1 lower
+#define O_A_GRAVE 0xC0  // 'À', "A with grave", a non-ascii latin-1 upper
+#define O_SUPER1 0xB9   // '¹', "superscript 1", a non-ascii latin-1 non-decimal digit
+#define O_1OVER4 0xBC   // '¼', "fraction 1/4", a non-ascii latin-1 non-digit numeric
+
+#define O_BIG_LOWER 0x101     // 'ā', "a with macron", a non-latin-1 lower
+#define O_BIG_TITLE 0x1C5     // 'ǅ', "D with z with caron", a non-latin-1 title
+#define O_BIG_UPPER 0x100     // 'Ā', "A with macron", a non-latin-1 upper
 #define O_BIG_DECIMAL 0x661   // '١', "Arabic-Indic 1", a non-latin-1 decimal
 #define O_BIG_DIGIT 0x2081    // '₁', "subscript 1", a non-latin-1 non-decimal digit
 #define O_BIG_NUMERIC 0x2153  // '⅓', "fraction 1/3", a non-latin-1 non-digit numeric
+
+#define O_y_DIAER 0xFF    // 'ÿ', "y with diaeresis", upper to non-latin-1
+#define O_Y_DIAER 0x178   // 'Ÿ', "Y with diaeresis", upper of O_y_DIAER
+#define O_MICRO 0xB5      // 'µ', "micro sign", latin-1, upper/fold to non-latin-1
+#define O_GREEK_MU 0x39C  // '', "Greek capital mu", upper of O_MICRO
+#define O_GREEK_mu 0x3BC  // '', "Greek small mu", fold of O_MICRO
+#define O_SHARP_s 0xDF    // 'ß', "sharp s", latin-1, upper/fold to 2 chrs, title!=upper
 
 // An array of all our test non-latin-1 characters, as ordinals.
 static int ords_non_latin_1[] = {
@@ -805,6 +813,22 @@ static MunitResult test_lower(const MunitParameter params[], fixture_t *fixture)
     eead(s, type->fromordsCN(N('a', O_A_GRAVE)), r, yp_lower(s),
             assert_string(r, 'a', isbinary(type) ? O_A_GRAVE : O_a_GRAVE));
     eead(s, type->fromordsCN(N('a', O_a_GRAVE)), r, yp_lower(s), assert_string(r, 'a', O_a_GRAVE));
+
+    // Specific non-ascii characters with unique properties.
+    if (!isbinary(type)) {
+        eead(s, type->fromordsCN(N(O_y_DIAER, 'A', 'B')), r, yp_lower(s),
+                assert_string(r, O_y_DIAER, 'a', 'b'));
+        eead(s, type->fromordsCN(N('A', 'B', O_y_DIAER)), r, yp_lower(s),
+                assert_string(r, 'a', 'b', O_y_DIAER));
+        eead(s, type->fromordsCN(N(O_MICRO, 'A', 'B')), r, yp_lower(s),
+                assert_string(r, O_MICRO, 'a', 'b'));
+        eead(s, type->fromordsCN(N('A', 'B', O_MICRO)), r, yp_lower(s),
+                assert_string(r, 'a', 'b', O_MICRO));
+        eead(s, type->fromordsCN(N(O_SHARP_s, 'A', 'B')), r, yp_lower(s),
+                assert_string(r, 's', 's', 'a', 'b'));
+        eead(s, type->fromordsCN(N('A', 'B', O_SHARP_s)), r, yp_lower(s),
+                assert_string(r, 'a', 'b', 's', 's'));
+    }
 
     // Non-cased characters are ignored.
     eead(s, type->fromordsCN(N('A', '1', ' ', '\t', '!', '\0')), r, yp_lower(s),
