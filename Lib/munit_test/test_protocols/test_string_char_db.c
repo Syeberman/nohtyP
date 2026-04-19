@@ -790,6 +790,52 @@ static MunitResult test_latin_1_classifiers(const MunitParameter params[], fixtu
     return MUNIT_OK;
 }
 
+static MunitResult test_lower(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic lower.
+    eead(s, type->fromordsCN(N('A', 'b')), r, yp_lower(s), assert_string(r, 'a', 'b'));
+    eead(s, type->fromordsCN(N('A', 'B')), r, yp_lower(s), assert_string(r, 'a', 'b'));
+
+    // All lowercase characters.
+    eead(s, type->fromordsCN(N('a', 'b')), r, yp_lower(s), assert_string(r, 'a', 'b'));
+
+    // Non-ascii characters are non-cased in binary strings.
+    eead(s, type->fromordsCN(N('a', O_A_GRAVE)), r, yp_lower(s),
+            assert_string(r, 'a', isbinary(type) ? O_A_GRAVE : O_a_GRAVE));
+    eead(s, type->fromordsCN(N('a', O_a_GRAVE)), r, yp_lower(s), assert_string(r, 'a', O_a_GRAVE));
+
+    // Non-cased characters are ignored.
+    eead(s, type->fromordsCN(N('A', '1', ' ', '\t', '!', '\0')), r, yp_lower(s),
+            assert_string(r, 'a', '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', 'B', '\0', O_a_GRAVE, O_SUPER1, O_1OVER4)), r,
+            yp_lower(s),
+            assert_string(r, '1', ' ', '\t', '!', 'b', '\0', O_a_GRAVE, O_SUPER1, O_1OVER4));
+
+    // No cased characters. Non-ascii characters are non-cased in binary strings.
+    eead(s, type->fromordsCN(0), r, yp_lower(s), assert_len(r, 0));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0')), r, yp_lower(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4)), r, yp_lower(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4));
+    eead(s, type->fromordsCN(N('1', O_A_GRAVE)), r, yp_lower(s),
+            assert_string(r, '1', isbinary(type) ? O_A_GRAVE : O_a_GRAVE));
+
+    // FIXME Return original object if no changes? Python _doesn't_ do this.
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_lower(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
 // FIXME Test the other converters.
 
 // Used by test_latin_1_converters, called on each latin-1 character.
@@ -835,8 +881,7 @@ static MunitResult test_latin_1_converters(const MunitParameter params[], fixtur
 {
     fixture_type_t *type = fixture->type;
 
-    // FIXME In Python, compare bytes to strs for same conversions?
-    // FIXME bytes only operates on the ASCII characters
+    // FIXME In yp_test validate our bytes/strs/etc convert identically to Python's.
     /*
     methods = "lower, upper, casefold, swapcase, capitalize"
     def get_expected(x, m):
@@ -1135,6 +1180,7 @@ MunitTest test_string_char_db_tests[] = {TEST(test_isalnum, test_string_char_db_
         TEST(test_isspace, test_string_char_db_params),
         TEST(test_isupper, test_string_char_db_params),
         TEST(test_latin_1_classifiers, test_string_char_db_params),
+        TEST(test_lower, test_string_char_db_params),
         TEST(test_latin_1_converters, test_string_char_db_params), {NULL}};
 
 

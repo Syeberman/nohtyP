@@ -22,28 +22,6 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
     return FALSE;
 }
 
-// TODO Should this become a proper nohtyP function? If so, should we assert that sequence is
-// a string type first?
-// TODO The ord() function also applies to bytes/bytearrays of length 1, which isn't fully
-// consistent with str as the elements of bytes is int but of str is str. And ord() fails on int,
-// so if getindex is returning an int here is it really ok to say it's an ord? ...ok maybe yes
-// because this function is "return the item as an ordinal" which is relative to the type of
-// sequence.
-// TODO So there's a lot of question marks and grey areas that need answers before moving to nohtyP.
-// TODO Spelunking into the Python source, it appears that ord accepting bytes/bytearray is an
-// accident of history that we shouldn't carry forward.
-//      https://github.com/Syeberman/cpython/blame/bd250300191133d276a71b395b6428081bf825b8/Python/bltinmodule.c
-// bytes is accepted because Python used to have a str and unicode type, but str became bytes and
-// unicode became str. And bytearray is accepted because 19 years ago GvR added it with the comment
-// "XXX Hopefully this is temporary". b'ab'[0] should be preferred to get the ordinal...
-// TODO In Pascal, ord accepts the "ordinal types", including integer, char, boolean, enumerated,
-// and subrange. Python doesn't have "ordinal types", but there is the preexisting idea of being
-// able to convert relevant types to their "position or order in a sequence".
-// TODO So, perhaps the use of "ord" here is OK so long a sequence is a string type. But there's
-// a question about yp_ord() accepting bytes/bytearray....wait, maybe that's the answer here:
-// don't implement a yp_ord but implement this function below instead, so we can convert any
-// element of a string directly to yp_uint32_t. (What should the return type be? See
-// `yp_int_t ord_fillchar` in yp_ljustC3/etc, which is our only mention of "ordinal" as a concept.)
 extern yp_uint32_t yp_getindex_asordC(ypObject *sequence, yp_ssize_t i, ypObject **exc)
 {
     yp_int_t  result;
@@ -53,14 +31,14 @@ extern yp_uint32_t yp_getindex_asordC(ypObject *sequence, yp_ssize_t i, ypObject
         return 0;
     }
 
-    // The elements of bytes and bytearray are ints in range(256).
     if (yp_type(item) == yp_t_int) {
+        // The elements of bytes and bytearray are ints in range(256).
         result = yp_asintC(item, exc);
         if (result < 0 || result > 0xFF) {
             *exc = yp_ValueError;
         }
-        // The elements of str and chrarray are one-character strs.
     } else {
+        // The elements of str and chrarray are one-character strs.
         result = yp_codepointC(item, exc);
     }
     yp_decref(item);

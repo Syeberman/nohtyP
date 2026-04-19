@@ -762,6 +762,17 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
         yp_decref(name);                 \
     } while (0)
 
+// Execute, execute, assert, decref: eead. Like ead, but executes two expressions that both need
+// to be discarded.
+// FIXME Use this in tests that would benefit from it.
+#define eead(name0, expression0, name1, expression1, assertion) \
+    do {                                                        \
+        ypObject *(name0) = (expression0);                      \
+        ypObject *(name1) = (expression1);                      \
+        assertion;                                              \
+        yp_decrefN(2, (name1), (name0));                        \
+    } while (0)
+
 
 #define _faulty_iter_test_raises(setup, iter_name, iter_expression, statement, tear_down,        \
         test_name, exc_suffix, expected, statement_str)                                          \
