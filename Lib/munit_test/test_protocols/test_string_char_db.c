@@ -920,6 +920,71 @@ static MunitResult test_upper(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
+static MunitResult test_casefold(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Binary strings don't support casefold.
+    if (isbinary(type)) {
+        ead(s, type->fromordsCN(N('A', 'b')), assert_raises(yp_casefold(s), yp_MethodError));
+        goto tear_down;
+    }
+
+    // Basic casefold.
+    eead(s, type->fromordsCN(N('A', 'b')), r, yp_casefold(s), assert_string(r, 'a', 'b'));
+    eead(s, type->fromordsCN(N('A', 'B')), r, yp_casefold(s), assert_string(r, 'a', 'b'));
+
+    // All casefolded characters.
+    eead(s, type->fromordsCN(N('a', 'b')), r, yp_casefold(s), assert_string(r, 'a', 'b'));
+
+    // Latin-1 characters.
+    eead(s, type->fromordsCN(N('A', O_A_GRAVE)), r, yp_casefold(s),
+            assert_string(r, 'a', O_a_GRAVE));
+    eead(s, type->fromordsCN(N('A', O_a_GRAVE)), r, yp_casefold(s),
+            assert_string(r, 'a', O_a_GRAVE));
+
+    // Specific latin-1 characters with unique properties.
+    eead(s, type->fromordsCN(N(O_y_DIAER, 'A', 'B')), r, yp_casefold(s),
+            assert_string(r, O_y_DIAER, 'a', 'b'));
+    eead(s, type->fromordsCN(N('A', 'B', O_y_DIAER)), r, yp_casefold(s),
+            assert_string(r, 'a', 'b', O_y_DIAER));
+    eead(s, type->fromordsCN(N(O_MICRO, 'A', 'B')), r, yp_casefold(s),
+            assert_string(r, O_GREEK_mu, 'a', 'b'));
+    eead(s, type->fromordsCN(N('A', 'B', O_MICRO)), r, yp_casefold(s),
+            assert_string(r, 'a', 'b', O_GREEK_mu));
+    eead(s, type->fromordsCN(N(O_SHARP_s, 'A', 'B')), r, yp_casefold(s),
+            assert_string(r, 's', 's', 'a', 'b'));
+    eead(s, type->fromordsCN(N('A', 'B', O_SHARP_s)), r, yp_casefold(s),
+            assert_string(r, 'a', 'b', 's', 's'));
+
+    // Non-cased characters are ignored.
+    eead(s, type->fromordsCN(N('A', '1', ' ', '\t', '!', '\0')), r, yp_casefold(s),
+            assert_string(r, 'a', '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', 'B', '\0', O_SUPER1, O_1OVER4)), r,
+            yp_casefold(s), assert_string(r, '1', ' ', '\t', '!', 'b', '\0', O_SUPER1, O_1OVER4));
+
+    // No cased characters.
+    eead(s, type->fromordsCN(0), r, yp_casefold(s), assert_len(r, 0));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0')), r, yp_casefold(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4)), r, yp_casefold(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4));
+
+    // FIXME Return original object if no changes? Python _doesn't_ do this.
+
+    // Non-latin-1.
+    {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_casefold(s), yp_SystemLimitationError));
+        }
+    }
+
+tear_down:
+    return MUNIT_OK;
+}
+
 // FIXME Test the other converters.
 
 // Used by test_latin_1_converters, called on each latin-1 character.
@@ -1265,6 +1330,7 @@ MunitTest test_string_char_db_tests[] = {TEST(test_isalnum, test_string_char_db_
         TEST(test_isupper, test_string_char_db_params),
         TEST(test_latin_1_classifiers, test_string_char_db_params),
         TEST(test_lower, test_string_char_db_params), TEST(test_upper, test_string_char_db_params),
+        TEST(test_casefold, test_string_char_db_params),
         TEST(test_latin_1_converters, test_string_char_db_params), {NULL}};
 
 
