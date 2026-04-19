@@ -290,9 +290,9 @@ ypAPI ypObject *yp_chrarray(ypObject *object);
 // Returns a new reference to an empty chrarray. (An empty str is exported as yp_str_empty.)
 ypAPI ypObject *yp_chrarray0(void);
 
-// Returns a new reference to the str representing a character whose Unicode codepoint is the
-// integer i.
-ypAPI ypObject *yp_chrC(yp_int_t i);
+// Returns a new reference to the str representing a character with the specified Unicode code
+// point.
+ypAPI ypObject *yp_chrC(yp_int_t codepoint);
 
 // Returns a new reference to a tuple/list of length n containing the given objects.
 ypAPI ypObject *yp_tupleN(int n, ...);
@@ -1175,6 +1175,10 @@ ypAPI ypObject *yp_decode3(ypObject *b, ypObject *encoding, ypObject *errors);
 // Equivalent to yp_decode3(b, yp_s_utf_8, yp_s_strict).
 ypAPI ypObject *yp_decode(ypObject *b);
 
+// Returns the Unicode code point of the single-character str. Returns zero and sets *exc on error.
+// This is the inverse of yp_chrC.
+ypAPI yp_int_t yp_codepointC(ypObject *character, ypObject **exc);
+
 // Immortal empty bytes and str objects.
 ypAPI ypObject *const yp_bytes_empty;
 ypAPI ypObject *const yp_str_empty;
@@ -1922,9 +1926,12 @@ typedef struct _yp_memory_allocator_t {
     // FIXME I don't think we need this at all, since we get the actual size in malloc. Both
     // TCMalloc and Mimalloc just allocate new buffers. Jemalloc _might_ expand large buffers.
     //
-    // - https://github.com/google/tcmalloc/blob/a9f51aa745ce9cc1d6812b01d0048ea4d5b85bb6/tcmalloc/tcmalloc.cc#L1289
-    // - https://github.com/microsoft/mimalloc/blob/09a27098aa6e9286518bd9c74e6ffa7199c3f04e/src/alloc.c#L269
-    // - https://github.com/jemalloc/jemalloc/blob/1972241cd204c60fb5b66f23c48a117879636161/src/arena.c#L1504
+    // -
+    // https://github.com/google/tcmalloc/blob/a9f51aa745ce9cc1d6812b01d0048ea4d5b85bb6/tcmalloc/tcmalloc.cc#L1289
+    // -
+    // https://github.com/microsoft/mimalloc/blob/09a27098aa6e9286518bd9c74e6ffa7199c3f04e/src/alloc.c#L269
+    // -
+    // https://github.com/jemalloc/jemalloc/blob/1972241cd204c60fb5b66f23c48a117879636161/src/arena.c#L1504
 
     // Frees memory returned by malloc and malloc_resize. May abort on error.
     void (*free)(void *p);
@@ -2061,6 +2068,8 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **
 // (if size is not NULL), *encoded to NULL, *encoding to the exception, and returns the exception.
 // FIXME Document byte ordering, absence of BOM, etc.
 // FIXME Or go away from encoding, and instead return the element size (1, 2, or 4) as an integer.
+// FIXME OR! Return a function that returns the i'th item given encoded. Or maybe a struct with
+// the element size, a getter function, and other future stuff.
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding);
 

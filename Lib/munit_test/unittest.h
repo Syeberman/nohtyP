@@ -550,6 +550,31 @@ for i in range(1, 35):
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
+#define _assert_string(obj, items, obj_fmt, item_strs, ...)                                    \
+    do {                                                                                       \
+        yp_ssize_t _ypmt_STR_n = yp_lengthof_array(items);                                     \
+        yp_ssize_t _ypmt_STR_i;                                                                \
+        _assert_len(obj, _ypmt_STR_n, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_STR_n);        \
+        for (_ypmt_STR_i = 0; _ypmt_STR_i < _ypmt_STR_n; _ypmt_STR_i++) {                      \
+            _assert_typeC_exc(yp_uint32_t, yp_getindex_asordC(obj, _ypmt_STR_i, &exc), ==,     \
+                    items[_ypmt_STR_i], "u",                                                   \
+                    "yp_getindex_asordC(" obj_fmt ", %" PRIssize ", &exc)", "%s", __VA_ARGS__, \
+                    _ypmt_STR_i, item_strs[_ypmt_STR_i]);                                      \
+        }                                                                                      \
+    } while (0)
+
+// Asserts that obj is a string containing exactly the given items in that order. Items are ordinal
+// values as C integers and/or C characters. Validates yp_lenC and yp_getindex_asordC.
+#define assert_string(obj, ...)                                                          \
+    do {                                                                                 \
+        ypObject   *_ypmt_STR_obj = (obj);                                               \
+        yp_uint32_t _ypmt_STR_items[] = {__VA_ARGS__};                                   \
+        char       *_ypmt_STR_item_strs[] = {STRINGIFY(__VA_ARGS__)};                    \
+        _assert_string(_ypmt_STR_obj, _ypmt_STR_items, "%s", _ypmt_STR_item_strs, #obj); \
+    } while (0)
+
+// items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
+// only to obj_fmt.
 #define _assert_sequence(obj, items, obj_fmt, item_strs, ...)                                   \
     do {                                                                                        \
         yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(items);                                      \
@@ -847,6 +872,10 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
 // A version of yp_isexceptionCN that accepts an array.
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions);
 
+// A version of yp_getindexC that returns the string element's ordinal value. Raises an exception if
+// the item is not an appropriate int or str object for an ordinal. sequence is expected but not
+// required to be a string object (bytes, str, etc). Sets *exc on error.
+extern yp_uint32_t yp_getindex_asordC(ypObject *sequence, yp_ssize_t i, ypObject **exc);
 
 // A safe sprintf that asserts on buffer overflow. Only call for arrays of fixed size (uses
 // yp_lengthof_array).
@@ -863,9 +892,9 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
 // Declares a variable name of type ypObject * and initializes it with a new reference to a function
 // object. The parameters argument must be surrounded by parentheses.
 // XXX Older compilers reject an empty parameters argument; use define_function2 instead.
-#define define_function(name, code, parameters)                                                     \
-    yp_parameter_decl_t _##name##_parameters[] = {UNPACK parameters};                               \
-    yp_function_decl_t  _##name##_declaration = {                                                   \
+#define define_function(name, code, parameters)                                                    \
+    yp_parameter_decl_t _##name##_parameters[] = {UNPACK parameters};                              \
+    yp_function_decl_t  _##name##_declaration = {                                                  \
             (code), 0, yp_lengthof_array(_##name##_parameters), _##name##_parameters, NULL, NULL}; \
     ypObject *name = yp_functionC(&_##name##_declaration)
 
@@ -915,7 +944,7 @@ typedef struct _fixture_type_t {
     // also supported for collections that can store key/value pairs (i.e. iter, tuple, and list).
     objvarargfunc newK;
 
-    // Creates a string from the int ordinal values.
+    // Creates a string from the C integer and/or C character ordinal values.
     objvarargfunc fromordsCN;
 
     // Flags to describe the properties of the type.

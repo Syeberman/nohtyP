@@ -12631,27 +12631,38 @@ ypObject *yp_chrarray0(void)
 }
 
 // TODO Like ints, the latin-1 chars are singletons in Python. Do the same.
-static ypObject *_yp_chrC(int type, yp_int_t i)
+static ypObject *_yp_chrC(int type, yp_int_t codepoint)
 {
     const ypStringLib_encinfo *newS_enc;
     ypObject                  *newS;
 
-    if (i < 0 || i > ypStringLib_MAX_UNICODE) return yp_ValueError;
+    if (codepoint < 0 || codepoint > ypStringLib_MAX_UNICODE) return yp_ValueError;
 
-    newS_enc = ypStr_ENC_FROM_ORD(i);
+    newS_enc = ypStr_ENC_FROM_ORD(codepoint);
 
     newS = _ypStr_new(type, 1, /*alloclen_fixed=*/TRUE, newS_enc);
     if (yp_isexceptionC(newS)) return newS;
     yp_ASSERT(ypStr_DATA(newS) == ypStr_INLINE_DATA(newS), "yp_chrC didn't allocate inline!");
 
-    // Recall we've already checked that i isn't outside of a 32-bit range (MAX_UNICODE)
-    newS_enc->setindexX(ypStr_DATA(newS), 0, (yp_uint32_t)i);
+    // Recall we've already checked that codepoint isn't outside of a 32-bit range (MAX_UNICODE)
+    newS_enc->setindexX(ypStr_DATA(newS), 0, (yp_uint32_t)codepoint);
     newS_enc->setindexX(ypStr_DATA(newS), 1, '\0');
     ypStr_SET_LEN(newS, 1);
     ypStr_ASSERT_INVARIANTS(newS);
     return newS;
 }
-ypObject *yp_chrC(yp_int_t i) { return _yp_chrC(ypStr_CODE, i); }
+ypObject *yp_chrC(yp_int_t codepoint) { return _yp_chrC(ypStr_CODE, codepoint); }
+
+yp_int_t yp_codepointC(ypObject *character, ypObject **exc)
+{
+    if (ypObject_TYPE_PAIR_CODE(character) != ypStr_CODE) {
+        return_yp_CEXC_BAD_TYPE(0, exc, character);
+    }
+    if (ypStr_LEN(character) != 1) {
+        return_yp_CEXC_ERR(0, exc, yp_ValueError);
+    }
+    return ypStr_ENC(character)->getindexX(ypStr_DATA(character), 0);
+}
 
 #pragma endregion str
 
