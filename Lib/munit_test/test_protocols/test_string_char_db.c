@@ -1046,7 +1046,77 @@ static MunitResult test_swapcase(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
-// FIXME Test the other converters.
+static MunitResult test_capitalize(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic capitalize.
+    eead(s, type->fromordsCN(N('a', 'b')), r, yp_capitalize(s), assert_string(r, 'A', 'b'));
+    eead(s, type->fromordsCN(N('A', 'B')), r, yp_capitalize(s), assert_string(r, 'A', 'b'));
+    eead(s, type->fromordsCN(N('a', 'B')), r, yp_capitalize(s), assert_string(r, 'A', 'b'));
+
+    // Already capitalized.
+    eead(s, type->fromordsCN(N('A', 'b')), r, yp_capitalize(s), assert_string(r, 'A', 'b'));
+
+    // Latin-1 characters are non-cased in binary strings.
+    eead(s, type->fromordsCN(N('a', O_a_GRAVE)), r, yp_capitalize(s),
+            assert_string(r, 'A', O_a_GRAVE));
+    eead(s, type->fromordsCN(N('a', O_A_GRAVE)), r, yp_capitalize(s),
+            assert_string(r, 'A', isbinary(type) ? O_A_GRAVE : O_a_GRAVE));
+    eead(s, type->fromordsCN(N(O_a_GRAVE, 'B')), r, yp_capitalize(s),
+            assert_string(r, isbinary(type) ? O_a_GRAVE : O_A_GRAVE, 'b'));
+    eead(s, type->fromordsCN(N(O_A_GRAVE, 'B')), r, yp_capitalize(s),
+            assert_string(r, O_A_GRAVE, 'b'));
+
+    // Specific latin-1 characters with unique properties.
+    if (!isbinary(type)) {
+        eead(s, type->fromordsCN(N(O_y_DIAER, 'a', 'B')), r, yp_capitalize(s),
+                assert_string(r, O_Y_DIAER, 'a', 'b'));
+        eead(s, type->fromordsCN(N('a', 'B', O_y_DIAER)), r, yp_capitalize(s),
+                assert_string(r, 'A', 'b', O_y_DIAER));
+        eead(s, type->fromordsCN(N(O_MICRO, 'a', 'B')), r, yp_capitalize(s),
+                assert_string(r, O_GREEK_MU, 'a', 'b'));
+        eead(s, type->fromordsCN(N('a', 'B', O_MICRO)), r, yp_capitalize(s),
+                assert_string(r, 'A', 'b', O_MICRO));
+        eead(s, type->fromordsCN(N(O_SHARP_s, 'a', 'B')), r, yp_capitalize(s),
+                assert_string(r, 'S', 's', 'a', 'b'));
+        eead(s, type->fromordsCN(N('a', 'B', O_SHARP_s)), r, yp_capitalize(s),
+                assert_string(r, 'A', 'b', O_SHARP_s));
+    }
+
+    // Non-cased characters are ignored. If the first character is non-cased, then no characters are
+    // titlecased.
+    eead(s, type->fromordsCN(N('a', '1')), r, yp_capitalize(s), assert_string(r, 'A', '1'));
+    eead(s, type->fromordsCN(N('1', 'B')), r, yp_capitalize(s), assert_string(r, '1', 'b'));
+    eead(s, type->fromordsCN(N('a', '1', ' ', '\t', '!', '\0')), r, yp_capitalize(s),
+            assert_string(r, 'A', '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', 'B', '\0', O_SUPER1, O_1OVER4)), r,
+            yp_capitalize(s), assert_string(r, '1', ' ', '\t', '!', 'b', '\0', O_SUPER1, O_1OVER4));
+
+    // No cased characters. Latin-1 characters are non-cased in binary strings.
+    eead(s, type->fromordsCN(0), r, yp_capitalize(s), assert_len(r, 0));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0')), r, yp_capitalize(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4)), r, yp_capitalize(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4));
+    eead(s, type->fromordsCN(N(O_a_GRAVE, ' ')), r, yp_capitalize(s),
+            assert_string(r, isbinary(type) ? O_a_GRAVE : O_A_GRAVE, ' '));
+    eead(s, type->fromordsCN(N('1', O_A_GRAVE)), r, yp_capitalize(s),
+            assert_string(r, '1', isbinary(type) ? O_A_GRAVE : O_a_GRAVE));
+
+    // FIXME Return original object if no changes? Python _doesn't_ do this.
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_capitalize(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
 
 // Used by test_latin_1_converters, called on each latin-1 character.
 static void char_conv_test(fixture_type_t *type, int ord, int lower0, int lower1, int upper0,
@@ -1393,6 +1463,7 @@ MunitTest test_string_char_db_tests[] = {TEST(test_isalnum, test_string_char_db_
         TEST(test_lower, test_string_char_db_params), TEST(test_upper, test_string_char_db_params),
         TEST(test_casefold, test_string_char_db_params),
         TEST(test_swapcase, test_string_char_db_params),
+        TEST(test_capitalize, test_string_char_db_params),
         TEST(test_latin_1_converters, test_string_char_db_params), {NULL}};
 
 
