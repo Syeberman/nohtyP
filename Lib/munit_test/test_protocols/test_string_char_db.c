@@ -985,6 +985,67 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_swapcase(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Basic swapcase.
+    eead(s, type->fromordsCN(N('A', 'b')), r, yp_swapcase(s), assert_string(r, 'a', 'B'));
+    eead(s, type->fromordsCN(N('A', 'B')), r, yp_swapcase(s), assert_string(r, 'a', 'b'));
+    eead(s, type->fromordsCN(N('a', 'b')), r, yp_swapcase(s), assert_string(r, 'A', 'B'));
+
+    // Latin-1 characters are non-cased in binary strings.
+    eead(s, type->fromordsCN(N('a', O_A_GRAVE)), r, yp_swapcase(s),
+            assert_string(r, 'A', isbinary(type) ? O_A_GRAVE : O_a_GRAVE));
+    eead(s, type->fromordsCN(N('A', O_a_GRAVE)), r, yp_swapcase(s),
+            assert_string(r, 'a', isbinary(type) ? O_a_GRAVE : O_A_GRAVE));
+
+    // Specific latin-1 characters with unique properties.
+    if (!isbinary(type)) {
+        eead(s, type->fromordsCN(N(O_y_DIAER, 'A', 'b')), r, yp_swapcase(s),
+                assert_string(r, O_Y_DIAER, 'a', 'B'));
+        eead(s, type->fromordsCN(N('A', 'b', O_y_DIAER)), r, yp_swapcase(s),
+                assert_string(r, 'a', 'B', O_Y_DIAER));
+        eead(s, type->fromordsCN(N(O_MICRO, 'A', 'b')), r, yp_swapcase(s),
+                assert_string(r, O_GREEK_MU, 'a', 'B'));
+        eead(s, type->fromordsCN(N('A', 'b', O_MICRO)), r, yp_swapcase(s),
+                assert_string(r, 'a', 'B', O_GREEK_MU));
+        eead(s, type->fromordsCN(N(O_SHARP_s, 'A', 'b')), r, yp_swapcase(s),
+                assert_string(r, 'S', 'S', 'a', 'B'));
+        eead(s, type->fromordsCN(N('A', 'b', O_SHARP_s)), r, yp_swapcase(s),
+                assert_string(r, 'a', 'B', 'S', 'S'));
+    }
+
+    // Non-cased characters are ignored.
+    eead(s, type->fromordsCN(N('A', '1', ' ', '\t', '!', '\0')), r, yp_swapcase(s),
+            assert_string(r, 'a', '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', 'b', '\0', O_SUPER1, O_1OVER4)), r,
+            yp_swapcase(s), assert_string(r, '1', ' ', '\t', '!', 'B', '\0', O_SUPER1, O_1OVER4));
+
+    // No cased characters. Latin-1 characters are non-cased in binary strings.
+    eead(s, type->fromordsCN(0), r, yp_swapcase(s), assert_len(r, 0));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0')), r, yp_swapcase(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0'));
+    eead(s, type->fromordsCN(N('1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4)), r, yp_swapcase(s),
+            assert_string(r, '1', ' ', '\t', '!', '\0', O_SUPER1, O_1OVER4));
+    eead(s, type->fromordsCN(N('1', O_A_GRAVE, O_a_GRAVE)), r, yp_swapcase(s),
+            assert_string(r, '1', isbinary(type) ? O_A_GRAVE : O_a_GRAVE,
+                    isbinary(type) ? O_a_GRAVE : O_A_GRAVE));
+
+    // FIXME Return original object if no changes? Python _doesn't_ do this.
+
+    // Non-latin-1.
+    if (!isbinary(type)) {
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(ords_non_latin_1); i++) {
+            ead(s, type->fromordsCN(N(ords_non_latin_1[i])),
+                    assert_raises(yp_swapcase(s), yp_SystemLimitationError));
+        }
+    }
+
+    return MUNIT_OK;
+}
+
 // FIXME Test the other converters.
 
 // Used by test_latin_1_converters, called on each latin-1 character.
@@ -1331,6 +1392,7 @@ MunitTest test_string_char_db_tests[] = {TEST(test_isalnum, test_string_char_db_
         TEST(test_latin_1_classifiers, test_string_char_db_params),
         TEST(test_lower, test_string_char_db_params), TEST(test_upper, test_string_char_db_params),
         TEST(test_casefold, test_string_char_db_params),
+        TEST(test_swapcase, test_string_char_db_params),
         TEST(test_latin_1_converters, test_string_char_db_params), {NULL}};
 
 
