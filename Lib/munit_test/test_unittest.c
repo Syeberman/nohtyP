@@ -180,8 +180,20 @@ static MunitResult test_assert_mapping_helper(const MunitParameter params[], fix
 // Ensure the various fixture_types_* arrays were initialzed properly.
 static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *fixture)
 {
-    assert_ssizeC(fixture_types_all->len, ==, 30);
-    assert_ptr_array(fixture_types_all->types, fixture_type_type, fixture_type_NoneType,
+    assert_ssizeC(fixture_types_all->len, ==, 31);
+    assert_ptr_array(fixture_types_all->types, fixture_type_exception, fixture_type_type,
+            fixture_type_NoneType, fixture_type_bool, fixture_type_int, fixture_type_intstore,
+            fixture_type_float, fixture_type_floatstore, fixture_type_iter, fixture_type_range,
+            fixture_type_bytes, fixture_type_bytearray, fixture_type_str, fixture_type_chrarray,
+            fixture_type_str_1byte, fixture_type_chrarray_1byte, fixture_type_str_2bytes,
+            fixture_type_chrarray_2bytes, fixture_type_str_4bytes, fixture_type_chrarray_4bytes,
+            fixture_type_tuple, fixture_type_list, fixture_type_frozenset, fixture_type_set,
+            fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_frozendict,
+            fixture_type_dict, fixture_type_frozendict_dirty, fixture_type_dict_dirty,
+            fixture_type_function, NULL);
+
+    assert_ssizeC(fixture_types_most->len, ==, 30);
+    assert_ptr_array(fixture_types_most->types, fixture_type_type, fixture_type_NoneType,
             fixture_type_bool, fixture_type_int, fixture_type_intstore, fixture_type_float,
             fixture_type_floatstore, fixture_type_iter, fixture_type_range, fixture_type_bytes,
             fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_str_1byte,
@@ -309,8 +321,8 @@ static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *
             fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_function, NULL);
 
     assert_ssizeC(fixture_types_string_not_variant->len, ==, 4);
-    assert_ptr_array(fixture_types_string_not_variant->types, fixture_type_bytes, fixture_type_bytearray,
-            fixture_type_str, fixture_type_chrarray, NULL);
+    assert_ptr_array(fixture_types_string_not_variant->types, fixture_type_bytes,
+            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, NULL);
 
     assert_ssizeC(fixture_types_immutable_not_str->len, ==, 14);
     assert_ptr_array(fixture_types_immutable_not_str->types, fixture_type_type,
@@ -332,7 +344,21 @@ static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *
 // Ensure the various param_values_types_* arrays were initialzed properly.
 static MunitResult test_param_values_types(const MunitParameter params[], fixture_t *fixture)
 {
-    assert_ptr_array(param_values_types_all, fixture_type_type->name, fixture_type_NoneType->name,
+    assert_ptr_array(param_values_types_all, fixture_type_exception->name, fixture_type_type->name,
+            fixture_type_NoneType->name, fixture_type_bool->name, fixture_type_int->name,
+            fixture_type_intstore->name, fixture_type_float->name, fixture_type_floatstore->name,
+            fixture_type_iter->name, fixture_type_range->name, fixture_type_bytes->name,
+            fixture_type_bytearray->name, fixture_type_str->name, fixture_type_chrarray->name,
+            fixture_type_str_1byte->name, fixture_type_chrarray_1byte->name,
+            fixture_type_str_2bytes->name, fixture_type_chrarray_2bytes->name,
+            fixture_type_str_4bytes->name, fixture_type_chrarray_4bytes->name,
+            fixture_type_tuple->name, fixture_type_list->name, fixture_type_frozenset->name,
+            fixture_type_set->name, fixture_type_frozenset_dirty->name,
+            fixture_type_set_dirty->name, fixture_type_frozendict->name, fixture_type_dict->name,
+            fixture_type_frozendict_dirty->name, fixture_type_dict_dirty->name,
+            fixture_type_function->name, NULL);
+
+    assert_ptr_array(param_values_types_most, fixture_type_type->name, fixture_type_NoneType->name,
             fixture_type_bool->name, fixture_type_int->name, fixture_type_intstore->name,
             fixture_type_float->name, fixture_type_floatstore->name, fixture_type_iter->name,
             fixture_type_range->name, fixture_type_bytes->name, fixture_type_bytearray->name,
@@ -605,8 +631,10 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
 
     {
         ypObject *of_type = rand_obj(NULL, type);
-        assert_not_exception(of_type);
-        assert_type_is(of_type, type->yp_type);
+        if (type != fixture_type_exception) {
+            assert_not_exception(of_type);
+        }
+        assert_obj(yp_type(of_type), is, type->yp_type);
         yp_decref(of_type);
     }
 
@@ -671,8 +699,9 @@ static MunitResult test_rand_obj_uniqueness(const MunitParameter params[], fixtu
     test_uniqueness(rand_obj_any_hashable(uq));
     test_uniqueness(rand_obj_any_hashable_not_str(uq));
     test_uniqueness(rand_obj_any_not_iterable(uq));
-    if (type != fixture_type_NoneType && type != fixture_type_bool) {
-        // rand_obj cannot ensure uniqueness for None and bool.
+    if (type != fixture_type_exception && type != fixture_type_NoneType &&
+            type != fixture_type_bool) {
+        // rand_obj cannot ensure uniqueness for exception, None, and bool.
         test_uniqueness(rand_obj(uq, type));
     }
 

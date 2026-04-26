@@ -10,7 +10,7 @@
 // tests will fail, but it may become a problem.
 
 
-#define FIXTURE_TYPES_ALL_LEN 30  // Verified in initialize_fixture_types.
+#define FIXTURE_TYPES_ALL_LEN 31  // Verified in initialize_fixture_types.
 
 
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
@@ -186,7 +186,7 @@ DEFINE_ARRAY_FROM_VA_LIST_FUNC(array_fromuint8NV, yp_uint8_t, int)
 // The maximum length of a random object that **does** create sub-objects (tuple, dict).
 #define RAND_OBJ_MAX_LEN_SUB_OBJECTS (8)
 
-
+static fixture_type_t fixture_type_exception_struct;
 static fixture_type_t fixture_type_type_struct;
 static fixture_type_t fixture_type_NoneType_struct;
 static fixture_type_t fixture_type_bool_struct;
@@ -425,7 +425,7 @@ static ypObject *rand_obj_any_memo(const rand_obj_supplier_memo_t *memo)
     } else {
         rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/FALSE};
         assert_ssizeC(sub_memo.depth, >=, 0);
-        return rand_choice_fixture_types(fixture_types_all)->_new_rand(&sub_memo);
+        return rand_choice_fixture_types(fixture_types_most)->_new_rand(&sub_memo);
     }
 }
 
@@ -490,8 +490,14 @@ static ypObject *_rand_obj(fixture_type_t *type)
 
 extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type)
 {
-    // None and bool have limited possible values, making uniqueness impossible.
-    if (type->yp_type == yp_t_NoneType || type->yp_type == yp_t_bool) {
+    if (type->yp_type == yp_t_invalidated || type->yp_type == yp_t_exception) {
+        if (uq != NULL) {
+            munit_error(
+                    "cannot ensure uniqueness for invalidated and exception");  // GCOVR_EXCL_LINE
+        }
+        return _rand_obj(type);
+    } else if (type->yp_type == yp_t_NoneType || type->yp_type == yp_t_bool) {
+        // None and bool have limited possible values, making uniqueness impossible.
         if (uq != NULL) {
             munit_error("cannot ensure uniqueness for None and bool");  // GCOVR_EXCL_LINE
         }
@@ -543,7 +549,7 @@ extern ypObject *rand_obj_any_hashable(uniqueness_t *uq)
 
 extern ypObject *rand_obj_any(uniqueness_t *uq)
 {
-    _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_all)));
+    _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_most)));
 }
 
 // Most "random objects" functions fill an array with the output of a "random object" function, and
@@ -715,10 +721,122 @@ extern ypObject *new_faulty_iter(
 }
 
 
+#if 0  // yp_invalidate is not currently implemented
+// Returns a random invalidated object.
+static ypObject *new_rand_invalidated(const rand_obj_supplier_memo_t *memo)
+{
+    // Immutable objects may be one of the built-in immortals, so start with mutable objects only.
+    ypObject *result = rand_obj_any_mutable(NULL);
+    assert_not_raises_exc(yp_invalidate(result, &exc));
+    return result;
+}
+
+static peer_type_t peers_invalidated[] = {{&fixture_type_invalidated_struct}, {NULL}};
+
+static fixture_type_t fixture_type_invalidated_struct = {
+        "invalidated",                     // name
+        NULL,                              // type (initialized at runtime)
+        NULL,                              // falsy (initialized at runtime, maybe)
+        &fixture_type_invalidated_struct,  // pair
+        NULL,                              // variant_of
+
+        new_rand_invalidated,  // _new_rand
+
+        NULL,               // new_
+        peers_invalidated,  // peers
+        NULL,               // rand_elems
+
+        objvarargfunc_error,  // newN
+
+        objvarargfunc_error,  // newK
+
+        objvarargfunc_error,  // fromordsCN
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        FALSE,  // is_iterable
+        FALSE,  // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_setlike
+        FALSE,  // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
+};
+
+fixture_type_t *fixture_type_invalidated = &fixture_type_invalidated_struct;
+
+static void initialize_fixture_type_invalidated(void)
+{
+    fixture_type_invalidated->yp_type = yp_t_invalidated;
+}
+#endif
+
+
+// Returns a random exception object.
+static ypObject *new_rand_exception(const rand_obj_supplier_memo_t *memo)
+{
+    // FIXME Statically initialize
+    ypObject *exceptions[] = {yp_BaseException, yp_SystemExit, yp_KeyboardInterrupt,
+            yp_GeneratorExit, yp_Exception, yp_StopIteration, yp_ArithmeticError,
+            yp_FloatingPointError, yp_OverflowError, yp_ZeroDivisionError, yp_AssertionError,
+            yp_AttributeError, yp_BufferError, yp_EOFError, yp_ImportError, yp_LookupError,
+            yp_IndexError, yp_KeyError, yp_MemoryError, yp_NameError, yp_UnboundLocalError,
+            yp_OSError, yp_ReferenceError, yp_RuntimeError, yp_NotImplementedError, yp_SyntaxError,
+            yp_SystemError, yp_TypeError, yp_ValueError, yp_UnicodeError, yp_UnicodeEncodeError,
+            yp_UnicodeDecodeError, yp_UnicodeTranslateError};
+    return rand_choice_array(exceptions);
+}
+
+static peer_type_t peers_exception[] = {{&fixture_type_exception_struct}, {NULL}};
+
+static fixture_type_t fixture_type_exception_struct = {
+        "exception",                     // name
+        NULL,                            // type (initialized at runtime)
+        NULL,                            // falsy (initialized at runtime, maybe)
+        &fixture_type_exception_struct,  // pair
+        NULL,                            // variant_of
+
+        new_rand_exception,  // _new_rand
+
+        NULL,             // new_
+        peers_exception,  // peers
+        NULL,             // rand_elems
+
+        objvarargfunc_error,  // newN
+
+        objvarargfunc_error,  // newK
+
+        objvarargfunc_error,  // fromordsCN
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        FALSE,  // is_iterable
+        FALSE,  // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_setlike
+        FALSE,  // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
+};
+
+fixture_type_t *fixture_type_exception = &fixture_type_exception_struct;
+
+static void initialize_fixture_type_exception(void)
+{
+    fixture_type_exception->yp_type = yp_t_exception;
+}
+
+
 // Returns a random type object, except invalidated and exception objects.
 static ypObject *new_rand_type(const rand_obj_supplier_memo_t *memo)
 {
-    return rand_choice_fixture_types(fixture_types_all)->yp_type;
+    return rand_choice_fixture_types(fixture_types_most)->yp_type;
 }
 
 static peer_type_t peers_type[] = {{&fixture_type_type_struct}, {NULL}};
@@ -2972,26 +3090,28 @@ static void initialize_fixture_type_function(void)
 }
 
 
-// FIXME I'm not sure "dirty" should be part of _all here. If we did the same for strings
-// (1-, 2-, and 4-byte, plus "any characters") that's *eight* different types (mut and immut).
-// FIXME ...or, rather, have a "_most" or "_prime" or something that contains the base versions?
-static fixture_type_t *fixture_types_all_types[] = {&fixture_type_type_struct,
-        &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
-        &fixture_type_intstore_struct, &fixture_type_float_struct, &fixture_type_floatstore_struct,
-        &fixture_type_iter_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
-        &fixture_type_bytearray_struct, &fixture_type_str_struct, &fixture_type_chrarray_struct,
-        &fixture_type_str_1byte_struct, &fixture_type_chrarray_1byte_struct,
-        &fixture_type_str_2bytes_struct, &fixture_type_chrarray_2bytes_struct,
-        &fixture_type_str_4bytes_struct, &fixture_type_chrarray_4bytes_struct,
-        &fixture_type_tuple_struct, &fixture_type_list_struct, &fixture_type_frozenset_struct,
-        &fixture_type_set_struct, &fixture_type_frozenset_dirty_struct,
-        &fixture_type_set_dirty_struct, &fixture_type_frozendict_struct, &fixture_type_dict_struct,
+static fixture_type_t *fixture_types_all_types[] = {&fixture_type_exception_struct,
+        &fixture_type_type_struct, &fixture_type_NoneType_struct, &fixture_type_bool_struct,
+        &fixture_type_int_struct, &fixture_type_intstore_struct, &fixture_type_float_struct,
+        &fixture_type_floatstore_struct, &fixture_type_iter_struct, &fixture_type_range_struct,
+        &fixture_type_bytes_struct, &fixture_type_bytearray_struct, &fixture_type_str_struct,
+        &fixture_type_chrarray_struct, &fixture_type_str_1byte_struct,
+        &fixture_type_chrarray_1byte_struct, &fixture_type_str_2bytes_struct,
+        &fixture_type_chrarray_2bytes_struct, &fixture_type_str_4bytes_struct,
+        &fixture_type_chrarray_4bytes_struct, &fixture_type_tuple_struct, &fixture_type_list_struct,
+        &fixture_type_frozenset_struct, &fixture_type_set_struct,
+        &fixture_type_frozenset_dirty_struct, &fixture_type_set_dirty_struct,
+        &fixture_type_frozendict_struct, &fixture_type_dict_struct,
         &fixture_type_frozendict_dirty_struct, &fixture_type_dict_dirty_struct,
         &fixture_type_function_struct, NULL};
-// param_values_types_all is populated in initialize_fixture_types.
 static fixture_types_t fixture_types_all_struct = {FIXTURE_TYPES_ALL_LEN, fixture_types_all_types};
 fixture_types_t       *fixture_types_all = &fixture_types_all_struct;
-char                  *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
+static fixture_types_t fixture_types_most_struct = {
+        FIXTURE_TYPES_ALL_LEN - 1, &(fixture_types_all_types[1])};
+fixture_types_t *fixture_types_most = &fixture_types_most_struct;
+// param_values_types_all and *_most are populated in initialize_fixture_types.
+char *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
+char *param_values_types_most[FIXTURE_TYPES_ALL_LEN + 1];
 
 // Defines the type arrays (i.e. fixture_types_mutable and param_values_types_mutable). Also defines
 // the filter functions used by FILL_FIXTURE_TYPES_ARRAYS to fill these type arrays. These are
@@ -3039,7 +3159,7 @@ static void fill_fixture_types_arrays(fixture_types_t *fixture_types, char **par
         int (*is_of_type)(fixture_type_t *))
 {
     fixture_type_t **type;
-    for (type = fixture_types_all->types; *type != NULL; type++) {
+    for (type = fixture_types_most->types; *type != NULL; type++) {
         if (is_of_type(*type)) {
             fixture_types->types[fixture_types->len] = *type;
             param_values_types[fixture_types->len] = (*type)->name;
@@ -3060,7 +3180,7 @@ static void initialize_fixture_types(void)
         abort();
     }
 
-    // Fill param_values_types_all. fixture_types_all was initialized statically.
+    // Fill param_values_types_all and *_most. fixture_types_all was initialized statically.
     {
         fixture_type_t **type;
         char           **param_values = param_values_types_all;
@@ -3070,6 +3190,8 @@ static void initialize_fixture_types(void)
         }
         *param_values = NULL;
     }
+    memcpy(param_values_types_most, param_values_types_all + 1,
+            sizeof(char *) * (FIXTURE_TYPES_ALL_LEN - 1 + 1));
 
     // Fill the remaining fixture_types_* and param_values_types_* arrays.
 #define FILL_FIXTURE_TYPES_ARRAYS(protocol) \
@@ -3100,6 +3222,7 @@ static void initialize_fixture_types(void)
 
     // Some fixture_type_t initialization needs to happen at runtime, as it references DLL pointers.
     // This happens after FILL_FIXTURE_TYPES_ARRAYS as some of these reference these arrays.
+    initialize_fixture_type_exception();
     initialize_fixture_type_type();
     initialize_fixture_type_NoneType();
     initialize_fixture_type_bool();

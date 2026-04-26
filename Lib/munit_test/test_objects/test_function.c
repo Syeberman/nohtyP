@@ -3085,10 +3085,10 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 }
 
 
-static MunitParameterEnum test_all_params[] = {{param_key_type, param_values_types_all}, {NULL}};
+static MunitParameterEnum test_most_params[] = {{param_key_type, param_values_types_most}, {NULL}};
 
 MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_new_immortal, NULL),
-        TEST(test_iscallableC, test_all_params), TEST(test_func_iscallable, test_all_params),
+        TEST(test_iscallableC, test_most_params), TEST(test_func_iscallable, test_most_params),
         TEST(test_callN, NULL), TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL),
         TEST(test_copy, NULL), TEST(test_deepcopy, NULL), TEST(test_bool, NULL),
         TEST(test_hash, NULL), TEST(test_call_t_function, NULL), TEST(test_oom, NULL), {NULL}};

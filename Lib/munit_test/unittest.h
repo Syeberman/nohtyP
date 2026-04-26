@@ -1031,6 +1031,7 @@ typedef struct _rand_elements_t {
 //
 // TODO Versions of each of these that build as the mutable type and then freezes, to test that the
 // freezing process still yields a viable object.
+extern fixture_type_t *fixture_type_exception;
 extern fixture_type_t *fixture_type_type;
 extern fixture_type_t *fixture_type_NoneType;
 extern fixture_type_t *fixture_type_bool;
@@ -1072,8 +1073,11 @@ typedef struct _fixture_types_t {
     fixture_type_t **types;  // An array of types. Null-terminated.
 } fixture_types_t;
 
-// "All", except invalidated and exception.
+// All, including invalidated and exception.
 extern fixture_types_t *fixture_types_all;
+
+// All, except invalidated and exception.
+extern fixture_types_t *fixture_types_most;
 
 extern fixture_types_t *fixture_types_mutable;
 extern fixture_types_t *fixture_types_numeric;
@@ -1100,6 +1104,7 @@ extern fixture_types_t *fixture_types_immutable_paired;
 // Arrays of MunitParameterEnum values for "type" and similar parameters (i.e. the names of types).
 // Can't be included in fixture_types_t because the compiler requires this to be a constant.
 extern char *param_values_types_all[];
+extern char *param_values_types_most[];
 extern char *param_values_types_mutable[];
 extern char *param_values_types_numeric[];
 extern char *param_values_types_iterable[];
@@ -1162,7 +1167,7 @@ extern uniqueness_t *uniqueness_new(void);
 // Discards all references in the tracker and frees memory. uq cannot be used afterwards.
 extern void uniqueness_dealloc(uniqueness_t *uq);
 
-// Returns a random object of any type.
+// Returns a random object of any type (except invalidated and exception).
 extern ypObject *rand_obj_any(uniqueness_t *uq);
 
 // Returns a random mutable object of any type.
@@ -1178,14 +1183,15 @@ extern ypObject *rand_obj_any_hashable_not_str(uniqueness_t *uq);
 // While the objects are equal to each other, they will be unequal to any other object in uq.
 extern hashability_pair_t rand_obj_any_hashability_pair(uniqueness_t *uq);
 
-// Returns a random object of any non-iterable type.
+// Returns a random object of any non-iterable type (except invalidated and exception).
 extern ypObject *rand_obj_any_not_iterable(uniqueness_t *uq);
 
-// Returns a random object of any non-callable type.
+// Returns a random object of any non-callable type (except invalidated and exception).
 extern ypObject *rand_obj_any_not_callable(uniqueness_t *uq);
 
-// Returns a random object of the given type. uq must be NULL for fixture_type_NoneType and
-// fixture_type_bool, as there are too few values for these types to guarantee uniqueness.
+// Returns a random object of the given type. uq must be NULL for fixture_type_invalidated and
+// *_exception. uq must also be NULL for *_NoneType and *_bool, as there are too few values for
+// these types to guarantee uniqueness.
 extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type);
 
 // Returns an iter yielding the n items in order.
