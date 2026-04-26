@@ -9000,6 +9000,7 @@ static yp_ssize_t _ypStringLib_convert_char_upper(const yp_character_database_t 
 static yp_ssize_t _ypStringLib_convert_char_casefold(const yp_character_database_t *chardata,
         yp_ssize_t i, yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted)
 {
+    yp_ASSERT(c <= chardata->max_char, "missed a max_char check");
     return chardata->tocasefold(c, len, converted);
 }
 
