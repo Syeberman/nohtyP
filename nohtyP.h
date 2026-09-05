@@ -1544,14 +1544,12 @@ ypAPI ypObject *yp_copy(ypObject *x);
 ypAPI ypObject *yp_deepcopy(ypObject *x);
 
 // Discards all contained objects in x, deallocates _some_ memory, and transmutes it to the
-// ypInvalidated type (rendering the object useless). If x is immortal or already invalidated this
-// is a no-op; immutable objects _can_ be invalidated. Sets *exc on error.
+// invalidated type (rendering the object useless). Immutable objects _can_ be invalidated. If x is
+// statically-allocated or already invalidated this is a no-op. Sets *exc on error.
+//
+// As nohtyP does not currently detect reference cycles during garbage collection, this is an
+// effective way to break cycles and free memory, particularly when immutables are involved.
 ypAPI void yp_invalidate(ypObject *x, ypObject **exc);
-
-// Invalidates x and, recursively, all contained objects. As nohtyP does not currently detect
-// reference cycles during garbage collection, this is an effective way to break cycles and free
-// memory. Sets *exc on error.
-ypAPI void yp_deepinvalidate(ypObject *x, ypObject **exc);
 
 
 /*
@@ -2305,6 +2303,8 @@ typedef struct _ypFunctionObject {
     _yp_INLINE_DATA(yp_parameter_decl_t);
 } ypFunctionObject;
 
+// Flags used on ob_flags.
+#define _ypObject_FLAG_STATIC_ALLOC (1u << 0)  // Statically-allocated (e.x. yp_IMMORTAL_*)
 // Set ob_refcnt to this value for immortal objects
 #define _ypObject_REFCNT_IMMORTAL (0x7FFFFFFFu)
 // Set ob_hash to this value for uninitialized hashes (tp_hash will be called and ob_hash updated)
@@ -2337,9 +2337,9 @@ typedef struct _ypFunctionObject {
 #endif
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                            \
-    {(type), 0, (type_flags), _ypObject_REFCNT_IMMORTAL, (len), _ypObject_LEN_INVALID, \
-            _ypObject_HASH_INVALID, (data)}
+#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                               \
+    {(type), _ypObject_FLAG_STATIC_ALLOC, (type_flags), _ypObject_REFCNT_IMMORTAL, (len), \
+            _ypObject_LEN_INVALID, _ypObject_HASH_INVALID, (data)}
 #define _yp_IMMORTAL_INT(qual, name, value)                                                \
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, _ypObject_LEN_INVALID, NULL), (value)}; \

@@ -988,9 +988,6 @@ namespace nohtyP
         internal static extern void yp_invalidate( ref ypObject_p x );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_deepinvalidate( ref ypObject_p x );
-
-        [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_type( ypObject_p @object );
 
         internal static ypObject_p yp_t_invalidated = DllImportData( "yp_t_invalidated" );

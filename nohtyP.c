@@ -316,16 +316,23 @@ typedef size_t yp_uhash_t;
 #define ypObject_TYPE_CODE_AS_FROZEN(type) ((type) & 0xFE)
 #define ypObject_TYPE(ob) (ypTypeTable[ypObject_TYPE_CODE(ob)])
 #define ypObject_IS_MUTABLE(ob) (ypObject_TYPE_CODE_IS_MUTABLE(ypObject_TYPE_CODE(ob)))
+#define ypObject_FLAGS(ob) (((ypObject *)(ob))->ob_flags)
 #define ypObject_REFCNT(ob) (((ypObject *)(ob))->ob_refcnt)
 
 // Type pairs are identified by the immutable type code, as all its methods are supported by the
 // immutable version
 #define ypObject_TYPE_PAIR_CODE(ob) ypObject_TYPE_CODE_AS_FROZEN(ypObject_TYPE_CODE(ob))
 
-// TODO Need two types of immortals: statically-allocated immortals (so should never be
-// freed/invalidated) and overly-incref'd immortals (should be allowed to be invalidated and thus
-// free any extra data, although the object itself will never be free'd as we've lost track of the
-// refcounts)
+// Flags used on ob_flags.
+#define ypObject_FLAG_STATIC_ALLOC _ypObject_FLAG_STATIC_ALLOC
+
+#define ypObject_IS_STATIC_ALLOC(ob) (ypObject_FLAGS(ob) & ypObject_FLAG_STATIC_ALLOC)
+
+// Immortals are identified by a refcnt of ypObject_REFCNT_IMMORTAL. There are two types of
+// immortals. Statically-allocated immortals have ypObject_FLAG_STATIC_ALLOC in ob_flags; such
+// immortals should never be freed or invalidated. All others are "overly-incref'd" immortals; these
+// _can_ be invalidated, allowing any extra references or memory to be released, although the object
+// itself will never be free'd as we've lost track of the refcounts.
 #define ypObject_REFCNT_IMMORTAL _ypObject_REFCNT_IMMORTAL
 
 // When a hash of this value is stored in ob_hash, call tp_currenthash
@@ -641,6 +648,9 @@ DEFINE_GENERIC_METHODS(TypeError, yp_TypeError);
 DEFINE_GENERIC_METHODS(InvalidatedError, yp_InvalidatedError);  // for Invalidated objects
 DEFINE_GENERIC_METHODS(ExceptionMethod, x);  // for exception objects; returns "self"
 #undef DEFINE_GENERIC_METHODS
+
+// No need for DEFINE_GENERIC_METHODS(SystemError, yp_SystemError) if this is the only one used.
+static ypObject *SystemError_visitfunc(ypObject *x, void *memo) { return yp_SystemError; }
 
 // TODO Is this yp_MethodError vs yp_TypeError distinction important to nohtyP? In Python it comes
 // down to the historical choices of if it was implemented as a function, as syntax, or as a method.
@@ -1325,7 +1335,8 @@ typedef struct {
 // FIXME Could we just use NameError or some other exception?
 // FIXME Unlike Python, make this official, so docstrings show "this parameter is optional, but
 // doesn't have a default value".
-// FIXME ...or just use yp_None
+// FIXME ...or just use yp_None.
+// FIXME Python now has sentinel values for this reason: https://peps.python.org/pep-0661/.
 yp_IMMORTAL_INVALIDATED(yp_Arg_Missing);
 
 
@@ -1371,15 +1382,17 @@ ypObject *const yp_i_two = ypInt_PREALLOC_REF(2);
 
 
 // Empty bytes can be represented by this, immortal object
-static ypStringLibObject _yp_bytes_empty_struct = {{ypBytes_CODE, 0, ypStringLib_ENC_CODE_BYTES,
-        ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, ""}};
-ypObject *const          yp_bytes_empty = yp_CONST_REF(yp_bytes_empty);
+static ypStringLibObject _yp_bytes_empty_struct = {
+        {ypBytes_CODE, _ypObject_FLAG_STATIC_ALLOC, ypStringLib_ENC_CODE_BYTES,
+                ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, ""}};
+ypObject *const yp_bytes_empty = yp_CONST_REF(yp_bytes_empty);
 
 
 // Empty strs can be represented by this, immortal object
-static ypStringLibObject _yp_str_empty_struct = {{ypStr_CODE, 0, ypStringLib_ENC_CODE_LATIN_1,
-        ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, ""}};
-ypObject *const          yp_str_empty = yp_CONST_REF(yp_str_empty);
+static ypStringLibObject _yp_str_empty_struct = {
+        {ypStr_CODE, _ypObject_FLAG_STATIC_ALLOC, ypStringLib_ENC_CODE_LATIN_1,
+                ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, ""}};
+ypObject *const yp_str_empty = yp_CONST_REF(yp_str_empty);
 
 yp_IMMORTAL_STR_LATIN_1(yp_s_ascii, "ascii");
 yp_IMMORTAL_STR_LATIN_1(yp_s_latin_1, "latin-1");
@@ -1432,8 +1445,8 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_z, "z");
 
 // Empty tuples can be represented by this, immortal object
 static ypObject     *_yp_tuple_empty_data[1] = {NULL};
-static ypTupleObject _yp_tuple_empty_struct = {{ypTuple_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, 0,
-        ypObject_HASH_INVALID, _yp_tuple_empty_data}};
+static ypTupleObject _yp_tuple_empty_struct = {{ypTuple_CODE, _ypObject_FLAG_STATIC_ALLOC, 0,
+        ypObject_REFCNT_IMMORTAL, 0, 0, ypObject_HASH_INVALID, _yp_tuple_empty_data}};
 ypObject *const      yp_tuple_empty = yp_CONST_REF(yp_tuple_empty);
 
 
@@ -1442,8 +1455,8 @@ ypObject *const      yp_tuple_empty = yp_CONST_REF(yp_tuple_empty);
 // Empty frozensets can be represented by this, immortal object
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypSetObject    _yp_frozenset_empty_struct = {
-        {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
-                ypObject_HASH_INVALID, _yp_frozenset_empty_data},
+        {ypFrozenSet_CODE, _ypObject_FLAG_STATIC_ALLOC, 0, ypObject_REFCNT_IMMORTAL, 0,
+                ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozenset_empty_data},
         0};
 ypObject *const yp_frozenset_empty = yp_CONST_REF(yp_frozenset_empty);
 
@@ -1451,15 +1464,17 @@ ypObject *const yp_frozenset_empty = yp_CONST_REF(yp_frozenset_empty);
 // Empty frozendicts can be represented by this, immortal object
 static ypObject     _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypDictObject _yp_frozendict_empty_struct = {
-        {ypFrozenDict_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
-                ypObject_HASH_INVALID, _yp_frozendict_empty_data},
+        {ypFrozenDict_CODE, _ypObject_FLAG_STATIC_ALLOC, 0, ypObject_REFCNT_IMMORTAL, 0,
+                ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozendict_empty_data},
         yp_CONST_REF(yp_frozenset_empty)};
 ypObject *const yp_frozendict_empty = yp_CONST_REF(yp_frozendict_empty);
 
 
 // Use yp_rangeC(0) as the standard empty object
 static ypRangeObject _yp_range_empty_struct = {
-        {ypRange_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, 0, ypObject_HASH_INVALID, NULL}, 0, 1};
+        {ypRange_CODE, _ypObject_FLAG_STATIC_ALLOC, 0, ypObject_REFCNT_IMMORTAL, 0, 0,
+                ypObject_HASH_INVALID, NULL},
+        0, 1};
 ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
 
 
@@ -2278,6 +2293,7 @@ static ypObject *_ypMem_malloc_fixed(int type, yp_ssize_t sizeof_obStruct)
     ypObject_SET_ALLOCLEN(ob, ypObject_LEN_INVALID);
     ob->ob_data = NULL;
     ypObject_SET_TYPE_CODE(ob, type);
+    ob->ob_flags = 0u;
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = ypObject_LEN_INVALID;
@@ -2314,6 +2330,7 @@ static ypObject *_ypMem_malloc_container_inline(int type, yp_ssize_t alloclen,
     ypObject_SET_ALLOCLEN(ob, alloclen);
     ob->ob_data = ((yp_uint8_t *)ob) + offsetof_inline;
     ypObject_SET_TYPE_CODE(ob, type);
+    ob->ob_flags = 0u;
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
@@ -2382,6 +2399,7 @@ static ypObject *_ypMem_malloc_container_variable(int type, yp_ssize_t required,
 
     ypObject_SET_ALLOCLEN(ob, alloclen);
     ypObject_SET_TYPE_CODE(ob, type);
+    ob->ob_flags = 0u;
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
@@ -2437,6 +2455,7 @@ static void *_ypMem_realloc_container_variable(ypObject *ob, yp_ssize_t required
     void      *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
     yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable(offsetof_inline, elemsize);
 
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(ob), "cannot realloc statically-allocated object");
     yp_ASSERT(required >= 0, "required cannot be negative");
     yp_ASSERT(extra >= 0, "extra cannot be negative");
     yp_ASSERT(required <= alloclen_max, "required cannot be larger than maximum");
@@ -2512,6 +2531,7 @@ static void *_ypMem_realloc_container_variable_new(ypObject *ob, yp_ssize_t requ
     void      *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
     yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable(offsetof_inline, elemsize);
 
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(ob), "cannot realloc statically-allocated object");
     yp_ASSERT(required >= 0, "required cannot be negative");
     yp_ASSERT(extra >= 0, "extra cannot be negative");
     yp_ASSERT(required <= alloclen_max, "required cannot be larger than maximum");
@@ -2559,6 +2579,7 @@ static void _ypMem_realloc_container_free_oldptr(
         ypObject *ob, void *oldptr, yp_ssize_t offsetof_inline)
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(ob), "cannot realloc statically-allocated object");
     yp_DEBUG("REALLOC_CONTAINER_FREE_OLDPTR: %p", ob);
     yp_ASSERT(oldptr != ob->ob_data, "handle the resized-in-place case separately");
     if (oldptr != inlineptr) yp_free(oldptr);
@@ -2577,6 +2598,7 @@ static void _ypMem_realloc_container_variable_clear(
     void      *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
     yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable(offsetof_inline, elemsize);
 
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(ob), "cannot realloc statically-allocated object");
     yp_ASSERT(inlinelen <= alloclen_max,
             "inlinelen is larger than maximum?! (Is _ypMem_ideal_size set too high?)");
 
@@ -2596,12 +2618,19 @@ static void _ypMem_realloc_container_variable_clear(
             (ob), obStruct, (alloclen_max), yp_sizeof_member(obStruct, ob_inline_data[0]))
 
 // Frees an object allocated with ypMem_MALLOC_FIXED
-#define ypMem_FREE_FIXED yp_free
+static void _ypMem_free_fixed(ypObject *ob)
+{
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(ob), "cannot free statically-allocated object");
+    yp_DEBUG("FREE_FIXED: %p", ob);
+    yp_free(ob);
+}
+#define ypMem_FREE_FIXED _ypMem_free_fixed
 
 // Frees an object allocated with either ypMem_MALLOC_CONTAINER_* macro
 static void _ypMem_free_container(ypObject *ob, yp_ssize_t offsetof_inline)
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(ob), "cannot free statically-allocated object");
     yp_DEBUG("FREE_CONTAINER: %p", ob);
     if (ob->ob_data != inlineptr) yp_free(ob->ob_data);
     yp_free(ob);
@@ -3377,6 +3406,17 @@ static ypObject *iter_traverse(ypObject *i, visitfunc visitor, void *memo)
     return _ypState_traverse(ypIter_STATE(i), ypIter_OBJLOCS(i), visitor, memo);
 }
 
+static ypObject *iter_close(ypObject *i);
+static ypObject *iter_invalidate(ypObject *i)
+{
+    ypObject *result;
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(i), "unexpected statically-allocated iter");
+    result = iter_close(i);
+    if (yp_isexceptionC(result)) return result;
+    ypObject_SET_TYPE_CODE(i, ypInvalidated_CODE);
+    return yp_None;
+}
+
 static ypObject *iter_bool(ypObject *i) { return yp_True; }
 
 // Decrements the reference count of the visited object
@@ -3459,7 +3499,7 @@ static ypObject *iter_send(ypObject *i, ypObject *value)
 static ypObject *iter_dealloc(ypObject *i, void *memo)
 {
     // FIXME Is there something better we can do to handle errors than just ignore them?
-    // TODO iter_close calls yp_decref. Can we get it to call yp_decref_fromdealloc instead?
+    // FIXME iter_close calls yp_decref. Can we get it to call yp_decref_fromdealloc instead?
     (void)iter_close(i);  // ignore errors; discards all references
     ypMem_FREE_CONTAINER(i, ypIterObject);
     return yp_None;
@@ -3500,7 +3540,7 @@ static ypTypeObject ypIter_Type = {
         TypeError_objproc,       // tp_frozen_copy
         TypeError_traversefunc,  // tp_unfrozen_deepcopy
         TypeError_traversefunc,  // tp_frozen_deepcopy
-        MethodError_objproc,     // tp_invalidate
+        iter_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         iter_bool,                   // tp_bool
@@ -3881,7 +3921,8 @@ extern ypObject *const yp_RecursionLimitError;
 
 // TODO Support unfreezable objects. Perhaps tp_freeze can return yp_NotImplemented in this case.
 // yp_freeze should raise an error in this case, but yp_deepfreeze might do something different...
-// TODO Make sure we don't modify immortals...although immortals should be immutable anyway.
+// FIXME Handle "didn't freeze" by returning TypeError or something? Or leave a no-op.
+// FIXME How does this handle if x is an exception? Invalidated?
 void yp_freeze(ypObject *x, ypObject **exc)
 {
     ypObject *result = ypObject_TYPE(x)->tp_freeze(x);
@@ -3900,7 +3941,7 @@ static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
     // TODO Consider switching to a keepalive list like deepcopy does. For example, if we have a
     // large object x that's reachable many times (i.e. [x] * 1000000, as a silly example), we
     // are going to process all of x each time. However, if we remember that we've already
-    // deep-frozen x, then we will only process it once...at the expense of maintaning keepalive
+    // deep-frozen x, then we will only process it once...at the expense of maintaining keepalive
     // all the time for every call to yp_deepfreeze.
     id = yp_intC((yp_ssize_t)x);
     yp_pushunique(memo, id, &exc);
@@ -4072,18 +4113,21 @@ ypObject *yp_deepcopy(ypObject *x) { return _yp_deepcopy(x, _yp_sametype_deepcop
 // tradeoff in the interests of reducing individual allocations. Perhaps there should be a limit
 // on how large to make CONTAINER_INLINE objects, or perhaps we should try to shrink the
 // invalidated object in-place (if supported by the heap).
-// TODO Should attempting to invalidate an immortal be an error?
 void yp_invalidate(ypObject *x, ypObject **exc)
 {
-    return_yp_EXC_ERR(exc, yp_NotImplementedError);  // TODO implement
+    ypObject *result = ypObject_TYPE(x)->tp_invalidate(x);
+    if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
+    yp_ASSERT(ypObject_TYPE_CODE(x) == ypInvalidated_CODE || ypObject_IS_STATIC_ALLOC(x),
+            "tp_invalidate didn't invalidate the object");
 }
 
-// TODO All "deep" operations may try to operate on immortals, which should not be invalidated.
-// Should this be an exception, or should these objects be silently skipped?
-void yp_deepinvalidate(ypObject *x, ypObject **exc)
-{
-    return_yp_EXC_ERR(exc, yp_NotImplementedError);  // TODO implement
-}
+// TODO yp_deepinvalidate: "Invalidates x and, recursively, all contained objects. As nohtyP does
+// not currently detect reference cycles during garbage collection, this is an effective way to
+// break cycles and free memory. Sets *exc on error."
+//
+// At the moment this feels like a bad idea; the blast radius is too high. There's no control over
+// what objects are invalidated outside of they just happen to be referenced via the root object.
+// Who knows what unintended objects we'll invalidate by blindly invalidating everything.
 
 #pragma endregion transmute
 
@@ -4365,6 +4409,20 @@ yp_ssize_t yp_lenC(ypObject *x, ypObject **exc)
  *************************************************************************************************/
 #pragma region invalidated
 
+// TODO There could still be special handling in the types to smooth over rough edges of having a
+// referenced object become invalidated. For example, if a dict key becomes invalidated, perhaps the
+// dict could treat it as "missing" and skip over it. BUT! What if it's a frozendict? Suddenly the
+// hash changes because this entry is now missing. So this is possibly a bad idea.
+
+static ypObject *invalidated_dealloc(ypObject *in, void *memo)
+{
+    ypMem_FREE_FIXED(in);
+    return yp_None;
+}
+
+// Calling yp_invalidate on an invalidated object is a no-op.
+static ypObject *invalidated_invalidate(ypObject *in) { return yp_None; }
+
 static ypObject *invalidated_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     return yp_NotImplementedError;
@@ -4381,7 +4439,7 @@ static ypTypeObject ypInvalidated_Type = {
 
         // Object fundamentals
         yp_CONST_REF(invalidated_func_new),  // tp_func_new
-        MethodError_visitfunc,               // tp_dealloc  // FIXME implement
+        invalidated_dealloc,                 // tp_dealloc
         NoRefs_traversefunc,                 // tp_traverse
         NULL,                                // tp_str
         NULL,                                // tp_repr
@@ -4392,7 +4450,7 @@ static ypTypeObject ypInvalidated_Type = {
         InvalidatedError_objproc,       // tp_frozen_copy
         InvalidatedError_traversefunc,  // tp_unfrozen_deepcopy
         InvalidatedError_traversefunc,  // tp_frozen_deepcopy
-        InvalidatedError_objproc,       // tp_invalidate
+        invalidated_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         InvalidatedError_objproc,     // tp_bool
@@ -4474,7 +4532,7 @@ static ypTypeObject ypBaseException_Type = {
 
         // Object fundamentals
         yp_CONST_REF(exception_func_new),  // tp_func_new
-        MethodError_visitfunc,             // tp_dealloc
+        SystemError_visitfunc,             // tp_dealloc
         NoRefs_traversefunc,               // tp_traverse
         NULL,                              // tp_str
         NULL,                              // tp_repr
@@ -4706,6 +4764,13 @@ static ypObject *type_frozen_deepcopy(ypObject *t, visitfunc copy_visitor, void 
     return yp_incref(t);
 }
 
+// Invalidating a statically-allocated object is a no-op.
+static ypObject *type_invalidate(ypObject *t)
+{
+    yp_ASSERT(ypObject_IS_STATIC_ALLOC(t), "unexpected dynamically-allocated type object");
+    return yp_None;
+}
+
 static ypObject *type_bool(ypObject *t) { return yp_True; }
 
 static ypObject *type_currenthash(
@@ -4745,7 +4810,7 @@ static ypTypeObject ypType_Type = {
 
         // Object fundamentals
         yp_CONST_REF(type_func_new),  // tp_func_new
-        MethodError_visitfunc,        // tp_dealloc
+        SystemError_visitfunc,        // tp_dealloc
         NoRefs_traversefunc,          // tp_traverse
         NULL,                         // tp_str
         NULL,                         // tp_repr
@@ -4756,7 +4821,7 @@ static ypTypeObject ypType_Type = {
         type_frozen_copy,      // tp_frozen_copy
         type_frozen_deepcopy,  // tp_unfrozen_deepcopy
         type_frozen_deepcopy,  // tp_frozen_deepcopy
-        MethodError_objproc,   // tp_invalidate
+        type_invalidate,       // tp_invalidate
 
         // Boolean operations and comparisons
         type_bool,                   // tp_bool
@@ -4825,6 +4890,9 @@ static ypObject *nonetype_frozen_deepcopy(ypObject *n, visitfunc copy_visitor, v
     return yp_None;  // _yp_deepcopy_memo_setitem is not needed here.
 }
 
+// Invalidating a statically-allocated object is a no-op.
+static ypObject *nonetype_invalidate(ypObject *n) { return yp_None; }
+
 static ypObject *nonetype_bool(ypObject *n) { return yp_False; }
 
 static ypObject *nonetype_currenthash(
@@ -4852,7 +4920,7 @@ static ypTypeObject ypNoneType_Type = {
 
         // Object fundamentals
         yp_CONST_REF(nonetype_func_new),  // tp_func_new
-        MethodError_visitfunc,            // tp_dealloc
+        SystemError_visitfunc,            // tp_dealloc
         NoRefs_traversefunc,              // tp_traverse
         NULL,                             // tp_str
         NULL,                             // tp_repr
@@ -4863,7 +4931,7 @@ static ypTypeObject ypNoneType_Type = {
         nonetype_frozen_copy,      // tp_frozen_copy
         nonetype_frozen_deepcopy,  // tp_unfrozen_deepcopy
         nonetype_frozen_deepcopy,  // tp_frozen_deepcopy
-        MethodError_objproc,       // tp_invalidate
+        nonetype_invalidate,       // tp_invalidate
 
         // Boolean operations and comparisons
         nonetype_bool,               // tp_bool
@@ -4937,6 +5005,9 @@ static ypObject *bool_frozen_deepcopy(ypObject *b, visitfunc copy_visitor, void 
     return b;  // _yp_deepcopy_memo_setitem is not needed here.
 }
 
+// Invalidating a statically-allocated object is a no-op.
+static ypObject *bool_invalidate(ypObject *b) { return yp_None; }
+
 static ypObject *bool_bool(ypObject *b) { return b; }
 
 // Here be bool_lt, bool_le, bool_eq, bool_ne, bool_ge, bool_gt
@@ -4981,7 +5052,7 @@ static ypTypeObject ypBool_Type = {
 
         // Object fundamentals
         yp_CONST_REF(bool_func_new),  // tp_func_new
-        MethodError_visitfunc,        // tp_dealloc
+        SystemError_visitfunc,        // tp_dealloc
         NoRefs_traversefunc,          // tp_traverse
         NULL,                         // tp_str
         NULL,                         // tp_repr
@@ -4992,7 +5063,7 @@ static ypTypeObject ypBool_Type = {
         bool_frozen_copy,      // tp_frozen_copy
         bool_frozen_deepcopy,  // tp_unfrozen_deepcopy
         bool_frozen_deepcopy,  // tp_frozen_deepcopy
-        MethodError_objproc,   // tp_invalidate
+        bool_invalidate,       // tp_invalidate
 
         // Boolean operations and comparisons
         bool_bool,  // tp_bool
@@ -5293,6 +5364,15 @@ static ypObject *int_frozen_deepcopy(ypObject *i, visitfunc copy_visitor, void *
     }
 }
 
+// FIXME Tests comparing dealloc to invalidate to ensure both free memory the same. (Because we
+// are copying some of the logic between them without necessarily calling a "tp_clear" method.)
+static ypObject *int_invalidate(ypObject *i)
+{
+    if (ypObject_IS_STATIC_ALLOC(i)) return yp_None;  // Silent no-op.
+    ypObject_SET_TYPE_CODE(i, ypInvalidated_CODE);
+    return yp_None;
+}
+
 static ypObject *int_bool(ypObject *i) { return ypBool_FROM_C(ypInt_VALUE(i)); }
 
 // Here be int_lt, int_le, int_eq, int_ne, int_ge, int_gt
@@ -5384,7 +5464,7 @@ static ypTypeObject ypInt_Type = {
         int_frozen_copy,        // tp_frozen_copy
         int_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         int_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,    // tp_invalidate
+        int_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         int_bool,  // tp_bool
@@ -5454,7 +5534,7 @@ static ypTypeObject ypIntStore_Type = {
         int_frozen_copy,        // tp_frozen_copy
         int_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         int_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,    // tp_invalidate
+        int_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         int_bool,  // tp_bool
@@ -6460,6 +6540,13 @@ static ypObject *float_frozen_deepcopy(ypObject *f, visitfunc copy_visitor, void
     return _ypFloat_deepcopy(ypFloat_CODE, f, copy_memo);
 }
 
+static ypObject *float_invalidate(ypObject *f)
+{
+    if (ypObject_IS_STATIC_ALLOC(f)) return yp_None;  // Silent no-op.
+    ypObject_SET_TYPE_CODE(f, ypInvalidated_CODE);
+    return yp_None;
+}
+
 static ypObject *float_bool(ypObject *f) { return ypBool_FROM_C(ypFloat_VALUE(f) != 0.0); }
 
 // Here be float_lt, float_le, float_eq, float_ne, float_ge, float_gt
@@ -6537,7 +6624,7 @@ static ypTypeObject ypFloat_Type = {
         float_frozen_copy,        // tp_frozen_copy
         float_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         float_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,      // tp_invalidate
+        float_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         float_bool,  // tp_bool
@@ -6607,7 +6694,7 @@ static ypTypeObject ypFloatStore_Type = {
         float_frozen_copy,        // tp_frozen_copy
         float_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         float_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,      // tp_invalidate
+        float_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         float_bool,  // tp_bool
@@ -8009,6 +8096,7 @@ static ypObject *_ypStringLib_maybe_realloc(
     yp_ssize_t haveBytes = ypStringLib_ALLOCLEN(s) << ypStringLib_ENC(s)->sizeshift;
     yp_ssize_t needBytes = (requiredLen + 1) << newEnc->sizeshift;
 
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(s), "attempting to realloc statically-allocated string");
     yp_ASSERT(requiredLen >= 0, "requiredLen cannot be negative");
     yp_ASSERT(extra >= 0, "extra cannot be negative");
     yp_ASSERT(requiredLen <= ypStringLib_LEN_MAX, "requiredLen cannot be >max");
@@ -8035,6 +8123,7 @@ static ypObject *_ypStringLib_grow_onextend(
     const ypStringLib_encinfo *oldEnc = ypStringLib_ENC(s);
     void                      *oldptr;
 
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(s), "attempting to grow statically-allocated string");
     yp_ASSERT(requiredLen >= ypStringLib_LEN(s), "requiredLen cannot be <len(s)");
     yp_ASSERT(requiredLen > ypStringLib_ALLOCLEN(s) - 1 || newEnc->elemsize > oldEnc->elemsize,
             "_ypStringLib_grow_onextend called unnecessarily");
@@ -10752,6 +10841,14 @@ static ypObject *bytes_frozen_deepcopy(ypObject *b, visitfunc copy_visitor, void
     return _ypBytes_deepcopy(ypBytes_CODE, b, copy_memo);
 }
 
+static ypObject *bytes_invalidate(ypObject *b)
+{
+    if (ypObject_IS_STATIC_ALLOC(b)) return yp_None;  // Silent no-op.
+    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR(b, ypBytesObject, ypBytes_ALLOCLEN_MAX);
+    ypObject_SET_TYPE_CODE(b, ypInvalidated_CODE);
+    return yp_None;
+}
+
 static ypObject *bytes_bool(ypObject *b) { return ypBool_FROM_C(ypBytes_LEN(b)); }
 
 static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
@@ -11267,7 +11364,7 @@ static ypTypeObject ypBytes_Type = {
         bytes_frozen_copy,        // tp_frozen_copy
         bytes_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         bytes_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,      // tp_invalidate
+        bytes_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         bytes_bool,  // tp_bool
@@ -11357,7 +11454,7 @@ static ypTypeObject ypByteArray_Type = {
         bytes_frozen_copy,        // tp_frozen_copy
         bytes_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         bytes_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,      // tp_invalidate
+        bytes_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         bytes_bool,  // tp_bool
@@ -11707,6 +11804,14 @@ static ypObject *str_frozen_deepcopy(ypObject *s, visitfunc copy_visitor, void *
 {
     if (ypStr_LEN(s) < 1) return yp_str_empty;
     return _ypStr_deepcopy(ypStr_CODE, s, copy_memo);
+}
+
+static ypObject *str_invalidate(ypObject *s)
+{
+    if (ypObject_IS_STATIC_ALLOC(s)) return yp_None;  // Silent no-op.
+    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR(s, ypStrObject, ypStr_ALLOCLEN_MAX);
+    ypObject_SET_TYPE_CODE(s, ypInvalidated_CODE);
+    return yp_None;
 }
 
 static ypObject *str_bool(ypObject *s) { return ypBool_FROM_C(ypStr_LEN(s)); }
@@ -12303,7 +12408,7 @@ static ypTypeObject ypStr_Type = {
         str_frozen_copy,        // tp_frozen_copy
         str_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         str_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,    // tp_invalidate
+        str_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         str_bool,  // tp_bool
@@ -12393,7 +12498,7 @@ static ypTypeObject ypChrArray_Type = {
         str_frozen_copy,        // tp_frozen_copy
         str_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         str_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,    // tp_invalidate
+        str_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         str_bool,  // tp_bool
@@ -13287,6 +13392,7 @@ static ypObject *_ypTuple_deepcopy(int type, ypObject *x, visitfunc copy_visitor
 static ypObject *_ypTuple_extend_grow(ypObject *sq, yp_ssize_t required, yp_ssize_t extra)
 {
     void *oldptr;
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(sq), "attempting to grow statically-allocated tuple");
     yp_ASSERT(required > ypTuple_LEN(sq), "required cannot be <=len(sq)");
     yp_ASSERT(required <= ypTuple_LEN_MAX, "required cannot be >max");
     oldptr = ypMem_REALLOC_CONTAINER_VARIABLE(
@@ -13509,6 +13615,7 @@ static ypObject *_ypTuple_setslice_grow(
     ypObject **oldptr;
     yp_ssize_t i;
 
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(sq), "attempting to grow statically-allocated tuple");
     yp_ASSERT(growBy >= 1, "growBy cannot be less than 1");
     yp_ASSERT(start >= 0 && stop >= 0, "start and stop must be adjusted values");
 
@@ -13976,6 +14083,16 @@ static ypObject *tuple_frozen_deepcopy(ypObject *sq, visitfunc copy_visitor, voi
     return _ypTuple_deepcopy(ypTuple_CODE, sq, copy_visitor, copy_memo);
 }
 
+static void      _list_clear(ypObject *sq);
+static ypObject *tuple_invalidate(ypObject *sq)
+{
+    if (ypObject_IS_STATIC_ALLOC(sq)) return yp_None;  // Silent no-op.
+    _list_clear(sq);
+    yp_ASSERT(ypTuple_ARRAY(sq) == ypTuple_INLINE_DATA(sq), "_list_clear didn't allocate inline!");
+    ypObject_SET_TYPE_CODE(sq, ypInvalidated_CODE);
+    return yp_None;
+}
+
 static ypObject *tuple_bool(ypObject *sq) { return ypBool_FROM_C(ypTuple_LEN(sq)); }
 
 // Sets *i to the index in sq and x of the first differing element, or -1 if the elements are equal
@@ -14103,11 +14220,13 @@ static ypObject *list_push(ypObject *sq, ypObject *x)
     return _ypTuple_push(sq, x, 0);
 }
 
-static ypObject *list_clear(ypObject *sq)
+// Clears sq. Always succeeds; has no return value.
+static void _list_clear(ypObject *sq)
 {
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(sq), "attempting to clear statically-allocated tuple");
     // XXX yp_decref _could_ run code that requires us to be in a good state, so pop items from the
     // end one-at-a-time
-    // TODO If yp_decref **adds** to this list, we'll never stop looping. We could use the detach
+    // FIXME If yp_decref **adds** to this list, we'll never stop looping. We could use the detach
     // methods...but if the data is inline then a small buffer is allocated, which isn't great for
     // a clear method.
     while (ypTuple_LEN(sq) > 0) {
@@ -14116,6 +14235,11 @@ static ypObject *list_clear(ypObject *sq)
     }
     ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR(sq, ypTupleObject, ypTuple_ALLOCLEN_MAX);
     yp_ASSERT(ypTuple_ARRAY(sq) == ypTuple_INLINE_DATA(sq), "list_clear didn't allocate inline!");
+}
+
+static ypObject *list_clear(ypObject *sq)
+{
+    _list_clear(sq);
     return yp_None;
 }
 
@@ -14147,6 +14271,7 @@ static ypObject *list_remove(ypObject *sq, ypObject *x, int raise_on_missing)
 static ypObject *tuple_dealloc(ypObject *sq, void *memo)
 {
     yp_ssize_t i;
+    // FIXME Call a common "clear" method here? Consider sharing with invalidate.
     for (i = 0; i < ypTuple_LEN(sq); i++) {
         yp_decref_fromdealloc(ypTuple_ARRAY(sq)[i], memo);
     }
@@ -14212,7 +14337,7 @@ static ypTypeObject ypTuple_Type = {
         tuple_frozen_copy,        // tp_frozen_copy
         tuple_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         tuple_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,      // tp_invalidate
+        tuple_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         tuple_bool,  // tp_bool
@@ -14304,7 +14429,7 @@ static ypTypeObject ypList_Type = {
         tuple_frozen_copy,        // tp_frozen_copy
         tuple_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         tuple_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,      // tp_invalidate
+        tuple_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         tuple_bool,  // tp_bool
@@ -16305,7 +16430,7 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
     yp_ssize_t      i;
     ypSet_KeyEntry *loc;
 
-    yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+    yp_ASSERT1(!ypObject_IS_STATIC_ALLOC(so));
 
     // Always allocate a separate buffer.
     newalloclen = _ypSet_calc_alloclen(minused);
@@ -17089,6 +17214,16 @@ static ypObject *frozenset_frozen_deepcopy(ypObject *so, visitfunc copy_visitor,
     return _ypSet_deepcopy(ypFrozenSet_CODE, so, copy_visitor, copy_memo);
 }
 
+static void      _set_clear(ypObject *so);
+static ypObject *frozenset_invalidate(ypObject *so)
+{
+    if (ypObject_IS_STATIC_ALLOC(so)) return yp_None;  // Silent no-op.
+    _set_clear(so);  // FIXME For all invalidate methods, clear is doing more than it needs to...
+    yp_ASSERT(ypSet_TABLE(so) == ypSet_INLINE_DATA(so), "_set_clear didn't allocate inline!");
+    ypObject_SET_TYPE_CODE(so, ypInvalidated_CODE);
+    return yp_None;
+}
+
 static ypObject *frozenset_bool(ypObject *so) { return ypBool_FROM_C(ypSet_LEN(so)); }
 
 // XXX Adapted from Python's frozenset_hash
@@ -17433,14 +17568,17 @@ static ypObject *set_push(ypObject *so, ypObject *x)
     return yp_None;
 }
 
-static ypObject *set_clear(ypObject *so)
+// Clears so. Always succeeds; has no return value.
+static void _set_clear(ypObject *so)
 {
     ypSet_KeyEntry *oldkeys = ypSet_TABLE(so);
     yp_ssize_t      keysleft = ypSet_LEN(so);
     yp_ssize_t      i;
 
+    yp_ASSERT1(!ypObject_IS_STATIC_ALLOC(so));
+
     // Discard the old keys
-    // TODO What if yp_decref modifies so? Here and everywhere, we should delay decrefs until we're
+    // FIXME What if yp_decref modifies so? Here and everywhere, we should delay decrefs until we're
     // done modifying the object.
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&oldkeys[i])) continue;
@@ -17461,6 +17599,11 @@ static ypObject *set_clear(ypObject *so)
     ypSet_SET_LEN(so, 0);
     ypSet_FILL(so) = 0;
     yp_memset(ypSet_TABLE(so), 0, ypSet_ALLOCLEN_MIN * yp_sizeof(ypSet_KeyEntry));
+}
+
+static ypObject *set_clear(ypObject *so)
+{
+    _set_clear(so);
     return yp_None;
 }
 
@@ -17588,7 +17731,7 @@ static ypTypeObject ypFrozenSet_Type = {
         frozenset_frozen_copy,        // tp_frozen_copy
         frozenset_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         frozenset_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,          // tp_invalidate
+        frozenset_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         frozenset_bool,  // tp_bool
@@ -17676,7 +17819,7 @@ static ypTypeObject ypSet_Type = {
         frozenset_frozen_copy,        // tp_frozen_copy
         frozenset_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         frozenset_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,          // tp_invalidate
+        frozenset_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         frozenset_bool,  // tp_bool
@@ -18044,7 +18187,7 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
     ypObject       *value;
     ypSet_KeyEntry *newkey_loc;
 
-    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(!ypObject_IS_STATIC_ALLOC(mp));
 
     // Always allocate a separate buffer. Remember that mp->ob_alloclen has been repurposed to hold
     // a search finger.
@@ -18096,7 +18239,7 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     ypObject  *result;
     yp_ssize_t newlen;
 
-    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(!ypObject_IS_STATIC_ALLOC(mp));
     yp_ASSERT1(!ypSet_ENTRY_USED(*key_loc));
     yp_ASSERT1(!yp_isexceptionC(key));
     yp_ASSERT1(!yp_isexceptionC(value));
@@ -18134,7 +18277,7 @@ static void _ypDict_push_existingkey(ypObject *mp, ypSet_KeyEntry *key_loc, ypOb
 {
     ypObject **value_loc;
 
-    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(!ypObject_IS_STATIC_ALLOC(mp));
     yp_ASSERT1(ypSet_ENTRY_USED(key_loc));
     yp_ASSERT1(!yp_isexceptionC(value));
 
@@ -18162,7 +18305,7 @@ static ypObject *_ypDict_push_byhash(
     ypObject       *exc = yp_None;
     ypObject       *result;
 
-    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(!ypObject_IS_STATIC_ALLOC(mp));
     yp_ASSERT1(!yp_isexceptionC(key));
     yp_ASSERT1(!yp_isexceptionC(value));
 
@@ -18192,7 +18335,7 @@ static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
     ypObject      **value_loc;
     ypObject       *oldvalue;
 
-    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+    yp_ASSERT1(!ypObject_IS_STATIC_ALLOC(mp));
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set.
@@ -18356,29 +18499,42 @@ static ypObject *dict_freeze(ypObject *mp)
     return yp_None;
 }
 
-static ypObject *frozendict_unfrozen_copy(ypObject *x)
+static ypObject *frozendict_unfrozen_copy(ypObject *mp)
 {
-    if (ypDict_LEN(x) < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return _ypDict_copy(ypDict_CODE, x, /*alloclen_fixed=*/FALSE);
+    if (ypDict_LEN(mp) < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
+    return _ypDict_copy(ypDict_CODE, mp, /*alloclen_fixed=*/FALSE);
 }
 
-static ypObject *frozendict_frozen_copy(ypObject *x)
+static ypObject *frozendict_frozen_copy(ypObject *mp)
 {
-    if (ypDict_LEN(x) < 1) return yp_frozendict_empty;
+    if (ypDict_LEN(mp) < 1) return yp_frozendict_empty;
     // A shallow copy of a frozendict to a frozendict doesn't require an actual copy
-    if (ypObject_TYPE_CODE(x) == ypFrozenDict_CODE) return yp_incref(x);
-    return _ypDict_copy(ypFrozenDict_CODE, x, /*alloclen_fixed=*/TRUE);
+    if (ypObject_TYPE_CODE(mp) == ypFrozenDict_CODE) return yp_incref(mp);
+    return _ypDict_copy(ypFrozenDict_CODE, mp, /*alloclen_fixed=*/TRUE);
 }
 
-static ypObject *frozendict_unfrozen_deepcopy(ypObject *x, visitfunc copy_visitor, void *copy_memo)
+static ypObject *frozendict_unfrozen_deepcopy(ypObject *mp, visitfunc copy_visitor, void *copy_memo)
 {
-    return _ypDict_deepcopy(ypDict_CODE, x, copy_visitor, copy_memo);
+    return _ypDict_deepcopy(ypDict_CODE, mp, copy_visitor, copy_memo);
 }
 
-static ypObject *frozendict_frozen_deepcopy(ypObject *x, visitfunc copy_visitor, void *copy_memo)
+static ypObject *frozendict_frozen_deepcopy(ypObject *mp, visitfunc copy_visitor, void *copy_memo)
 {
-    if (ypDict_LEN(x) < 1) return yp_frozendict_empty;
-    return _ypDict_deepcopy(ypFrozenDict_CODE, x, copy_visitor, copy_memo);
+    if (ypDict_LEN(mp) < 1) return yp_frozendict_empty;
+    return _ypDict_deepcopy(ypFrozenDict_CODE, mp, copy_visitor, copy_memo);
+}
+
+static ypObject *dict_clear(ypObject *mp);
+static ypObject *frozendict_invalidate(ypObject *mp)
+{
+    ypObject *result;
+    if (ypObject_IS_STATIC_ALLOC(mp)) return yp_None;  // Silent no-op.
+    // FIXME a dict_clear that doesn't fail, and doesn't allocate anything.
+    result = dict_clear(mp);
+    if (yp_isexceptionC(result)) return result;
+    yp_ASSERT(ypDict_VALUES(mp) == ypDict_INLINE_DATA(mp), "dict_clear didn't allocate inline!");
+    ypObject_SET_TYPE_CODE(mp, ypInvalidated_CODE);
+    return yp_None;
 }
 
 static ypObject *frozendict_bool(ypObject *mp) { return ypBool_FROM_C(ypDict_LEN(mp)); }
@@ -18508,6 +18664,8 @@ static ypObject *dict_clear(ypObject *mp)
     yp_ssize_t valuesleft = ypDict_LEN(mp);
     yp_ssize_t i;
 
+    yp_ASSERT(!ypObject_IS_STATIC_ALLOC(mp));
+
     // Create a new keyset
     // TODO Rather than creating a new keyset which we may never need, use yp_frozenset_empty,
     // leaving it to _ypDict_push to allocate a new keyset...BUT this means yp_frozenset_empty
@@ -18519,7 +18677,7 @@ static ypObject *dict_clear(ypObject *mp)
             alloclen == ypSet_ALLOCLEN_MIN, "expect alloclen of ypSet_ALLOCLEN_MIN for new keyset");
 
     // Discard the old values
-    // TODO yp_decref may mutate mp, invalidating valuesleft!
+    // FIXME yp_decref may mutate mp, invalidating valuesleft!
     for (i = 0; valuesleft > 0; i++) {
         if (oldvalues[i] == NULL) continue;
         valuesleft -= 1;
@@ -18964,7 +19122,7 @@ static ypTypeObject ypFrozenDict_Type = {
         frozendict_frozen_copy,        // tp_frozen_copy
         frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         frozendict_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,           // tp_invalidate
+        frozendict_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         frozendict_bool,             // tp_bool
@@ -19048,7 +19206,7 @@ static ypTypeObject ypDict_Type = {
         frozendict_frozen_copy,        // tp_frozen_copy
         frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
         frozendict_frozen_deepcopy,    // tp_frozen_deepcopy
-        MethodError_objproc,           // tp_invalidate
+        frozendict_invalidate,         // tp_invalidate
 
         // Boolean operations and comparisons
         frozendict_bool,             // tp_bool
@@ -19436,6 +19594,13 @@ static ypObject *range_frozen_deepcopy(ypObject *r, visitfunc copy_visitor, void
     return newR;
 }
 
+static ypObject *range_invalidate(ypObject *r)
+{
+    if (ypObject_IS_STATIC_ALLOC(r)) return yp_None;  // Silent no-op.
+    ypObject_SET_TYPE_CODE(r, ypInvalidated_CODE);
+    return yp_None;
+}
+
 static ypObject *range_bool(ypObject *r) { return ypBool_FROM_C(ypRange_LEN(r)); }
 
 // A default_ of NULL means to raise an error if i is out of bounds.
@@ -19682,7 +19847,7 @@ static ypTypeObject ypRange_Type = {
         range_frozen_copy,      // tp_frozen_copy
         range_frozen_deepcopy,  // tp_unfrozen_deepcopy
         range_frozen_deepcopy,  // tp_frozen_deepcopy
-        MethodError_objproc,    // tp_invalidate
+        range_invalidate,       // tp_invalidate
 
         // Boolean operations and comparisons
         range_bool,  // tp_bool
@@ -20765,6 +20930,14 @@ static ypObject *ypFunction_call_array(ypObject *f, yp_ssize_t n, ypObject *cons
 
 // Function methods
 
+// Decrements the reference count of the visited object
+static ypObject *_function_decref_visitor(ypObject *x, void *memo)
+{
+    // FIXME Call yp_decref_fromdealloc instead?
+    yp_decref(x);
+    return yp_None;
+}
+
 static ypObject *_function_traverse_state(ypObject *f, visitfunc visitor, void *memo)
 {
     ypFunctionState *state = ypFunction_STATE(f);
@@ -20803,6 +20976,15 @@ static ypObject *function_frozen_deepcopy(ypObject *f, visitfunc copy_visitor, v
     return yp_NotImplementedError;  // TODO Support deepcopy.
 }
 
+static ypObject *function_invalidate(ypObject *f)
+{
+    if (ypObject_IS_STATIC_ALLOC(f)) return yp_None;  // Silent no-op.
+    // FIXME A specific _function_clear method?
+    (void)function_traverse(f, _function_decref_visitor, NULL);  // never fails
+    ypObject_SET_TYPE_CODE(f, ypInvalidated_CODE);
+    return yp_None;
+}
+
 static ypObject *function_bool(ypObject *f) { return yp_True; }
 
 static ypObject *function_currenthash(
@@ -20818,14 +21000,6 @@ static ypObject *function_call(ypObject *f, ypObject **function, ypObject **self
 {
     *function = yp_incref(f);
     *self = NULL;  // i.e. "no implicit first argument"
-    return yp_None;
-}
-
-// Decrements the reference count of the visited object
-static ypObject *_function_decref_visitor(ypObject *x, void *memo)
-{
-    // TODO Call yp_decref_fromdealloc instead?
-    yp_decref(x);
     return yp_None;
 }
 
@@ -20867,7 +21041,7 @@ static ypTypeObject ypFunction_Type = {
         function_frozen_copy,      // tp_frozen_copy
         function_frozen_deepcopy,  // tp_unfrozen_deepcopy
         function_frozen_deepcopy,  // tp_frozen_deepcopy
-        MethodError_objproc,       // tp_invalidate
+        function_invalidate,       // tp_invalidate
 
         // Boolean operations and comparisons
         function_bool,               // tp_bool
