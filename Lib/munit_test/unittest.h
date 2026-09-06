@@ -1031,6 +1031,7 @@ typedef struct _rand_elements_t {
 //
 // TODO Versions of each of these that build as the mutable type and then freezes, to test that the
 // freezing process still yields a viable object.
+extern fixture_type_t *fixture_type_invalidated;
 extern fixture_type_t *fixture_type_exception;
 extern fixture_type_t *fixture_type_type;
 extern fixture_type_t *fixture_type_NoneType;

@@ -10,7 +10,7 @@
 // tests will fail, but it may become a problem.
 
 
-#define FIXTURE_TYPES_ALL_LEN 31  // Verified in initialize_fixture_types.
+#define FIXTURE_TYPES_ALL_LEN 32  // Verified in initialize_fixture_types.
 
 
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
@@ -186,6 +186,7 @@ DEFINE_ARRAY_FROM_VA_LIST_FUNC(array_fromuint8NV, yp_uint8_t, int)
 // The maximum length of a random object that **does** create sub-objects (tuple, dict).
 #define RAND_OBJ_MAX_LEN_SUB_OBJECTS (8)
 
+static fixture_type_t fixture_type_invalidated_struct;
 static fixture_type_t fixture_type_exception_struct;
 static fixture_type_t fixture_type_type_struct;
 static fixture_type_t fixture_type_NoneType_struct;
@@ -721,7 +722,6 @@ extern ypObject *new_faulty_iter(
 }
 
 
-#if 0  // yp_invalidate is not currently implemented
 // Returns a random invalidated object.
 static ypObject *new_rand_invalidated(const rand_obj_supplier_memo_t *memo)
 {
@@ -772,7 +772,6 @@ static void initialize_fixture_type_invalidated(void)
 {
     fixture_type_invalidated->yp_type = yp_t_invalidated;
 }
-#endif
 
 
 // Returns a random exception object.
@@ -3090,12 +3089,12 @@ static void initialize_fixture_type_function(void)
 }
 
 
-static fixture_type_t *fixture_types_all_types[] = {&fixture_type_exception_struct,
-        &fixture_type_type_struct, &fixture_type_NoneType_struct, &fixture_type_bool_struct,
-        &fixture_type_int_struct, &fixture_type_intstore_struct, &fixture_type_float_struct,
-        &fixture_type_floatstore_struct, &fixture_type_iter_struct, &fixture_type_range_struct,
-        &fixture_type_bytes_struct, &fixture_type_bytearray_struct, &fixture_type_str_struct,
-        &fixture_type_chrarray_struct, &fixture_type_str_1byte_struct,
+static fixture_type_t *fixture_types_all_types[] = {&fixture_type_invalidated_struct,
+        &fixture_type_exception_struct, &fixture_type_type_struct, &fixture_type_NoneType_struct,
+        &fixture_type_bool_struct, &fixture_type_int_struct, &fixture_type_intstore_struct,
+        &fixture_type_float_struct, &fixture_type_floatstore_struct, &fixture_type_iter_struct,
+        &fixture_type_range_struct, &fixture_type_bytes_struct, &fixture_type_bytearray_struct,
+        &fixture_type_str_struct, &fixture_type_chrarray_struct, &fixture_type_str_1byte_struct,
         &fixture_type_chrarray_1byte_struct, &fixture_type_str_2bytes_struct,
         &fixture_type_chrarray_2bytes_struct, &fixture_type_str_4bytes_struct,
         &fixture_type_chrarray_4bytes_struct, &fixture_type_tuple_struct, &fixture_type_list_struct,
@@ -3107,7 +3106,7 @@ static fixture_type_t *fixture_types_all_types[] = {&fixture_type_exception_stru
 static fixture_types_t fixture_types_all_struct = {FIXTURE_TYPES_ALL_LEN, fixture_types_all_types};
 fixture_types_t       *fixture_types_all = &fixture_types_all_struct;
 static fixture_types_t fixture_types_most_struct = {
-        FIXTURE_TYPES_ALL_LEN - 1, &(fixture_types_all_types[1])};
+        FIXTURE_TYPES_ALL_LEN - 2, &(fixture_types_all_types[2])};
 fixture_types_t *fixture_types_most = &fixture_types_most_struct;
 // param_values_types_all and *_most are populated in initialize_fixture_types.
 char *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
@@ -3190,8 +3189,8 @@ static void initialize_fixture_types(void)
         }
         *param_values = NULL;
     }
-    memcpy(param_values_types_most, param_values_types_all + 1,
-            sizeof(char *) * (FIXTURE_TYPES_ALL_LEN - 1 + 1));
+    memcpy(param_values_types_most, param_values_types_all + 2,
+            sizeof(char *) * (FIXTURE_TYPES_ALL_LEN - 2 + 1));
 
     // Fill the remaining fixture_types_* and param_values_types_* arrays.
 #define FILL_FIXTURE_TYPES_ARRAYS(protocol) \
@@ -3222,6 +3221,7 @@ static void initialize_fixture_types(void)
 
     // Some fixture_type_t initialization needs to happen at runtime, as it references DLL pointers.
     // This happens after FILL_FIXTURE_TYPES_ARRAYS as some of these reference these arrays.
+    initialize_fixture_type_invalidated();
     initialize_fixture_type_exception();
     initialize_fixture_type_type();
     initialize_fixture_type_NoneType();

@@ -41,7 +41,11 @@ static MunitResult test_unsupported_protocols(const MunitParameter params[], fix
     ypObject       *typeError;
     ypObject       *methodError;
 
-    if (type == fixture_type_exception) {
+    if (type == fixture_type_invalidated) {
+        // Invalidated objects raise yp_InvalidatedError on all operations.
+        typeError = yp_InvalidatedError;
+        methodError = yp_InvalidatedError;
+    } else if (type == fixture_type_exception) {
         // Exception passthrough means if an exception is given as input, it is returned.
         typeError = self;
         methodError = self;
