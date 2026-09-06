@@ -49,8 +49,9 @@ static void _test_newN(
 
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_newN(N(yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception(any_newN(N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_newN(N(exception)), exception);
+        assert_isexception(any_newN(N(yp_None, exception)), exception);
     }
 
     obj_array_decref(items);
@@ -124,7 +125,8 @@ static void _test_new(fixture_type_t *type, fixture_type_t *x_type,
 
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_new(yp_SyntaxError), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_new(exception), exception);
     }
 
     obj_array_decref(items);
@@ -329,7 +331,10 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     }
 
     // Exception passthrough.
-    assert_isexception(yp_callN(type->yp_type, N(yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_callN(type->yp_type, N(exception)), exception);
+    }
 
     yp_decrefN(N(str_iterable, str_cls, str_rand));
     uniqueness_dealloc(uq);
@@ -422,9 +427,12 @@ static void _test_new_repeatCN(
             any_new_repeatCN(yp_SSIZE_T_MAX, N(items[0], items[1])), yp_MemorySizeOverflowError);
 
     // Exception passthrough.
-    assert_isexception(any_new_repeatCN(2, N(yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(any_new_repeatCN(0, N(yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(any_new_repeatCN(2, N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_new_repeatCN(2, N(exception)), exception);
+        assert_isexception(any_new_repeatCN(0, N(exception)), exception);
+        assert_isexception(any_new_repeatCN(2, N(yp_None, exception)), exception);
+    }
 
     obj_array_decref(items);
     uniqueness_dealloc(uq);
@@ -546,9 +554,10 @@ static MunitResult test_itemarrayCX(const MunitParameter params[], fixture_t *fi
 
     // Exception passthrough.
     {
+        ypObject        *exception = rand_obj(NULL, fixture_type_exception);
         yp_ssize_t       len;
         ypObject *const *array;
-        assert_raises(yp_itemarrayCX(yp_SyntaxError, &len, &array), yp_SyntaxError);
+        assert_raises(yp_itemarrayCX(exception, &len, &array), exception);
         assert_ssizeC(len, ==, 0);
         assert_null(array);
     }

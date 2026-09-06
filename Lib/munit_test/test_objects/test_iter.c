@@ -337,8 +337,11 @@ static void _test_new2(ypObject *(*any_new2)(ypObject *, ypObject *))
     assert_raises(any_new2(not_callable, yp_None), yp_TypeError);
 
     // Exception passthrough.
-    assert_isexception(any_new2(yp_SyntaxError, yp_None), yp_SyntaxError);
-    assert_isexception(any_new2(yp_t_tuple, yp_SyntaxError), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_new2(exception, yp_None), exception);
+        assert_isexception(any_new2(yp_t_tuple, exception), exception);
+    }
 
     obj_array_decref(items);
     yp_decrefN(N(s_keyword, s_star_star_kwargs, s_star_args, s_star, not_callable));
@@ -402,9 +405,12 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     assert_raises(yp_callN(yp_t_iter, N(not_callable, yp_None)), yp_TypeError);
 
     // Exception passthrough.
-    assert_isexception(yp_callN(yp_t_iter, N(yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(yp_callN(yp_t_iter, N(yp_SyntaxError, yp_t_tuple)), yp_SyntaxError);
-    assert_isexception(yp_callN(yp_t_iter, N(yp_t_tuple, yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_callN(yp_t_iter, N(exception)), exception);
+        assert_isexception(yp_callN(yp_t_iter, N(exception, yp_t_tuple)), exception);
+        assert_isexception(yp_callN(yp_t_iter, N(yp_t_tuple, exception)), exception);
+    }
 
     yp_decrefN(N(str_rand, str_sentinel, str_object, str_cls, not_callable, not_iterable));
     uniqueness_dealloc(uq);
@@ -555,7 +561,10 @@ static void _test_next(ypObject *(*any_next)(ypObject *), int raises)
     }
 
     // Exception passthrough.
-    assert_raises(any_next(yp_SyntaxError), yp_SyntaxError);
+    {
+        ypObject *passthrough = rand_obj(NULL, fixture_type_exception);
+        assert_raises(any_next(passthrough), passthrough);
+    }
 
 #undef assert_exhausted
 
@@ -594,8 +603,8 @@ static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
     }
 
     // Exception passthrough.
-    assert_raises(yp_send(yp_SyntaxError, values[0]), yp_SyntaxError);
     {
+        ypObject                  *exception = rand_obj(NULL, fixture_type_exception);
         ypObject                  *iter;
         scripted_generator_state_t state = {
                 2, {{items[0], values[0]}, {yp_GeneratorExit, yp_GeneratorExit}}};
@@ -603,8 +612,10 @@ static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
                 scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
 
-        assert_raises(yp_send(iter, yp_SyntaxError), yp_SyntaxError);
+        assert_raises(yp_send(exception, values[0]), exception);
+
         // Exception passthrough does not close the iterator.
+        assert_raises(yp_send(iter, exception), exception);
         ead(item, yp_send(iter, values[0]), assert_obj(item, is, items[0]));
 
         yp_decrefN(N(iter));
@@ -652,16 +663,18 @@ static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
     }
 
     // Exception passthrough.
-    assert_raises(yp_next2(yp_SyntaxError, defaults[0]), yp_SyntaxError);
     {
+        ypObject                  *exception = rand_obj(NULL, fixture_type_exception);
         ypObject                  *iter;
         scripted_generator_state_t state = {2, {{items[0]}, {yp_GeneratorExit, yp_GeneratorExit}}};
         yp_generator_decl_t        decl = {
                 scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
         assert_not_raises(iter = yp_generatorC(&decl));
 
-        assert_raises(yp_next2(iter, yp_SyntaxError), yp_SyntaxError);
+        assert_raises(yp_next2(exception, defaults[0]), exception);
+
         // Exception passthrough does not close the iterator.
+        assert_raises(yp_next2(iter, exception), exception);
         ead(item, yp_next2(iter, defaults[0]), assert_obj(item, is, items[0]));
 
         yp_decrefN(N(iter));
@@ -807,7 +820,10 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
     }
 
     // Exception passthrough.
-    assert_raises(yp_throw(yp_SyntaxError, yp_Exception), yp_SyntaxError);
+    {
+        ypObject *passthrough = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_throw(passthrough, yp_Exception), passthrough);
+    }
 
     obj_array_decref(items);
     uniqueness_dealloc(uq);
@@ -889,7 +905,10 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
     }
 
     // Exception passthrough.
-    assert_raises_exc(yp_close(yp_SyntaxError, &exc), yp_SyntaxError);
+    {
+        ypObject *passthrough = rand_obj(NULL, fixture_type_exception);
+        assert_raises_exc(yp_close(passthrough, &exc), passthrough);
+    }
 
     obj_array_decref(items);
     uniqueness_dealloc(uq);

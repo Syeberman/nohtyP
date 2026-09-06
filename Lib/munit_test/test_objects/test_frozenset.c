@@ -79,8 +79,9 @@ static void _test_newN(
 
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_newN(N(yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception(any_newN(N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_newN(N(exception)), exception);
+        assert_isexception(any_newN(N(yp_None, exception)), exception);
     }
 
     obj_array_decref(items);
@@ -171,7 +172,8 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
 
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_new(yp_SyntaxError), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_new(exception), exception);
     }
 
     obj_array_decref(items);
@@ -372,7 +374,10 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     }
 
     // Exception passthrough.
-    assert_isexception(yp_callN(type->yp_type, N(yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_callN(type->yp_type, N(exception)), exception);
+    }
 
     yp_decrefN(N(str_iterable, str_cls, str_rand));
     uniqueness_dealloc(uq);

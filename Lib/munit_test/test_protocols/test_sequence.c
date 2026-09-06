@@ -180,7 +180,10 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
         // Exception passthrough.
-        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(sq, exception), exception);
+        }
 
         assert_sequence(sq, items[1], items[4]);  // sq unchanged.
         yp_decrefN(N(sq));
@@ -228,7 +231,10 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
         // Exception passthrough.
-        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(sq, exception), exception);
+        }
 
         assert_sequence(sq, items[4], items[1]);  // sq unchanged.
         yp_decrefN(N(sq));
@@ -257,7 +263,10 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
         // Exception passthrough.
-        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(sq, exception), exception);
+        }
 
         assert_sequence(sq, items[1]);  // sq unchanged.
         yp_decrefN(N(sq));
@@ -280,7 +289,10 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
         // Exception passthrough.
-        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(sq, exception), exception);
+        }
 
         assert_len(sq, 0);  // sq unchanged.
         yp_decrefN(N(sq));
@@ -688,8 +700,9 @@ static void _test_concat(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_concat(sq, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_concat(sq, exception), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decrefN(N(sq));
     }
@@ -1097,8 +1110,11 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     assert_raises(yp_getitem(sq, sq), yp_TypeError);
 
     // Exception passthrough.
-    assert_isexception(yp_getitem(sq, yp_SyntaxError), yp_SyntaxError);
-    assert_isexception(yp_getitem(empty, yp_SyntaxError), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_getitem(sq, exception), exception);
+        assert_isexception(yp_getitem(empty, exception), exception);
+    }
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -1176,11 +1192,14 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     }
 
     // Exception passthrough.
-    assert_isexception(yp_getdefault(sq, yp_SyntaxError, items[2]), yp_SyntaxError);
-    assert_isexception(yp_getdefault(empty, yp_SyntaxError, items[2]), yp_SyntaxError);
-    assert_isexception(yp_getdefault(sq, ist_0, yp_SyntaxError), yp_SyntaxError);
-    assert_isexception(yp_getdefault(sq, ist_2, yp_SyntaxError), yp_SyntaxError);
-    assert_isexception(yp_getdefault(empty, ist_0, yp_SyntaxError), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_getdefault(sq, exception, items[2]), exception);
+        assert_isexception(yp_getdefault(empty, exception, items[2]), exception);
+        assert_isexception(yp_getdefault(sq, ist_0, exception), exception);
+        assert_isexception(yp_getdefault(sq, ist_2, exception), exception);
+        assert_isexception(yp_getdefault(empty, ist_0, exception), exception);
+    }
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -1339,12 +1358,15 @@ static void _test_findC(fixture_type_t *type,
     }
 
     // Exception passthrough.
-    assert_isexception_exc(any_findC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC5(sq, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC(empty, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC5(empty, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC5(empty, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception_exc(any_findC(sq, exception, &exc), exception);
+        assert_isexception_exc(any_findC5(sq, exception, 0, 1, &exc), exception);
+        assert_isexception_exc(any_findC5(sq, exception, 0, 0, &exc), exception);
+        assert_isexception_exc(any_findC(empty, exception, &exc), exception);
+        assert_isexception_exc(any_findC5(empty, exception, 0, 1, &exc), exception);
+        assert_isexception_exc(any_findC5(empty, exception, 0, 0, &exc), exception);
+    }
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -1504,12 +1526,15 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     }
 
     // Exception passthrough.
-    assert_isexception_exc(yp_countC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC5(sq, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC(empty, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC5(empty, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC5(empty, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception_exc(yp_countC(sq, exception, &exc), exception);
+        assert_isexception_exc(yp_countC5(sq, exception, 0, 1, &exc), exception);
+        assert_isexception_exc(yp_countC5(sq, exception, 0, 0, &exc), exception);
+        assert_isexception_exc(yp_countC(empty, exception, &exc), exception);
+        assert_isexception_exc(yp_countC5(empty, exception, 0, 1, &exc), exception);
+        assert_isexception_exc(yp_countC5(empty, exception, 0, 0, &exc), exception);
+    }
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -1617,8 +1642,9 @@ static void _test_setindexC(fixture_type_t *type,
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_setindexC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_setindexC(sq, 0, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1939,8 +1965,9 @@ static void _test_setsliceC(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_setsliceC6(sq, 0, 1, 1, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setsliceC6(sq, 0, 1, 1, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2010,8 +2037,9 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_setitem(sq, yp_SyntaxError, items[2], &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setitem(sq, exception, items[2], &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2296,8 +2324,9 @@ static void _test_delitem(fixture_type_t *type,
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_delitem(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_delitem(sq, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2392,8 +2421,9 @@ static void _test_appendC(
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_append(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_append(sq, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2569,8 +2599,9 @@ static void _test_extend(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_extend(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_extend(sq, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2786,8 +2817,9 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_insertC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_insertC(sq, 0, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -3052,8 +3084,9 @@ static void _test_remove(
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_remove(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_remove(sq, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }

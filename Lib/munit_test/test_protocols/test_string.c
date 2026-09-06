@@ -1231,12 +1231,15 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
             assert_obj(yp_startswith(s, x_tuple), is, yp_True));
 
     // Exception passthrough.
-    assert_raises(yp_startswith(s, yp_SyntaxError), yp_SyntaxError);
-    assert_raises(yp_startswithC4(s, yp_SyntaxError, 0, 1), yp_SyntaxError);
-    assert_raises(yp_startswithC4(s, yp_SyntaxError, 0, 0), yp_SyntaxError);
-    assert_raises(yp_startswith(empty, yp_SyntaxError), yp_SyntaxError);
-    assert_raises(yp_startswithC4(empty, yp_SyntaxError, 0, 1), yp_SyntaxError);
-    assert_raises(yp_startswithC4(empty, yp_SyntaxError, 0, 0), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_startswith(s, exception), exception);
+        assert_raises(yp_startswithC4(s, exception, 0, 1), exception);
+        assert_raises(yp_startswithC4(s, exception, 0, 0), exception);
+        assert_raises(yp_startswith(empty, exception), exception);
+        assert_raises(yp_startswithC4(empty, exception, 0, 1), exception);
+        assert_raises(yp_startswithC4(empty, exception, 0, 0), exception);
+    }
 
     assert_sequence(s, x_items[1], x_items[2], items[0], x_items[3]);  // s unchanged.
 
@@ -1441,12 +1444,15 @@ static void _test_endswith(fixture_type_t *type, fixture_type_t *x_type)
     ead(x_tuple, yp_tupleN(N(x_3, not_iterable)), assert_obj(yp_endswith(s, x_tuple), is, yp_True));
 
     // Exception passthrough.
-    assert_raises(yp_endswith(s, yp_SyntaxError), yp_SyntaxError);
-    assert_raises(yp_endswithC4(s, yp_SyntaxError, 3, 4), yp_SyntaxError);
-    assert_raises(yp_endswithC4(s, yp_SyntaxError, 4, 4), yp_SyntaxError);
-    assert_raises(yp_endswith(empty, yp_SyntaxError), yp_SyntaxError);
-    assert_raises(yp_endswithC4(empty, yp_SyntaxError, 3, 4), yp_SyntaxError);
-    assert_raises(yp_endswithC4(empty, yp_SyntaxError, 4, 4), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_endswith(s, exception), exception);
+        assert_raises(yp_endswithC4(s, exception, 3, 4), exception);
+        assert_raises(yp_endswithC4(s, exception, 4, 4), exception);
+        assert_raises(yp_endswith(empty, exception), exception);
+        assert_raises(yp_endswithC4(empty, exception, 3, 4), exception);
+        assert_raises(yp_endswithC4(empty, exception, 4, 4), exception);
+    }
 
     assert_sequence(s, x_items[1], items[0], x_items[2], x_items[3]);  // s unchanged.
 
@@ -1499,7 +1505,7 @@ static MunitResult test_lower(const MunitParameter params[], fixture_t *fixture)
     {
         ypObject *s = type->newN(0);
         ead(result, yp_lower(s), assert_len(result, 0));
-        assert_len(s, 0); // s unchanged.
+        assert_len(s, 0);  // s unchanged.
         yp_decrefN(N(s));
     }
 
@@ -1524,7 +1530,7 @@ static MunitResult test_upper(const MunitParameter params[], fixture_t *fixture)
     {
         ypObject *s = type->newN(0);
         ead(result, yp_upper(s), assert_len(result, 0));
-        assert_len(s, 0); // s unchanged.
+        assert_len(s, 0);  // s unchanged.
         yp_decrefN(N(s));
     }
 
@@ -1555,7 +1561,7 @@ static MunitResult test_casefold(const MunitParameter params[], fixture_t *fixtu
     {
         ypObject *s = type->newN(0);
         ead(result, yp_casefold(s), assert_len(result, 0));
-        assert_len(s, 0); // s unchanged.
+        assert_len(s, 0);  // s unchanged.
         yp_decrefN(N(s));
     }
 
@@ -1581,7 +1587,7 @@ static MunitResult test_swapcase(const MunitParameter params[], fixture_t *fixtu
     {
         ypObject *s = type->newN(0);
         ead(result, yp_swapcase(s), assert_len(result, 0));
-        assert_len(s, 0); // s unchanged.
+        assert_len(s, 0);  // s unchanged.
         yp_decrefN(N(s));
     }
 
@@ -1606,7 +1612,7 @@ static MunitResult test_capitalize(const MunitParameter params[], fixture_t *fix
     {
         ypObject *s = type->newN(0);
         ead(result, yp_capitalize(s), assert_len(result, 0));
-        assert_len(s, 0); // s unchanged.
+        assert_len(s, 0);  // s unchanged.
         yp_decrefN(N(s));
     }
 

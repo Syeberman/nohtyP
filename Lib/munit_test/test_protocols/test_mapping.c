@@ -192,7 +192,10 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ead(x, x_type->newK(K(keys[0], mp)), assert_obj(any_cmp(mp, x), is, x_different));
 
         // Exception passthrough.
-        assert_isexception(any_cmp(mp, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(mp, exception), exception);
+        }
 
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);  // mp unchanged.
         yp_decref(mp);
@@ -223,7 +226,10 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ead(x, x_type->newK(K(keys[0], empty)), assert_obj(any_cmp(empty, x), is, x_different));
 
         // Exception passthrough.
-        assert_isexception(any_cmp(empty, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(empty, exception), exception);
+        }
 
         assert_len(empty, 0);  // empty unchanged.
         yp_decref(empty);
@@ -402,8 +408,11 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     }
 
     // Exception passthrough.
-    assert_isexception(yp_getitem(mp, yp_SyntaxError), yp_SyntaxError);
-    assert_isexception(yp_getitem(empty, yp_SyntaxError), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_getitem(mp, exception), exception);
+        assert_isexception(yp_getitem(empty, exception), exception);
+    }
 
     assert_mapping(mp, keys[0], values[0], keys[1], values[1]);  // mp unchanged
 
@@ -474,11 +483,14 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     }
 
     // Exception passthrough.
-    assert_isexception(yp_getdefault(mp, yp_SyntaxError, values[2]), yp_SyntaxError);
-    assert_isexception(yp_getdefault(empty, yp_SyntaxError, values[2]), yp_SyntaxError);
-    assert_isexception(yp_getdefault(mp, keys[0], yp_SyntaxError), yp_SyntaxError);
-    assert_isexception(yp_getdefault(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
-    assert_isexception(yp_getdefault(empty, keys[0], yp_SyntaxError), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_getdefault(mp, exception, values[2]), exception);
+        assert_isexception(yp_getdefault(empty, exception, values[2]), exception);
+        assert_isexception(yp_getdefault(mp, keys[0], exception), exception);
+        assert_isexception(yp_getdefault(mp, keys[2], exception), exception);
+        assert_isexception(yp_getdefault(empty, keys[0], exception), exception);
+    }
 
     assert_mapping(mp, keys[0], values[0], keys[1], values[1]);  // mp unchanged
 
@@ -578,9 +590,10 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_isexception_exc(yp_setitem(mp, yp_SyntaxError, values[2], &exc), yp_SyntaxError);
-        assert_isexception_exc(yp_setitem(mp, keys[2], yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setitem(mp, exception, values[2], &exc), exception);
+        assert_isexception_exc(yp_setitem(mp, keys[2], exception, &exc), exception);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
     }
@@ -683,8 +696,9 @@ static void _test_delitem(
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_isexception_exc(any_delitem(mp, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_delitem(mp, exception, &exc), exception);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
     }
@@ -819,15 +833,16 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
         ypObject *empty = type->newK(0);
-        assert_isexception(yp_popvalue3(mp, yp_SyntaxError, values[3]), yp_SyntaxError);
-        assert_isexception(yp_popvalue2(mp, yp_SyntaxError), yp_SyntaxError);
-        assert_isexception(yp_popvalue3(empty, yp_SyntaxError, values[3]), yp_SyntaxError);
-        assert_isexception(yp_popvalue2(empty, yp_SyntaxError), yp_SyntaxError);
-        assert_isexception(yp_popvalue3(mp, keys[0], yp_SyntaxError), yp_SyntaxError);
-        assert_isexception(yp_popvalue3(mp, keys[3], yp_SyntaxError), yp_SyntaxError);
-        assert_isexception(yp_popvalue3(empty, keys[0], yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_popvalue3(mp, exception, values[3]), exception);
+        assert_isexception(yp_popvalue2(mp, exception), exception);
+        assert_isexception(yp_popvalue3(empty, exception, values[3]), exception);
+        assert_isexception(yp_popvalue2(empty, exception), exception);
+        assert_isexception(yp_popvalue3(mp, keys[0], exception), exception);
+        assert_isexception(yp_popvalue3(mp, keys[3], exception), exception);
+        assert_isexception(yp_popvalue3(empty, keys[0], exception), exception);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
         assert_len(empty, 0);
         yp_decrefN(N(mp, empty));
@@ -1046,10 +1061,11 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_isexception(yp_setdefault(mp, yp_SyntaxError, values[2]), yp_SyntaxError);
-        assert_isexception(yp_setdefault(mp, keys[0], yp_SyntaxError), yp_SyntaxError);
-        assert_isexception(yp_setdefault(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_setdefault(mp, exception, values[2]), exception);
+        assert_isexception(yp_setdefault(mp, keys[0], exception), exception);
+        assert_isexception(yp_setdefault(mp, keys[2], exception), exception);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
     }
@@ -1215,29 +1231,28 @@ static MunitResult test_updateK(const MunitParameter params[], fixture_t *fixtur
     // Optimization: we add directly to mp from the varargs. Unfortunately, if varargs contains
     // an exception mid-way, mp may have already been modified.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_raises_exc(yp_updateK(mp, &exc, K(keys[1], values[3], yp_SyntaxError, values[2])),
-                yp_SyntaxError);
+        assert_raises_exc(
+                yp_updateK(mp, &exc, K(keys[1], values[3], exception, values[2])), exception);
         assert_mapping(mp, keys[0], values[0], keys[1], values[3]);
         assert_raises_exc(
-                updateK_to_updateKV(mp, &exc, K(keys[1], values[4], yp_SyntaxError, values[2])),
-                yp_SyntaxError);
+                updateK_to_updateKV(mp, &exc, K(keys[1], values[4], exception, values[2])),
+                exception);
         assert_mapping(mp, keys[0], values[0], keys[1], values[4]);
         yp_decref(mp);
     }
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_isexception_exc(yp_updateK(mp, &exc, K(yp_SyntaxError, values[2])), yp_SyntaxError);
-        assert_isexception_exc(yp_updateK(mp, &exc, K(keys[0], yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception_exc(yp_updateK(mp, &exc, K(keys[2], yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception_exc(
-                updateK_to_updateKV(mp, &exc, K(yp_SyntaxError, values[2])), yp_SyntaxError);
-        assert_isexception_exc(
-                updateK_to_updateKV(mp, &exc, K(keys[0], yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception_exc(
-                updateK_to_updateKV(mp, &exc, K(keys[2], yp_SyntaxError)), yp_SyntaxError);
+        assert_isexception_exc(yp_updateK(mp, &exc, K(exception, values[2])), exception);
+        assert_isexception_exc(yp_updateK(mp, &exc, K(keys[0], exception)), exception);
+        assert_isexception_exc(yp_updateK(mp, &exc, K(keys[2], exception)), exception);
+        assert_isexception_exc(updateK_to_updateKV(mp, &exc, K(exception, values[2])), exception);
+        assert_isexception_exc(updateK_to_updateKV(mp, &exc, K(keys[0], exception)), exception);
+        assert_isexception_exc(updateK_to_updateKV(mp, &exc, K(keys[2], exception)), exception);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
     }
@@ -1425,8 +1440,9 @@ static void _test_update(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_raises_exc(yp_update(mp, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_raises_exc(yp_update(mp, exception, &exc), exception);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp));
     }

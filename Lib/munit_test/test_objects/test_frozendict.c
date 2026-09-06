@@ -98,12 +98,11 @@ static void _test_newK(
 
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_newK(K(yp_SyntaxError, yp_None)), yp_SyntaxError);
-        assert_isexception(any_newK(K(yp_None, yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception(
-                any_newK(K(keys[0], values[0], yp_SyntaxError, yp_None)), yp_SyntaxError);
-        assert_isexception(
-                any_newK(K(keys[0], values[0], yp_None, yp_SyntaxError)), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_newK(K(exception, yp_None)), exception);
+        assert_isexception(any_newK(K(yp_None, exception)), exception);
+        assert_isexception(any_newK(K(keys[0], values[0], exception, yp_None)), exception);
+        assert_isexception(any_newK(K(keys[0], values[0], yp_None, exception)), exception);
     }
 
     obj_array_decref(values);
@@ -201,7 +200,8 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
 
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_new(yp_SyntaxError), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_new(exception), exception);
     }
 
     obj_array_decref(values);
@@ -481,7 +481,10 @@ static void _test_call_type(fixture_type_t *type, peer_type_t *peer)
     }
 
     // Exception passthrough.
-    assert_isexception(yp_callN(type->yp_type, N(yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_callN(type->yp_type, N(exception)), exception);
+    }
 
     obj_array_decref(values);
     obj_array_decref(keys);
@@ -578,10 +581,11 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
 
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_fromkeysN(yp_SyntaxError, 0), yp_SyntaxError);
-        assert_isexception(any_fromkeysN(yp_SyntaxError, N(yp_None)), yp_SyntaxError);
-        assert_isexception(any_fromkeysN(yp_None, N(yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception(any_fromkeysN(yp_None, N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_fromkeysN(exception, 0), exception);
+        assert_isexception(any_fromkeysN(exception, N(yp_None)), exception);
+        assert_isexception(any_fromkeysN(yp_None, N(exception)), exception);
+        assert_isexception(any_fromkeysN(yp_None, N(yp_None, exception)), exception);
     }
 
     obj_array_decref(values);
@@ -667,9 +671,10 @@ static void _test_fromkeys(fixture_type_t *type, peer_type_t  *peer,
 
     // Exception passthrough.
     if (test_exception_passthrough) {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *list_empty = yp_listN(0);
-        assert_isexception(any_fromkeys(yp_SyntaxError, list_empty), yp_SyntaxError);
-        assert_isexception(any_fromkeys(list_empty, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(any_fromkeys(exception, list_empty), exception);
+        assert_isexception(any_fromkeys(list_empty, exception), exception);
         yp_decrefN(N(list_empty));
     }
 

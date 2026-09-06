@@ -197,7 +197,10 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         }
 
         // Exception passthrough.
-        assert_isexception(any_cmp(so, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(so, exception), exception);
+        }
 
         assert_setlike(so, items[0], items[1]);  // so unchanged.
         yp_decref(so);
@@ -225,7 +228,10 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         }
 
         // Exception passthrough.
-        assert_isexception(any_cmp(empty, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(empty, exception), exception);
+        }
 
         assert_len(empty, 0);  // empty unchanged.
         yp_decref(empty);
@@ -789,8 +795,9 @@ static void _test_union(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_union(so, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_union(so, exception), exception);
         yp_decrefN(N(so));
     }
 
@@ -977,8 +984,9 @@ static void _test_intersection(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_intersection(so, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_intersection(so, exception), exception);
         yp_decrefN(N(so));
     }
 
@@ -1165,8 +1173,9 @@ static void _test_difference(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_difference(so, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_difference(so, exception), exception);
         yp_decrefN(N(so));
     }
 
@@ -1364,8 +1373,9 @@ static void _test_symmetric_difference(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_symmetric_difference(so, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_symmetric_difference(so, exception), exception);
         yp_decrefN(N(so));
     }
 
@@ -1545,8 +1555,9 @@ static void _test_update(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_update(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1716,8 +1727,9 @@ static void _test_intersection_update(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_intersection_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_intersection_update(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1887,8 +1899,9 @@ static void _test_difference_update(fixture_type_t *type, peer_type_t *peer)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_difference_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_difference_update(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -2069,9 +2082,9 @@ static void _test_symmetric_difference_update(fixture_type_t *type, peer_type_t 
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(
-                yp_symmetric_difference_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_symmetric_difference_update(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -2175,8 +2188,9 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_push(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_push(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -2267,8 +2281,9 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_pushunique(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_pushunique(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -2381,8 +2396,9 @@ static void _test_remove(
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_remove(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_remove(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }

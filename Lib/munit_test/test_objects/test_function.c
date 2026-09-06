@@ -2544,7 +2544,7 @@ static MunitResult test_iscallableC(const MunitParameter params[], fixture_t *fi
     }
 
     // x is an exception.
-    assert_false(yp_iscallableC(yp_SyntaxError));
+    assert_false(yp_iscallableC(rand_obj(NULL, fixture_type_exception)));
 
     return MUNIT_OK;
 }
@@ -2577,7 +2577,10 @@ static MunitResult test_func_iscallable(const MunitParameter params[], fixture_t
     }
 
     // Exception passthrough.
-    assert_raises(yp_callN(yp_func_iscallable, N(yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_callN(yp_func_iscallable, N(exception)), exception);
+    }
 
     yp_decrefN(N(x, str_rand, str_obj));
     return MUNIT_OK;

@@ -165,9 +165,12 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     }
 
     // Exception passthrough.
-    assert_isexception(yp_callN(yp_t_range, N(yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(yp_callN(yp_t_range, N(ist_0, yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(yp_callN(yp_t_range, N(ist_0, ist_2, yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_callN(yp_t_range, N(exception)), exception);
+        assert_isexception(yp_callN(yp_t_range, N(ist_0, exception)), exception);
+        assert_isexception(yp_callN(yp_t_range, N(ist_0, ist_2, exception)), exception);
+    }
 
     yp_decrefN(N(str_rand, str_step, str_x, str_cls, f_value, ist_2, ist_1, ist_0));
     return MUNIT_OK;
