@@ -4115,7 +4115,9 @@ ypObject *yp_deepcopy(ypObject *x) { return _yp_deepcopy(x, _yp_sametype_deepcop
 // invalidated object in-place (if supported by the heap).
 void yp_invalidate(ypObject *x, ypObject **exc)
 {
-    ypObject *result = ypObject_TYPE(x)->tp_invalidate(x);
+    ypObject *result;
+    yp_DEBUG("yp_invalidate: type %d %p", ypObject_TYPE_CODE(x), x);
+    result = ypObject_TYPE(x)->tp_invalidate(x);
     if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
     yp_ASSERT(ypObject_TYPE_CODE(x) == ypInvalidated_CODE || ypObject_IS_STATIC_ALLOC(x),
             "tp_invalidate didn't invalidate the object");
@@ -18529,9 +18531,10 @@ static ypObject *frozendict_invalidate(ypObject *mp)
 {
     ypObject *result;
     if (ypObject_IS_STATIC_ALLOC(mp)) return yp_None;  // Silent no-op.
-    // FIXME a dict_clear that doesn't fail, and doesn't allocate anything.
+    // FIXME A dict_clear that doesn't fail, and doesn't allocate anything.
     result = dict_clear(mp);
     if (yp_isexceptionC(result)) return result;
+    yp_decref(ypDict_KEYSET(mp)); // FIXME A dict_clear that doesn't allocate.
     yp_ASSERT(ypDict_VALUES(mp) == ypDict_INLINE_DATA(mp), "dict_clear didn't allocate inline!");
     ypObject_SET_TYPE_CODE(mp, ypInvalidated_CODE);
     return yp_None;
