@@ -1230,6 +1230,18 @@ static void _test_startswith(fixture_type_t *type, fixture_type_t *x_type)
     ead(x_tuple, yp_tupleN(N(x_1, not_iterable)),
             assert_obj(yp_startswith(s, x_tuple), is, yp_True));
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_startswith(s, invalidated), yp_InvalidatedError);
+        assert_raises(yp_startswithC4(s, invalidated, 0, 1), yp_InvalidatedError);
+        assert_raises(yp_startswithC4(s, invalidated, 0, 0), yp_InvalidatedError);
+        assert_raises(yp_startswith(empty, invalidated), yp_InvalidatedError);
+        assert_raises(yp_startswithC4(empty, invalidated, 0, 1), yp_InvalidatedError);
+        assert_raises(yp_startswithC4(empty, invalidated, 0, 0), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -1442,6 +1454,18 @@ static void _test_endswith(fixture_type_t *type, fixture_type_t *x_type)
     ead(x_tuple, yp_tupleN(N(x_0, not_iterable)),
             assert_raises(yp_endswith(s, x_tuple), yp_TypeError));
     ead(x_tuple, yp_tupleN(N(x_3, not_iterable)), assert_obj(yp_endswith(s, x_tuple), is, yp_True));
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_endswith(s, invalidated), yp_InvalidatedError);
+        assert_raises(yp_endswithC4(s, invalidated, 3, 4), yp_InvalidatedError);
+        assert_raises(yp_endswithC4(s, invalidated, 4, 4), yp_InvalidatedError);
+        assert_raises(yp_endswith(empty, invalidated), yp_InvalidatedError);
+        assert_raises(yp_endswithC4(empty, invalidated, 3, 4), yp_InvalidatedError);
+        assert_raises(yp_endswithC4(empty, invalidated, 4, 4), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     {

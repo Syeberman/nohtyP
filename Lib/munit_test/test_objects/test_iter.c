@@ -336,6 +336,14 @@ static void _test_new2(ypObject *(*any_new2)(ypObject *, ypObject *))
     // x is not callable.
     assert_raises(any_new2(not_callable, yp_None), yp_TypeError);
 
+    // Invalidated argument. Allowed for sentinel values.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_new2(invalidated, yp_None), yp_InvalidatedError);
+        ead(iter, any_new2(yp_t_tuple, invalidated), assert_not_exception(iter));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -403,6 +411,15 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 
     // x is not callable.
     assert_raises(yp_callN(yp_t_iter, N(not_callable, yp_None)), yp_TypeError);
+
+    // Invalidated argument. Allowed for sentinel values.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_callN(yp_t_iter, N(invalidated)), yp_InvalidatedError);
+        assert_isexception(yp_callN(yp_t_iter, N(invalidated, yp_t_tuple)), yp_InvalidatedError);
+        ead(iter, yp_callN(yp_t_iter, N(yp_t_tuple, invalidated)), assert_not_exception(iter));
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     {
@@ -560,6 +577,13 @@ static void _test_next(ypObject *(*any_next)(ypObject *), int raises)
         yp_decrefN(N(iter));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(any_next(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *passthrough = rand_obj(NULL, fixture_type_exception);
@@ -600,6 +624,24 @@ static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
         assert_raises(yp_send(iter, values[3]), yp_StopIteration);
 
         yp_decrefN(N(iter));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject                  *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                2, {{items[0], invalidated}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 2, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_raises(yp_send(invalidated, values[0]), yp_InvalidatedError);
+
+        // Invalidated objects can be sent to iterators.
+        ead(item, yp_send(iter, invalidated), assert_obj(item, is, items[0]));
+
+        yp_decrefN(N(iter, invalidated));
     }
 
     // Exception passthrough.
@@ -660,6 +702,25 @@ static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
         ead(item, yp_next2(iter, defaults[3]), assert_obj(item, is, defaults[3]));
 
         yp_decrefN(N(iter));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject                  *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject                  *iter;
+        scripted_generator_state_t state = {
+                3, {{items[0]}, {yp_StopIteration}, {yp_GeneratorExit, yp_GeneratorExit}}};
+        yp_generator_decl_t decl = {
+                scripted_generator_iter_func, 1, &state, &scripted_generator_state_decl};
+        assert_not_raises(iter = yp_generatorC(&decl));
+
+        assert_raises(yp_next2(invalidated, defaults[0]), yp_InvalidatedError);
+
+        // Invalidated objects can be defaults.
+        ead(item, yp_next2(iter, invalidated), assert_obj(item, is, items[0]));
+        ead(item, yp_next2(iter, invalidated), assert_obj(item, is, invalidated));
+
+        yp_decrefN(N(iter, invalidated));
     }
 
     // Exception passthrough.
@@ -819,6 +880,13 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(iter));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_throw(invalidated, yp_Exception), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *passthrough = rand_obj(NULL, fixture_type_exception);
@@ -902,6 +970,13 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
         assert_raises(yp_next(iter), yp_StopIteration);
 
         yp_decrefN(N(iter));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises_exc(yp_close(invalidated, &exc), yp_InvalidatedError);
+        yp_decref(invalidated);
     }
 
     // Exception passthrough.

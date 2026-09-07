@@ -30,7 +30,6 @@ static MunitResult test_reference_counting(const MunitParameter params[], fixtur
 // TODO Is the distinction between yp_TypeError and yp_MethodError really that important? Should
 // everything below just be yp_TypeError? I'm choosing the equivalent to what Python raises but the
 // distinction is sometimes arbitrary (i.e. in Python next is a function but close is a method).
-// FIXME This test could also check that invalidateds return correct exceptions.
 // TODO Wherever we ensure exceptions and invalidateds return the correct exceptions, we should also
 // ensure that they do so where the arguments would otherwise be "ignored" (i.e. an empty slice
 // might ignore the object, but we need to ensure exception passthrough works).

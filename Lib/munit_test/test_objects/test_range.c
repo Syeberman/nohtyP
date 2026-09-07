@@ -164,6 +164,15 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(N(args_two, args_three, args_four, kwargs_cls, kwargs_step, kwargs_rand));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_callN(yp_t_range, N(invalidated)), yp_InvalidatedError);
+        assert_isexception(yp_callN(yp_t_range, N(ist_0, invalidated)), yp_InvalidatedError);
+        assert_isexception(yp_callN(yp_t_range, N(ist_0, ist_2, invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);

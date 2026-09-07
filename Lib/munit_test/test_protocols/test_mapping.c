@@ -191,6 +191,13 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         }
         ead(x, x_type->newK(K(keys[0], mp)), assert_obj(any_cmp(mp, x), is, x_different));
 
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(mp, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
         // Exception passthrough.
         {
             ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -224,6 +231,13 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
                     assert_obj(any_cmp(empty, x), is, x_different));
         }
         ead(x, x_type->newK(K(keys[0], empty)), assert_obj(any_cmp(empty, x), is, x_different));
+
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(empty, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
 
         // Exception passthrough.
         {
@@ -407,6 +421,14 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
         ead(value, yp_getitem(mp, keys[1]), assert_obj(value, is, values[1]));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_getitem(mp, invalidated), yp_InvalidatedError);
+        assert_isexception(yp_getitem(empty, invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -480,6 +502,17 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     if (type->original_object_return) {
         ead(value, yp_getdefault(mp, keys[0], values[2]), assert_obj(value, eq, values[0]));
         ead(value, yp_getdefault(mp, keys[1], values[2]), assert_obj(value, eq, values[1]));
+    }
+
+    // Invalidated argument. Allowed for default values.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_getdefault(mp, invalidated, values[2]), yp_InvalidatedError);
+        assert_isexception(yp_getdefault(empty, invalidated, values[2]), yp_InvalidatedError);
+        ead(value, yp_getdefault(mp, keys[0], invalidated), assert_obj(value, eq, values[0]));
+        ead(value, yp_getdefault(mp, keys[2], invalidated), assert_obj(value, is, invalidated));
+        ead(value, yp_getdefault(empty, keys[0], invalidated), assert_obj(value, is, invalidated));
+        yp_decref(invalidated);
     }
 
     // Exception passthrough.
@@ -588,6 +621,16 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decrefN(N(pair.hashable, pair.unhashable, mp));
     }
 
+    // Invalidated argument. Allowed for values, but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_isexception_exc(yp_setitem(mp, invalidated, values[2], &exc), yp_InvalidatedError);
+        assert_not_raises_exc(yp_setitem(mp, keys[2], invalidated, &exc));
+        assert_len(mp, 3);
+        yp_decrefN(N(mp, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -692,6 +735,15 @@ static void _test_delitem(
         assert_not_raises_exc(any_delitem(mp, pair.unhashable, &exc));
         assert_len(mp, 0);
         yp_decrefN(N(pair.hashable, pair.unhashable, mp));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_isexception_exc(any_delitem(mp, invalidated, &exc), yp_InvalidatedError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decrefN(N(mp, invalidated));
     }
 
     // Exception passthrough.
@@ -829,6 +881,23 @@ static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixtu
         ead(value, yp_popvalue3(mp, keys[3], values[3]), assert_obj(value, is, values[3]));
         ead(value, yp_popvalue2(mp, keys[1]), assert_obj(value, is, values[1]));
         yp_decref(mp);
+    }
+
+    // Invalidated argument. Allowed for default values, but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        ypObject *empty = type->newK(0);
+        assert_isexception(yp_popvalue3(mp, invalidated, values[3]), yp_InvalidatedError);
+        assert_isexception(yp_popvalue2(mp, invalidated), yp_InvalidatedError);
+        assert_isexception(yp_popvalue3(empty, invalidated, values[3]), yp_InvalidatedError);
+        assert_isexception(yp_popvalue2(empty, invalidated), yp_InvalidatedError);
+        ead(value, yp_popvalue3(mp, keys[0], invalidated), assert_obj(value, eq, values[0]));
+        ead(value, yp_popvalue3(mp, keys[3], invalidated), assert_obj(value, is, invalidated));
+        ead(value, yp_popvalue3(empty, keys[0], invalidated), assert_obj(value, is, invalidated));
+        assert_mapping(mp, keys[1], values[1], keys[2], values[2]);
+        assert_len(empty, 0);
+        yp_decrefN(N(empty, mp, invalidated));
     }
 
     // Exception passthrough.
@@ -1059,6 +1128,17 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
         yp_decref(mp);
     }
 
+    // Invalidated argument. Allowed for values, but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_isexception(yp_setdefault(mp, invalidated, values[2]), yp_InvalidatedError);
+        ead(value, yp_setdefault(mp, keys[0], invalidated), assert_obj(value, eq, values[0]));
+        ead(value, yp_setdefault(mp, keys[2], invalidated), assert_obj(value, is, invalidated));
+        assert_len(mp, 3);
+        yp_decrefN(N(mp, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -1241,6 +1321,22 @@ static MunitResult test_updateK(const MunitParameter params[], fixture_t *fixtur
                 exception);
         assert_mapping(mp, keys[0], values[0], keys[1], values[4]);
         yp_decref(mp);
+    }
+
+    // Invalidated argument. Allowed for values, but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_isexception_exc(
+                yp_updateK(mp, &exc, K(invalidated, values[2])), yp_InvalidatedError);
+        assert_not_raises_exc(yp_updateK(mp, &exc, K(keys[0], invalidated)));
+        assert_not_raises_exc(yp_updateK(mp, &exc, K(keys[2], invalidated)));
+        assert_isexception_exc(
+                updateK_to_updateKV(mp, &exc, K(invalidated, values[2])), yp_InvalidatedError);
+        assert_not_raises_exc(updateK_to_updateKV(mp, &exc, K(keys[1], invalidated)));
+        assert_not_raises_exc(updateK_to_updateKV(mp, &exc, K(keys[3], invalidated)));
+        assert_len(mp, 4);
+        yp_decrefN(N(mp, invalidated));
     }
 
     // Exception passthrough.
@@ -1436,6 +1532,15 @@ static void _test_update(fixture_type_t *type, peer_type_t *peer)
         assert_raises_exc(yp_update(mp, not_iterable, &exc), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_raises_exc(yp_update(mp, invalidated, &exc), yp_InvalidatedError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decrefN(N(mp, invalidated));
     }
 
     // Exception passthrough.

@@ -196,6 +196,13 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
                     assert_obj(any_cmp(so, x), is, x_superset));
         }
 
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(so, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
         // Exception passthrough.
         {
             ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -225,6 +232,13 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         if (x_can_contain_so(type, x_type)) {
             ead(x, x_type->newN(N(empty, items[0], items[1])),
                     assert_obj(any_cmp(empty, x), is, so_empty));
+        }
+
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(empty, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
         }
 
         // Exception passthrough.
@@ -793,6 +807,14 @@ static void _test_union(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_union(so, invalidated), yp_InvalidatedError);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -982,6 +1004,14 @@ static void _test_intersection(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_intersection(so, invalidated), yp_InvalidatedError);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -1169,6 +1199,14 @@ static void _test_difference(fixture_type_t *type, peer_type_t *peer)
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_raises(yp_difference(so, not_iterable), yp_TypeError);
         yp_decrefN(N(so));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_difference(so, invalidated), yp_InvalidatedError);
+        yp_decrefN(N(so, invalidated));
     }
 
     // Exception passthrough.
@@ -1371,6 +1409,14 @@ static void _test_symmetric_difference(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_symmetric_difference(so, invalidated), yp_InvalidatedError);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -1553,6 +1599,15 @@ static void _test_update(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_update(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -1725,6 +1780,15 @@ static void _test_intersection_update(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_intersection_update(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -1895,6 +1959,15 @@ static void _test_difference_update(fixture_type_t *type, peer_type_t *peer)
         assert_raises_exc(yp_difference_update(so, not_iterable, &exc), yp_TypeError);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_difference_update(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
     }
 
     // Exception passthrough.
@@ -2080,6 +2153,16 @@ static void _test_symmetric_difference_update(fixture_type_t *type, peer_type_t 
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(
+                yp_symmetric_difference_update(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -2186,6 +2269,15 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(pair.hashable, pair.unhashable, so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_push(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -2277,6 +2369,15 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
         assert_raises_exc(yp_pushunique(so, pair.unhashable, &exc), yp_TypeError);
         assert_setlike(so, pair.hashable);
         yp_decrefN(N(pair.hashable, pair.unhashable, so));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_pushunique(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
     }
 
     // Exception passthrough.
@@ -2392,6 +2493,15 @@ static void _test_remove(
         assert_hashC_exc(yp_currenthashC(so, &exc), ==, yp_currenthashC(expected, &exc));
 
         yp_decrefN(N(expected, so));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(any_remove(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
     }
 
     // Exception passthrough.

@@ -87,6 +87,28 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
         yp_decrefN(N(self));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *empty = type->newN(0);
+        assert_isexception(yp_contains(self, invalidated), yp_InvalidatedError);
+        assert_isexception(yp_in(invalidated, self), yp_InvalidatedError);
+        assert_isexception(yp_not_in(invalidated, self), yp_InvalidatedError);
+        if (type->hashable_items_only || !type->original_object_return) {
+            // Types like sets and strs operate on the value, even if empty, triggering an error.
+            assert_isexception(yp_contains(empty, invalidated), yp_InvalidatedError);
+            assert_isexception(yp_in(invalidated, empty), yp_InvalidatedError);
+            assert_isexception(yp_not_in(invalidated, empty), yp_InvalidatedError);
+        } else {
+            // Types like tuple do not operate on the value when empty.
+            assert_obj(yp_contains(empty, invalidated), is, yp_False);
+            assert_obj(yp_in(invalidated, empty), is, yp_False);
+            assert_obj(yp_not_in(invalidated, empty), is, yp_True);
+        }
+        yp_decrefN(N(self, empty, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);

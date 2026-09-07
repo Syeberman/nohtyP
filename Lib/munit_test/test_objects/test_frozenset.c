@@ -77,6 +77,14 @@ static void _test_newN(
         assert_obj(any_newN(-1), is, type->falsy);
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_newN(N(invalidated)), yp_InvalidatedError);
+        assert_isexception(any_newN(N(yp_None, invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -169,6 +177,13 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
 
     // x is not an iterable.
     assert_raises(any_new(not_iterable), yp_TypeError);
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_new(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     if (test_exception_passthrough) {
@@ -371,6 +386,13 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         assert_raises(yp_call_stars(type->yp_type, yp_tuple_empty, kwargs_rand), yp_TypeError);
 
         yp_decrefN(N(kwargs_rand, kwargs_cls, kwargs_iterable, args_two, set_empty));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_callN(type->yp_type, N(invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
     }
 
     // Exception passthrough.

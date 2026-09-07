@@ -101,6 +101,13 @@ static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
     // x is not an iterable. yp_iter is yp_TypeError, yp_iter_keys is yp_MethodError.
     assert_raises(any_iter(not_iterable), yp_TypeError, yp_MethodError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(any_iter(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -251,6 +258,13 @@ static void _test_unpackN(fixture_type_t *type, void (*any_unpackN)(ypObject *, 
     // x is not an iterable.
     assert_raises_exc(any_unpackN(not_iterable, N(&exc)), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises_exc(any_unpackN(invalidated, N(&exc)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *passthrough = rand_obj(NULL, fixture_type_exception);
@@ -376,6 +390,13 @@ static void _test_reversed(fixture_type_t *type, ypObject *(*any_reversed)(ypObj
     // x is not an iterable.
     assert_raises(any_reversed(not_iterable), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(any_reversed(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -475,6 +496,13 @@ static void _test_sorted(fixture_type_t *type, ypObject *(*any_sorted)(ypObject 
     // x is not an iterable.
     assert_raises(any_sorted(not_iterable), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(any_sorted(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -572,6 +600,18 @@ static void _test_sorted3(
     // x is not an iterable.
     assert_raises(any_sorted3(not_iterable, yp_None, yp_False), yp_TypeError);
     assert_raises(any_sorted3(not_iterable, key_zero, yp_True), yp_TypeError);
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *x = yp_listN(N(items[1]));
+
+        assert_raises(any_sorted3(invalidated, yp_None, yp_False), yp_InvalidatedError);
+        assert_raises(any_sorted3(x, invalidated, yp_False), yp_InvalidatedError);
+        assert_raises(any_sorted3(x, yp_None, invalidated), yp_InvalidatedError);
+
+        yp_decrefN(N(x, invalidated));
+    }
 
     // Exception passthrough.
     {
@@ -760,6 +800,14 @@ static void _test_send(fixture_type_t *type, ypObject *x_two, ypObject *(*any_it
         yp_decrefN(N(second, first, iter));
     }
 
+    // Invalidated argument. Allowed to send to iterators.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_send(invalidated, yp_None), yp_InvalidatedError);
+        eead(iter, any_iter(x_two), first, yp_send(iter, invalidated), assert_not_exception(first));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -808,6 +856,13 @@ static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
 
     // x is not an iterable.
     assert_raises(yp_send(not_iterable, send_value), yp_TypeError);
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_send(invalidated, send_value), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     {
@@ -882,6 +937,15 @@ static void _test_next2(fixture_type_t *type, ypObject *x_two, ypObject *(*any_i
         yp_decrefN(N(second, first, iter));
     }
 
+    // Invalidated argument. Allowed for default values.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_next2(invalidated, yp_None), yp_InvalidatedError);
+        eead(iter, any_iter(x_two), first, yp_next2(iter, invalidated),
+                assert_not_exception(first));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -929,6 +993,13 @@ static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
 
     // x is not an iterable.
     assert_raises(yp_next2(not_iterable, default_), yp_TypeError);
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_next2(invalidated, default_), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     {
@@ -992,6 +1063,14 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
 
     // x is not an iterable.
     assert_raises(yp_throw(not_iterable, yp_SyntaxError), yp_TypeError);
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_throw(invalidated, yp_Exception), yp_InvalidatedError);
+        ead(iter, new_iterN(0), assert_raises(yp_throw(iter, invalidated), yp_InvalidatedError));
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     {
@@ -1077,6 +1156,13 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
 
     // x is not an iterable.
     assert_raises_exc(yp_close(not_iterable, &exc), yp_MethodError);
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises_exc(yp_close(invalidated, &exc), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     {
@@ -1184,6 +1270,13 @@ static void _test_iter_values(fixture_type_t *type)
 
     // x is not an iterable.
     assert_raises(yp_iter_values(not_iterable), yp_MethodError);
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_iter_values(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     {
@@ -1295,6 +1388,13 @@ static void _test_iter_items(fixture_type_t *type)
 
     // x is not an iterable.
     assert_raises(yp_iter_items(not_iterable), yp_MethodError);
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_iter_items(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     {
@@ -1429,6 +1529,14 @@ static void _test_miniiter(
         assert_raises(any_miniiter(not_iterable, &mi_state), yp_TypeError, yp_MethodError);
     }
 
+    // Invalidated argument.
+    {
+        ypObject   *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        yp_uint64_t mi_state;
+        assert_raises(any_miniiter(invalidated, &mi_state), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject   *exception = rand_obj(NULL, fixture_type_exception);
@@ -1559,6 +1667,14 @@ static void _test_miniiter_values(fixture_type_t *type)
         assert_raises(yp_miniiter_values(not_iterable, &mi_state), yp_MethodError);
     }
 
+    // Invalidated argument.
+    {
+        ypObject   *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        yp_uint64_t mi_state;
+        assert_raises(yp_miniiter_values(invalidated, &mi_state), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject   *exception = rand_obj(NULL, fixture_type_exception);
@@ -1687,6 +1803,14 @@ static void _test_miniiter_items(fixture_type_t *type)
     {
         yp_uint64_t mi_state;
         assert_raises(yp_miniiter_items(not_iterable, &mi_state), yp_MethodError);
+    }
+
+    // Invalidated argument.
+    {
+        ypObject   *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        yp_uint64_t mi_state;
+        assert_raises(yp_miniiter_items(invalidated, &mi_state), yp_InvalidatedError);
+        yp_decref(invalidated);
     }
 
     // Exception passthrough.

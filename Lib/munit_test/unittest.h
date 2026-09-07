@@ -801,6 +801,7 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
     } while (0)
 
 // XXX yp_SyntaxError is chosen as nohtyP.c neither raises nor catches it.
+// FIXME Consider a function to return a random exception that is compatible with new_faulty_iter.
 // XXX The tests with yp_GeneratorExit are to ensure it's not treated like yp_StopIteration.
 #define _faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down,       \
         exc_suffix, statement_str)                                                                 \

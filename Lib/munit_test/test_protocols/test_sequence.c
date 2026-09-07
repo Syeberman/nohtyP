@@ -179,6 +179,13 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         // x is sq.
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(sq, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
         // Exception passthrough.
         {
             ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -230,6 +237,13 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         // x is sq.
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(sq, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
         // Exception passthrough.
         {
             ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -262,6 +276,13 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         // x is sq.
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(sq, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
         // Exception passthrough.
         {
             ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -287,6 +308,13 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
 
         // x is sq.
         assert_obj(any_cmp(sq, sq), is, x_eq);
+
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(sq, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
 
         // Exception passthrough.
         {
@@ -696,6 +724,15 @@ static void _test_concat(fixture_type_t *type, peer_type_t *peer)
         ypObject *sq = type->newN(N(items[0], items[1]));
         assert_raises(yp_concat(sq, not_iterable), yp_TypeError);
         yp_decrefN(N(sq));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_concat(sq, invalidated), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
     }
 
     // Exception passthrough.
@@ -1109,6 +1146,14 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     // Index is sq.
     assert_raises(yp_getitem(sq, sq), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_getitem(sq, invalidated), yp_InvalidatedError);
+        assert_isexception(yp_getitem(empty, invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -1189,6 +1234,17 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     if (type->original_object_return) {
         ead(zero, yp_getdefault(sq, ist_0, items[2]), assert_obj(zero, is, items[0]));
         ead(two, yp_getdefault(sq, ist_2, items[2]), assert_obj(two, is, items[2]));
+    }
+
+    // Invalidated argument. Allowed for default values.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_getdefault(sq, invalidated, items[2]), yp_InvalidatedError);
+        assert_isexception(yp_getdefault(empty, invalidated, items[2]), yp_InvalidatedError);
+        ead(zero, yp_getdefault(sq, ist_0, invalidated), assert_obj(zero, eq, items[0]));
+        ead(two, yp_getdefault(sq, ist_2, invalidated), assert_obj(two, is, invalidated));
+        ead(zero, yp_getdefault(empty, ist_0, invalidated), assert_obj(zero, is, invalidated));
+        yp_decref(invalidated);
     }
 
     // Exception passthrough.
@@ -1361,6 +1417,25 @@ static void _test_findC(fixture_type_t *type,
             assert_raises_exc(any_findC5(sq_0_1_2, sq_0_1, 0, 3, &exc), yp_TypeError);
         }
         yp_decrefN(N(sq_0_1_2, sq_0_1));
+    }
+
+    // Invalidated argument. Some types convert the value even when empty.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception_exc(any_findC(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_isexception_exc(any_findC5(sq, invalidated, 0, 1, &exc), yp_InvalidatedError);
+        if (type->original_object_return) {
+            assert_not_found_exc(any_findC5(sq, invalidated, 0, 0, &exc));
+            assert_not_found_exc(any_findC(empty, invalidated, &exc));
+            assert_not_found_exc(any_findC5(empty, invalidated, 0, 1, &exc));
+            assert_not_found_exc(any_findC5(empty, invalidated, 0, 0, &exc));
+        } else {
+            assert_isexception_exc(any_findC5(sq, invalidated, 0, 0, &exc), yp_InvalidatedError);
+            assert_isexception_exc(any_findC(empty, invalidated, &exc), yp_InvalidatedError);
+            assert_isexception_exc(any_findC5(empty, invalidated, 0, 1, &exc), yp_InvalidatedError);
+            assert_isexception_exc(any_findC5(empty, invalidated, 0, 0, &exc), yp_InvalidatedError);
+        }
+        yp_decref(invalidated);
     }
 
     // Exception passthrough.
@@ -1547,6 +1622,25 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(sq_0_1_2, sq_0_1));
     }
 
+    // Invalidated argument. Some types convert the value even when empty.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception_exc(yp_countC(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_isexception_exc(yp_countC5(sq, invalidated, 0, 1, &exc), yp_InvalidatedError);
+        if (type->original_object_return) {
+            assert_ssizeC_exc(yp_countC5(sq, invalidated, 0, 0, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC(empty, invalidated, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(empty, invalidated, 0, 1, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(empty, invalidated, 0, 0, &exc), ==, 0);
+        } else {
+            assert_isexception_exc(yp_countC5(sq, invalidated, 0, 0, &exc), yp_InvalidatedError);
+            assert_isexception_exc(yp_countC(empty, invalidated, &exc), yp_InvalidatedError);
+            assert_isexception_exc(yp_countC5(empty, invalidated, 0, 1, &exc), yp_InvalidatedError);
+            assert_isexception_exc(yp_countC5(empty, invalidated, 0, 0, &exc), yp_InvalidatedError);
+        }
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -1660,6 +1754,19 @@ static void _test_setindexC(fixture_type_t *type,
         assert_not_raises_exc(any_setindexC(sq, 3, items[1], &exc));
         assert_sequence(sq, items[0], items[0], items[1], items[1]);
         yp_decref(sq);
+    }
+
+    // Invalidated argument. Allowed for values on some types.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->original_object_return) {
+            assert_not_raises_exc(any_setindexC(sq, 0, invalidated, &exc));
+        } else {
+            assert_raises_exc(any_setindexC(sq, 0, invalidated, &exc), yp_InvalidatedError);
+        }
+        assert_len(sq, 2);
+        yp_decrefN(N(sq, invalidated));
     }
 
     // Exception passthrough.
@@ -1985,6 +2092,15 @@ static void _test_setsliceC(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(sq));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_setsliceC6(sq, 0, 1, 1, invalidated, &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -2055,6 +2171,15 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         assert_raises_exc(yp_setitem(sq, sq, items[2], &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_setitem(sq, invalidated, items[2], &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
     }
 
     // Exception passthrough.
@@ -2344,6 +2469,15 @@ static void _test_delitem(fixture_type_t *type,
         yp_decref(sq);
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(any_delitem(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -2439,6 +2573,20 @@ static void _test_appendC(
         assert_not_raises_exc(any_append(sq, items[1], &exc));
         assert_sequence(sq, items[0], items[0], items[1], items[2], items[1]);
         yp_decref(sq);
+    }
+
+    // Invalidated argument. Allowed for values on some types.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->original_object_return) {
+            assert_not_raises_exc(any_append(sq, invalidated, &exc));
+            assert_len(sq, 3);
+        } else {
+            assert_raises_exc(any_append(sq, invalidated, &exc), yp_InvalidatedError);
+            assert_sequence(sq, items[0], items[1]);
+        }
+        yp_decrefN(N(sq, invalidated));
     }
 
     // Exception passthrough.
@@ -2617,6 +2765,15 @@ static void _test_extend(fixture_type_t *type, peer_type_t *peer)
         assert_raises_exc(yp_extend(sq, not_iterable, &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decrefN(N(sq));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_extend(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
     }
 
     // Exception passthrough.
@@ -2835,6 +2992,20 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
         assert_not_raises_exc(yp_insertC(sq, 0, items[1], &exc));
         assert_sequence(sq, items[1], items[0], items[0], items[1], items[2]);
         yp_decref(sq);
+    }
+
+    // Invalidated argument. Allowed for values on some types.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->original_object_return) {
+            assert_not_raises_exc(yp_insertC(sq, 0, invalidated, &exc));
+            assert_len(sq, 3);
+        } else {
+            assert_raises_exc(yp_insertC(sq, 0, invalidated, &exc), yp_InvalidatedError);
+            assert_sequence(sq, items[0], items[1]);
+        }
+        yp_decrefN(N(sq, invalidated));
     }
 
     // Exception passthrough.
@@ -3102,6 +3273,15 @@ static void _test_remove(
             assert_sequence(sq_0_1_2, items[0], items[1], items[2]);
         }
         yp_decrefN(N(sq_0_1_2, sq_0_1));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(any_remove(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
     }
 
     // Exception passthrough.

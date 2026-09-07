@@ -96,13 +96,24 @@ static void _test_newK(
         assert_obj(any_newK(-1), is, type->falsy);
     }
 
+    // Invalidated argument. Allowed for values but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_newK(K(invalidated, yp_None)), yp_InvalidatedError);
+        ead(mp, any_newK(K(yp_None, invalidated)), assert_len(mp, 1));
+        assert_isexception(
+                any_newK(K(keys[0], values[0], invalidated, values[1])), yp_InvalidatedError);
+        ead(mp, any_newK(K(keys[0], values[0], keys[1], invalidated)), assert_len(mp, 2));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
         assert_isexception(any_newK(K(exception, yp_None)), exception);
         assert_isexception(any_newK(K(yp_None, exception)), exception);
-        assert_isexception(any_newK(K(keys[0], values[0], exception, yp_None)), exception);
-        assert_isexception(any_newK(K(keys[0], values[0], yp_None, exception)), exception);
+        assert_isexception(any_newK(K(keys[0], values[0], exception, values[1])), exception);
+        assert_isexception(any_newK(K(keys[0], values[0], keys[1], exception)), exception);
     }
 
     obj_array_decref(values);
@@ -197,6 +208,13 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
 
     // x is not an iterable.
     assert_raises(any_new(not_iterable), yp_TypeError);
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_new(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
 
     // Exception passthrough.
     if (test_exception_passthrough) {
@@ -480,6 +498,13 @@ static void _test_call_type(fixture_type_t *type, peer_type_t *peer)
         yp_decref(kwargs);
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_callN(type->yp_type, N(invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -579,6 +604,16 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
         assert_obj(any_fromkeysN(values[0], -1), is, type->falsy);
     }
 
+    // Invalidated argument. Allowed for values but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ead(mp, any_fromkeysN(invalidated, 0), assert_len(mp, 0));
+        ead(mp, any_fromkeysN(invalidated, N(yp_None)), assert_len(mp, 1));
+        assert_isexception(any_fromkeysN(yp_None, N(invalidated)), yp_InvalidatedError);
+        assert_isexception(any_fromkeysN(yp_None, N(yp_None, invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
         ypObject *exception = rand_obj(NULL, fixture_type_exception);
@@ -668,6 +703,15 @@ static void _test_fromkeys(fixture_type_t *type, peer_type_t  *peer,
 
     // x is not an iterable.
     assert_raises(any_fromkeys(not_iterable, values[0]), yp_TypeError);
+
+    // Invalidated argument. Allowed for values but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *list_one = yp_listN(1, yp_None);
+        assert_isexception(any_fromkeys(invalidated, yp_None), yp_InvalidatedError);
+        ead(mp, any_fromkeys(list_one, invalidated), assert_len(mp, 1));
+        yp_decrefN(N(list_one, invalidated));
+    }
 
     // Exception passthrough.
     if (test_exception_passthrough) {

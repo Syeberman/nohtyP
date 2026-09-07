@@ -409,10 +409,19 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                 chrarray_star_star_kwargs));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        define_function(f, None_code, ({invalidated}));
+        assert_isexception(f, yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
-        define_function(f, None_code, ({yp_OSError}));
-        assert_isexception(f, yp_OSError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        define_function(f, None_code, ({exception}));
+        assert_isexception(f, exception);
     }
 
     yp_decrefN(N(
@@ -2574,6 +2583,13 @@ static MunitResult test_func_iscallable(const MunitParameter params[], fixture_t
         assert_raises(yp_call_stars(yp_func_iscallable, list_empty, kwargs_rand), yp_TypeError);
 
         yp_decrefN(N(kwargs_rand, kwargs_obj, list_empty));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_obj(yp_callN(yp_func_iscallable, N(invalidated)), is, yp_False);
+        yp_decref(invalidated);
     }
 
     // Exception passthrough.
