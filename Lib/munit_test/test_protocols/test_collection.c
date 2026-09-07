@@ -71,9 +71,19 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     // x is self. Recall `"abc" in "abc"` is True for strings.
     {
         ypObject *self = type->newN(N(items[0], items[1]));
-        assert_obj(yp_contains(self, self), is, type->is_string ? yp_True : yp_False);
-        assert_obj(yp_in(self, self), is, type->is_string ? yp_True : yp_False);
-        assert_obj(yp_not_in(self, self), is, type->is_string ? yp_False : yp_True);
+        if (type->is_string) {
+            assert_obj(yp_contains(self, self), is, yp_True);
+            assert_obj(yp_in(self, self), is, yp_True);
+            assert_obj(yp_not_in(self, self), is, yp_False);
+        } else if (type->original_object_return) {
+            assert_obj(yp_contains(self, self), is, yp_False);
+            assert_obj(yp_in(self, self), is, yp_False);
+            assert_obj(yp_not_in(self, self), is, yp_True);
+        } else {
+            assert_raises(yp_contains(self, self), yp_TypeError);
+            assert_raises(yp_in(self, self), yp_TypeError);
+            assert_raises(yp_not_in(self, self), yp_TypeError);
+        }
         yp_decrefN(N(self));
     }
 

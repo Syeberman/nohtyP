@@ -78,6 +78,9 @@
 // the only use of drop. Does this introduction and meaning for "drop" make things clearer or not?
 // Would it make sense to rename set.discard() to set.drop()/etc?
 
+// TODO Search for yp_isexceptionC[N2] and be critical of the exceptions we are catching internally.
+// In particular, consider if they interfere with exception passthrough.
+
 #define yp_FUTURE
 #include "nohtyP.h"
 
@@ -18534,7 +18537,7 @@ static ypObject *frozendict_invalidate(ypObject *mp)
     // FIXME A dict_clear that doesn't fail, and doesn't allocate anything.
     result = dict_clear(mp);
     if (yp_isexceptionC(result)) return result;
-    yp_decref(ypDict_KEYSET(mp)); // FIXME A dict_clear that doesn't allocate.
+    yp_decref(ypDict_KEYSET(mp));  // FIXME A dict_clear that doesn't allocate.
     yp_ASSERT(ypDict_VALUES(mp) == ypDict_INLINE_DATA(mp), "dict_clear didn't allocate inline!");
     ypObject_SET_TYPE_CODE(mp, ypInvalidated_CODE);
     return yp_None;
@@ -19529,6 +19532,9 @@ ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value)
 
 // Determines the index in r for the given object x, or -1 if it isn't in the range
 // XXX If using *index as an actual index, ensure it doesn't overflow yp_ssize_t
+// XXX Unlike Python, this raises a TypeError on non-numeric types. Python rejects `1 in 'a'`,
+// `[] in {}`, and similar operations on type-specific containers. However, for range, Python
+// allows `'a' in range(0)`. In the interest of consistency, break from Python.
 static ypObject *_ypRange_find(ypObject *r, ypObject *x, yp_ssize_t *index)
 {
     ypObject *exc = yp_None;
@@ -19536,9 +19542,10 @@ static ypObject *_ypRange_find(ypObject *r, ypObject *x, yp_ssize_t *index)
     yp_int_t  x_offset;
     yp_int_t  x_asint = yp_asint_exactC(x, &exc);
     if (yp_isexceptionC(exc)) {
-        // If x isn't an int or float, or can't be exactly converted to an equal int, then it's not
-        // contained in this range
-        if (yp_isexceptionCN(exc, 2, yp_TypeError, yp_ArithmeticError)) {
+        // If x can't be exactly converted to an equal int, then it's not contained in this range.
+        // However, if x is an exception, it will passthrough yp_asint_exactC, and it should
+        // passthrough us as well.
+        if (yp_isexceptionC2(exc, yp_ArithmeticError) && !yp_isexceptionC(x)) {
             *index = -1;
             return yp_None;
         }

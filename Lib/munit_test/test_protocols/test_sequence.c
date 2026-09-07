@@ -1312,13 +1312,16 @@ static void _test_findC(fixture_type_t *type,
     if (type->is_string) {
         assert_ssizeC_exc(any_findC(sq, sq, &exc), ==, 0);
         assert_ssizeC_exc(any_findC5(sq, sq, 0, 3, &exc), ==, 0);
-    } else {
+    } else if (type->original_object_return) {
         assert_not_found_exc(any_findC(sq, sq, &exc));
         assert_not_found_exc(any_findC5(sq, sq, 0, 3, &exc));
+    } else {
+        assert_raises_exc(any_findC(sq, sq, &exc), yp_TypeError);
+        assert_raises_exc(any_findC5(sq, sq, 0, 3, &exc), yp_TypeError);
     }
 
     // x is sq; sq contains sq.
-    if (!type->is_string && type->is_mutable) {
+    if (type->original_object_return && type->is_mutable) {
         ypObject *sq_sq = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_insertC(sq_sq, 1, sq_sq, &exc));
         assert_ssizeC_exc(any_findC(sq_sq, sq_sq, &exc), ==, 1);
@@ -1350,9 +1353,12 @@ static void _test_findC(fixture_type_t *type,
         if (type->is_string) {
             assert_ssizeC_exc(any_findC(sq_0_1_2, sq_0_1, &exc), ==, 0);
             assert_ssizeC_exc(any_findC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, 0);
-        } else {
+        } else if (type->original_object_return) {
             assert_not_found_exc(any_findC(sq_0_1_2, sq_0_1, &exc));
             assert_not_found_exc(any_findC5(sq_0_1_2, sq_0_1, 0, 3, &exc));
+        } else {
+            assert_raises_exc(any_findC(sq_0_1_2, sq_0_1, &exc), yp_TypeError);
+            assert_raises_exc(any_findC5(sq_0_1_2, sq_0_1, 0, 3, &exc), yp_TypeError);
         }
         yp_decrefN(N(sq_0_1_2, sq_0_1));
     }
@@ -1486,11 +1492,19 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     assert_ssizeC_exc(yp_countC5(sq, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
 
     // x is sq; sq not in sq. Recall `"abc" in "abc"` is True for strings.
-    assert_ssizeC_exc(yp_countC(sq, sq, &exc), ==, type->is_string ? 1 : 0);
-    assert_ssizeC_exc(yp_countC5(sq, sq, 0, 3, &exc), ==, type->is_string ? 1 : 0);
+    if (type->is_string) {
+        assert_ssizeC_exc(yp_countC(sq, sq, &exc), ==, 1);
+        assert_ssizeC_exc(yp_countC5(sq, sq, 0, 3, &exc), ==, 1);
+    } else if (type->original_object_return) {
+        assert_ssizeC_exc(yp_countC(sq, sq, &exc), ==, 0);
+        assert_ssizeC_exc(yp_countC5(sq, sq, 0, 3, &exc), ==, 0);
+    } else {
+        assert_raises_exc(yp_countC(sq, sq, &exc), yp_TypeError);
+        assert_raises_exc(yp_countC5(sq, sq, 0, 3, &exc), yp_TypeError);
+    }
 
     // x is sq, sq contains sq.
-    if (!type->is_string && type->is_mutable) {
+    if (type->original_object_return && type->is_mutable) {
         ypObject *sq_sq = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_insertC(sq_sq, 1, sq_sq, &exc));
         assert_ssizeC_exc(yp_countC(sq_sq, sq_sq, &exc), ==, 1);
@@ -1520,8 +1534,16 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
         ypObject *sq_0_1_2 = type->newN(N(items[0], items[1], items[2]));
         ypObject *sq_0_1 = type->newN(N(items[0], items[1]));
         assert_obj(sq_0_1, ne, items[2]);  // ensure sq_0_1 isn't actually an item in sq_0_1_2
-        assert_ssizeC_exc(yp_countC(sq_0_1_2, sq_0_1, &exc), ==, type->is_string ? 1 : 0);
-        assert_ssizeC_exc(yp_countC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, type->is_string ? 1 : 0);
+        if (type->is_string) {
+            assert_ssizeC_exc(yp_countC(sq_0_1_2, sq_0_1, &exc), ==, 1);
+            assert_ssizeC_exc(yp_countC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, 1);
+        } else if (type->original_object_return) {
+            assert_ssizeC_exc(yp_countC(sq_0_1_2, sq_0_1, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, 0);
+        } else {
+            assert_raises_exc(yp_countC(sq_0_1_2, sq_0_1, &exc), yp_TypeError);
+            assert_raises_exc(yp_countC5(sq_0_1_2, sq_0_1, 0, 3, &exc), yp_TypeError);
+        }
         yp_decrefN(N(sq_0_1_2, sq_0_1));
     }
 
