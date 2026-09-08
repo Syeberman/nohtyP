@@ -1,5 +1,8 @@
 version: 0.5.{build}
 
+# AppVeyor limits the total build time to 60 minutes, so we test a subset of the available
+# compilers. We choose the newest and the oldest versions for each compiler and OS/arch combination.
+
 branches:
   only:
     - main
@@ -16,8 +19,8 @@ image:
   - Ubuntu2204
   - macOS-Sonoma
   - Visual Studio 2022
-  - Visual Studio 2019
-  - Visual Studio 2017
+  # - Visual Studio 2019  # Cut for time
+  # - Visual Studio 2017  # Cut for time
   - Visual Studio 2015
 
 platform:
@@ -51,13 +54,15 @@ for:
       only:
         - image: Ubuntu2204
     environment:
-      YP_COMPILER_OSES: gcc_13:posix gcc_12:posix gcc_11:posix gcc_10:posix gcc_9:posix
+      # Cut for time: gcc_12:posix gcc_11:posix gcc_10:posix
+      YP_COMPILER_OSES: gcc_13:posix gcc_9:posix
       YP_CI_CODECOV_UPLOAD: true
   - matrix:
       only:
         - image: macOS-Sonoma
     environment:
-      YP_COMPILER_OSES: gcc_12:darwin gcc_11:darwin gcc_10:darwin
+      # Cut for time: gcc_11:darwin
+      YP_COMPILER_OSES: gcc_12:darwin gcc_10:darwin
   - matrix:
       only:
         - image: Visual Studio 2022
@@ -82,7 +87,8 @@ for:
       only:
         - image: Visual Studio 2015
     environment:
-      YP_COMPILER_OSES: gcc_6:win32 gcc_5:win32 msvs_120:win32 msvs_110:win32 msvs_100:win32 msvs_90:win32
+      # Cut for time: msvs_120:win32 msvs_100:win32
+      YP_COMPILER_OSES: gcc_6:win32 gcc_5:win32 msvs_110:win32 msvs_90:win32
       # TODO Figure out why gcc_5:win32:amd64 isn't available
       YP_SKIP_TARGETS: gcc_5:win32:amd64 msvs_100:win32:amd64 msvs_90:win32:amd64
 
