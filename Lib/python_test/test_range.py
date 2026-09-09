@@ -616,7 +616,9 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(5.1, r)
         self.assertNotIn(-1, r)
         self.assertNotIn(10, r)
-        self.assertNotIn("", r)
+        # XXX Unlike Python (but like Python's str, dict, etc), `in` fails on incompatible types.
+        with self.assertRaises(TypeError):
+            self.assertNotIn("", r)
         r = yp_range(9, -1, -1)
         self.assertIn(0, r)
         self.assertIn(1, r)
@@ -624,7 +626,8 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(5.1, r)
         self.assertNotIn(-1, r)
         self.assertNotIn(10, r)
-        self.assertNotIn("", r)
+        with self.assertRaises(TypeError):
+            self.assertNotIn("", r)
         r = yp_range(0, 10, 2)
         self.assertIn(0, r)
         self.assertNotIn(1, r)
@@ -632,7 +635,8 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(5.1, r)
         self.assertNotIn(-1, r)
         self.assertNotIn(10, r)
-        self.assertNotIn("", r)
+        with self.assertRaises(TypeError):
+            self.assertNotIn("", r)
         r = yp_range(9, -1, -2)
         self.assertNotIn(0, r)
         self.assertIn(1, r)
@@ -640,7 +644,8 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(5.1, r)
         self.assertNotIn(-1, r)
         self.assertNotIn(10, r)
-        self.assertNotIn("", r)
+        with self.assertRaises(TypeError):
+            self.assertNotIn("", r)
 
     def test_reverse_iteration(self):
         for r in [yp_range(10),

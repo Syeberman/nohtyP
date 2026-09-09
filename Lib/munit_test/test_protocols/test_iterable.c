@@ -1,3 +1,10 @@
+// Tests for objects that support the iterable protocol.
+//
+// These tests are written to include fixture_type_range, which imposes a restriction: constructor
+// arguments must follow a range pattern. To support this, fixture_type_range->rand_elems->items
+// returns integers following a range pattern. As such, constructors in these tests should always be
+// called with a slice of the type's rand_elems->items, or else the constructor will fail the test.
+
 #include "munit_test/unittest.h"
 
 
@@ -20,7 +27,7 @@ static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic iter.
     {
@@ -94,10 +101,20 @@ static void _test_iter(fixture_type_t *type, ypObject *(*any_iter)(ypObject *))
     // x is not an iterable. yp_iter is yp_TypeError, yp_iter_keys is yp_MethodError.
     assert_raises(any_iter(not_iterable), yp_TypeError, yp_MethodError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(any_iter(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(any_iter(yp_SyntaxError), yp_SyntaxError);
-    assert_raises(any_iter(yp_StopIteration), yp_StopIteration);
-    assert_raises(any_iter(yp_GeneratorExit), yp_GeneratorExit);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(any_iter(exception), exception);
+        assert_raises(any_iter(yp_StopIteration), yp_StopIteration);
+        assert_raises(any_iter(yp_GeneratorExit), yp_GeneratorExit);
+    }
 
     obj_array_decref(items);
     yp_decrefN(N(not_iterable));
@@ -124,7 +141,7 @@ static void _test_unpackN(fixture_type_t *type, void (*any_unpackN)(ypObject *, 
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[3];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic unpackN.
     {
@@ -241,8 +258,18 @@ static void _test_unpackN(fixture_type_t *type, void (*any_unpackN)(ypObject *, 
     // x is not an iterable.
     assert_raises_exc(any_unpackN(not_iterable, N(&exc)), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises_exc(any_unpackN(invalidated, N(&exc)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises_exc(any_unpackN(yp_SyntaxError, N(&exc)), yp_SyntaxError);
+    {
+        ypObject *passthrough = rand_obj(NULL, fixture_type_exception);
+        assert_raises_exc(any_unpackN(passthrough, N(&exc)), passthrough);
+    }
 
     // Bug: yp_StopIteration was mistaken for an exhausted iterator.
     assert_raises_exc(any_unpackN(yp_StopIteration, N(&exc)), yp_StopIteration);
@@ -301,7 +328,7 @@ static void _test_reversed(fixture_type_t *type, ypObject *(*any_reversed)(ypObj
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // reversed is not supported on iterators, set-likes, and mappings.
     if (type->yp_type == yp_t_iter || type->is_setlike || type->is_mapping) {
@@ -363,10 +390,20 @@ static void _test_reversed(fixture_type_t *type, ypObject *(*any_reversed)(ypObj
     // x is not an iterable.
     assert_raises(any_reversed(not_iterable), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(any_reversed(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(any_reversed(yp_SyntaxError), yp_SyntaxError);
-    assert_raises(any_reversed(yp_StopIteration), yp_StopIteration);
-    assert_raises(any_reversed(yp_GeneratorExit), yp_GeneratorExit);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(any_reversed(exception), exception);
+        assert_raises(any_reversed(yp_StopIteration), yp_StopIteration);
+        assert_raises(any_reversed(yp_GeneratorExit), yp_GeneratorExit);
+    }
 
 tear_down:
     obj_array_decref(items);
@@ -419,7 +456,7 @@ static void _test_sorted(fixture_type_t *type, ypObject *(*any_sorted)(ypObject 
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_ordered_items);
+    obj_array_fill(items, uq, type->rand_elems->items_ordered);
 
     // Basic sorted.
     {
@@ -459,10 +496,20 @@ static void _test_sorted(fixture_type_t *type, ypObject *(*any_sorted)(ypObject 
     // x is not an iterable.
     assert_raises(any_sorted(not_iterable), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(any_sorted(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(any_sorted(yp_SyntaxError), yp_SyntaxError);
-    assert_raises(any_sorted(yp_StopIteration), yp_StopIteration);
-    assert_raises(any_sorted(yp_GeneratorExit), yp_GeneratorExit);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(any_sorted(exception), exception);
+        assert_raises(any_sorted(yp_StopIteration), yp_StopIteration);
+        assert_raises(any_sorted(yp_GeneratorExit), yp_GeneratorExit);
+    }
 
     obj_array_decref(items);
     yp_decrefN(N(not_iterable));
@@ -482,7 +529,7 @@ static void _test_sorted3(
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_ordered_items);
+    obj_array_fill(items, uq, type->rand_elems->items_ordered);
 
     // Basic sorted3.
     for (key = keys_noop; *key != NULL; key++) {
@@ -554,15 +601,28 @@ static void _test_sorted3(
     assert_raises(any_sorted3(not_iterable, yp_None, yp_False), yp_TypeError);
     assert_raises(any_sorted3(not_iterable, key_zero, yp_True), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *x = yp_listN(N(items[1]));
+
+        assert_raises(any_sorted3(invalidated, yp_None, yp_False), yp_InvalidatedError);
+        assert_raises(any_sorted3(x, invalidated, yp_False), yp_InvalidatedError);
+        assert_raises(any_sorted3(x, yp_None, invalidated), yp_InvalidatedError);
+
+        yp_decrefN(N(x, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *list_empty = yp_listN(0);
 
-        assert_raises(any_sorted3(yp_SyntaxError, yp_None, yp_False), yp_SyntaxError);
+        assert_raises(any_sorted3(exception, yp_None, yp_False), exception);
         assert_raises(any_sorted3(yp_StopIteration, yp_None, yp_False), yp_StopIteration);
         assert_raises(any_sorted3(yp_GeneratorExit, yp_None, yp_False), yp_GeneratorExit);
-        assert_raises(any_sorted3(list_empty, yp_SyntaxError, yp_False), yp_SyntaxError);
-        assert_raises(any_sorted3(list_empty, yp_None, yp_SyntaxError), yp_SyntaxError);
+        assert_raises(any_sorted3(list_empty, exception, yp_False), exception);
+        assert_raises(any_sorted3(list_empty, yp_None, exception), exception);
 
         yp_decrefN(N(list_empty));
     }
@@ -740,11 +800,22 @@ static void _test_send(fixture_type_t *type, ypObject *x_two, ypObject *(*any_it
         yp_decrefN(N(second, first, iter));
     }
 
+    // Invalidated argument. Allowed to send to iterators.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_send(invalidated, yp_None), yp_InvalidatedError);
+        eead(iter, any_iter(x_two), first, yp_send(iter, invalidated), assert_not_exception(first));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(yp_send(yp_SyntaxError, yp_None), yp_SyntaxError);
-    assert_raises(yp_send(yp_StopIteration, yp_None), yp_StopIteration);
-    assert_raises(yp_send(yp_GeneratorExit, yp_None), yp_GeneratorExit);
-    ead(iter, any_iter(x_two), assert_raises(yp_send(iter, yp_SyntaxError), yp_SyntaxError));
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_send(exception, yp_None), exception);
+        assert_raises(yp_send(yp_StopIteration, yp_None), yp_StopIteration);
+        assert_raises(yp_send(yp_GeneratorExit, yp_None), yp_GeneratorExit);
+        ead(iter, any_iter(x_two), assert_raises(yp_send(iter, exception), exception));
+    }
 }
 
 static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
@@ -754,7 +825,7 @@ static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *send_value = rand_obj_any(uq);
     ypObject       *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // yp_send with yp_iter. x is reused so can't be an iter.
     if (type != fixture_type_iter) {
@@ -768,7 +839,7 @@ static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
         ypObject *values[2];
         ypObject *pairs[2];  // The key/value pairs.
         ypObject *x;
-        obj_array_fill(values, uq, type->rand_values);
+        obj_array_fill(values, uq, type->rand_elems->values);
         assert_not_raises(pairs[0] = yp_tupleN(2, items[0], values[0]));
         assert_not_raises(pairs[1] = yp_tupleN(2, items[1], values[1]));
         x = type->newK(K(items[0], values[0], items[1], values[1]));
@@ -786,10 +857,20 @@ static MunitResult test_send(const MunitParameter params[], fixture_t *fixture)
     // x is not an iterable.
     assert_raises(yp_send(not_iterable, send_value), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_send(invalidated, send_value), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(yp_send(yp_SyntaxError, send_value), yp_SyntaxError);
-    assert_raises(yp_send(yp_StopIteration, send_value), yp_StopIteration);
-    assert_raises(yp_send(yp_GeneratorExit, send_value), yp_GeneratorExit);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_send(exception, send_value), exception);
+        assert_raises(yp_send(yp_StopIteration, send_value), yp_StopIteration);
+        assert_raises(yp_send(yp_GeneratorExit, send_value), yp_GeneratorExit);
+    }
 
     obj_array_decref(items);
     yp_decrefN(N(send_value, not_iterable));
@@ -856,11 +937,23 @@ static void _test_next2(fixture_type_t *type, ypObject *x_two, ypObject *(*any_i
         yp_decrefN(N(second, first, iter));
     }
 
+    // Invalidated argument. Allowed for default values.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_next2(invalidated, yp_None), yp_InvalidatedError);
+        eead(iter, any_iter(x_two), first, yp_next2(iter, invalidated),
+                assert_not_exception(first));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(yp_next2(yp_SyntaxError, yp_None), yp_SyntaxError);
-    assert_raises(yp_next2(yp_StopIteration, yp_None), yp_StopIteration);
-    assert_raises(yp_next2(yp_GeneratorExit, yp_None), yp_GeneratorExit);
-    ead(iter, any_iter(x_two), assert_raises(yp_next2(iter, yp_SyntaxError), yp_SyntaxError));
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_next2(exception, yp_None), exception);
+        assert_raises(yp_next2(yp_StopIteration, yp_None), yp_StopIteration);
+        assert_raises(yp_next2(yp_GeneratorExit, yp_None), yp_GeneratorExit);
+        ead(iter, any_iter(x_two), assert_raises(yp_next2(iter, exception), exception));
+    }
 }
 
 static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
@@ -870,7 +963,7 @@ static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *default_ = rand_obj_any(uq);
     ypObject       *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // yp_next2 with yp_iter. x is reused so can't be an iter.
     if (type != fixture_type_iter) {
@@ -884,7 +977,7 @@ static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
         ypObject *values[2];
         ypObject *pairs[2];  // The key/value pairs.
         ypObject *x;
-        obj_array_fill(values, uq, type->rand_values);
+        obj_array_fill(values, uq, type->rand_elems->values);
         assert_not_raises(pairs[0] = yp_tupleN(2, items[0], values[0]));
         assert_not_raises(pairs[1] = yp_tupleN(2, items[1], values[1]));
         x = type->newK(K(items[0], values[0], items[1], values[1]));
@@ -901,10 +994,20 @@ static MunitResult test_next2(const MunitParameter params[], fixture_t *fixture)
     // x is not an iterable.
     assert_raises(yp_next2(not_iterable, default_), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_next2(invalidated, default_), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(yp_next2(yp_SyntaxError, default_), yp_SyntaxError);
-    assert_raises(yp_next2(yp_StopIteration, default_), yp_StopIteration);
-    assert_raises(yp_next2(yp_GeneratorExit, default_), yp_GeneratorExit);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_next2(exception, default_), exception);
+        assert_raises(yp_next2(yp_StopIteration, default_), yp_StopIteration);
+        assert_raises(yp_next2(yp_GeneratorExit, default_), yp_GeneratorExit);
+    }
 
     obj_array_decref(items);
     yp_decrefN(N(default_, not_iterable));
@@ -922,7 +1025,7 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *not_exception = rand_obj_any(uq);
     ypObject       *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // yp_throw with yp_iter. x is reused so can't be an iter.
     if (type != fixture_type_iter) {
@@ -941,7 +1044,7 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
     if (type->is_mapping) {
         ypObject *values[2];
         ypObject *x;
-        obj_array_fill(values, uq, type->rand_values);
+        obj_array_fill(values, uq, type->rand_elems->values);
         x = type->newK(K(items[0], values[0], items[1], values[1]));
 
         for (exception = syntax_stopIter_genExit; *exception != NULL; exception++) {
@@ -961,10 +1064,21 @@ static MunitResult test_throw(const MunitParameter params[], fixture_t *fixture)
     // x is not an iterable.
     assert_raises(yp_throw(not_iterable, yp_SyntaxError), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_throw(invalidated, yp_Exception), yp_InvalidatedError);
+        ead(iter, new_iterN(0), assert_raises(yp_throw(iter, invalidated), yp_InvalidatedError));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(yp_throw(yp_SyntaxError, yp_Exception), yp_SyntaxError);
-    assert_raises(yp_throw(yp_StopIteration, yp_Exception), yp_StopIteration);
-    assert_raises(yp_throw(yp_GeneratorExit, yp_Exception), yp_GeneratorExit);
+    {
+        ypObject *passthrough = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_throw(passthrough, yp_Exception), passthrough);
+        assert_raises(yp_throw(yp_StopIteration, yp_Exception), yp_StopIteration);
+        assert_raises(yp_throw(yp_GeneratorExit, yp_Exception), yp_GeneratorExit);
+    }
 
     obj_array_decref(items);
     yp_decrefN(N(not_exception, not_iterable));
@@ -1016,7 +1130,7 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *items[3];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // yp_close with yp_iter. x is reused so can't be an iter.
     if (type != fixture_type_iter) {
@@ -1029,7 +1143,7 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
     if (type->is_mapping) {
         ypObject *values[3];
         ypObject *x;
-        obj_array_fill(values, uq, type->rand_values);
+        obj_array_fill(values, uq, type->rand_elems->values);
         x = type->newK(K(items[0], values[0], items[1], values[1], items[2], values[2]));
 
         _test_close(type, x, yp_iter_keys);
@@ -1043,10 +1157,20 @@ static MunitResult test_close(const MunitParameter params[], fixture_t *fixture)
     // x is not an iterable.
     assert_raises_exc(yp_close(not_iterable, &exc), yp_MethodError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises_exc(yp_close(invalidated, &exc), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises_exc(yp_close(yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_raises_exc(yp_close(yp_StopIteration, &exc), yp_StopIteration);
-    assert_raises_exc(yp_close(yp_GeneratorExit, &exc), yp_GeneratorExit);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises_exc(yp_close(exception, &exc), exception);
+        assert_raises_exc(yp_close(yp_StopIteration, &exc), yp_StopIteration);
+        assert_raises_exc(yp_close(yp_GeneratorExit, &exc), yp_GeneratorExit);
+    }
 
     obj_array_decref(items);
     yp_decrefN(N(not_iterable));
@@ -1084,8 +1208,8 @@ static void _test_iter_values(fixture_type_t *type)
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *keys[2];
     ypObject     *values[2];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Basic iter_values.
     {
@@ -1147,10 +1271,20 @@ static void _test_iter_values(fixture_type_t *type)
     // x is not an iterable.
     assert_raises(yp_iter_values(not_iterable), yp_MethodError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_iter_values(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(yp_iter_values(yp_SyntaxError), yp_SyntaxError);
-    assert_raises(yp_iter_values(yp_StopIteration), yp_StopIteration);
-    assert_raises(yp_iter_values(yp_GeneratorExit), yp_GeneratorExit);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_iter_values(exception), exception);
+        assert_raises(yp_iter_values(yp_StopIteration), yp_StopIteration);
+        assert_raises(yp_iter_values(yp_GeneratorExit), yp_GeneratorExit);
+    }
 
     obj_array_decref(values);
     obj_array_decref(keys);
@@ -1183,8 +1317,8 @@ static void _test_iter_items(fixture_type_t *type)
     ypObject     *keys[2];
     ypObject     *values[2];
     ypObject     *pairs[2];  // The key/value pairs.
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
     assert_not_raises(pairs[0] = yp_tupleN(2, keys[0], values[0]));
     assert_not_raises(pairs[1] = yp_tupleN(2, keys[1], values[1]));
 
@@ -1255,10 +1389,20 @@ static void _test_iter_items(fixture_type_t *type)
     // x is not an iterable.
     assert_raises(yp_iter_items(not_iterable), yp_MethodError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_raises(yp_iter_items(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(yp_iter_items(yp_SyntaxError), yp_SyntaxError);
-    assert_raises(yp_iter_items(yp_StopIteration), yp_StopIteration);
-    assert_raises(yp_iter_items(yp_GeneratorExit), yp_GeneratorExit);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_iter_items(exception), exception);
+        assert_raises(yp_iter_items(yp_StopIteration), yp_StopIteration);
+        assert_raises(yp_iter_items(yp_GeneratorExit), yp_GeneratorExit);
+    }
 
     obj_array_decref(pairs);
     obj_array_decref(values);
@@ -1306,7 +1450,7 @@ static void _test_miniiter(
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic miniiter.
     {
@@ -1385,10 +1529,19 @@ static void _test_miniiter(
         assert_raises(any_miniiter(not_iterable, &mi_state), yp_TypeError, yp_MethodError);
     }
 
+    // Invalidated argument.
+    {
+        ypObject   *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        yp_uint64_t mi_state;
+        assert_raises(any_miniiter(invalidated, &mi_state), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
+        ypObject   *exception = rand_obj(NULL, fixture_type_exception);
         yp_uint64_t mi_state;
-        assert_raises(any_miniiter(yp_SyntaxError, &mi_state), yp_SyntaxError);
+        assert_raises(any_miniiter(exception, &mi_state), exception);
         assert_raises(any_miniiter(yp_StopIteration, &mi_state), yp_StopIteration);
         assert_raises(any_miniiter(yp_GeneratorExit, &mi_state), yp_GeneratorExit);
     }
@@ -1447,8 +1600,8 @@ static void _test_miniiter_values(fixture_type_t *type)
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *keys[2];
     ypObject     *values[2];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Basic miniiter.
     {
@@ -1514,10 +1667,19 @@ static void _test_miniiter_values(fixture_type_t *type)
         assert_raises(yp_miniiter_values(not_iterable, &mi_state), yp_MethodError);
     }
 
+    // Invalidated argument.
+    {
+        ypObject   *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        yp_uint64_t mi_state;
+        assert_raises(yp_miniiter_values(invalidated, &mi_state), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
+        ypObject   *exception = rand_obj(NULL, fixture_type_exception);
         yp_uint64_t mi_state;
-        assert_raises(yp_miniiter_values(yp_SyntaxError, &mi_state), yp_SyntaxError);
+        assert_raises(yp_miniiter_values(exception, &mi_state), exception);
         assert_raises(yp_miniiter_values(yp_StopIteration, &mi_state), yp_StopIteration);
         assert_raises(yp_miniiter_values(yp_GeneratorExit, &mi_state), yp_GeneratorExit);
     }
@@ -1554,8 +1716,8 @@ static void _test_miniiter_items(fixture_type_t *type)
     ypObject     *keys[2];
     ypObject     *values[2];
     ypObject     *pairs[2];  // The key/value pairs.
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
     assert_not_raises(pairs[0] = yp_tupleN(2, keys[0], values[0]));
     assert_not_raises(pairs[1] = yp_tupleN(2, keys[1], values[1]));
 
@@ -1643,10 +1805,19 @@ static void _test_miniiter_items(fixture_type_t *type)
         assert_raises(yp_miniiter_items(not_iterable, &mi_state), yp_MethodError);
     }
 
+    // Invalidated argument.
+    {
+        ypObject   *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        yp_uint64_t mi_state;
+        assert_raises(yp_miniiter_items(invalidated, &mi_state), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
+        ypObject   *exception = rand_obj(NULL, fixture_type_exception);
         yp_uint64_t mi_state;
-        assert_raises(yp_miniiter_items(yp_SyntaxError, &mi_state), yp_SyntaxError);
+        assert_raises(yp_miniiter_items(exception, &mi_state), exception);
         assert_raises(yp_miniiter_items(yp_StopIteration, &mi_state), yp_StopIteration);
         assert_raises(yp_miniiter_items(yp_GeneratorExit, &mi_state), yp_GeneratorExit);
     }

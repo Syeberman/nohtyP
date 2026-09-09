@@ -271,7 +271,7 @@ ypAPI ypObject *yp_chrarray_frombytesC4(
         yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors);
 
 // Equivalent to yp_str3(yp_bytesC(len, source), yp_s_utf_8, yp_s_strict). Note that in Python,
-// omitting encoding and errors would normally return the string representation of the bytes object
+// omitting encoding and errors would normally return the text representation of the bytes object
 // ("b'Zoot!'"), however this constructor decodes it ("Zoot!").
 ypAPI ypObject *yp_str_frombytesC2(yp_ssize_t len, const yp_uint8_t *source);
 ypAPI ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source);
@@ -281,18 +281,18 @@ ypAPI ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source
 ypAPI ypObject *yp_str3(ypObject *source, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_chrarray3(ypObject *source, ypObject *encoding, ypObject *errors);
 
-// Returns a new reference to the "informal" or nicely-printable string representation of object, as
-// a str/chrarray. As in Python, passing a bytes object to this constructor returns the string
-// representation ("b'Zoot!'"); to decode the bytes, use yp_str3.
+// Returns a new reference to the "informal" or nicely-printable representation of object, as a
+// str/chrarray. As in Python, passing a bytes object to this constructor returns the representation
+// ("b'Zoot!'"); to decode the bytes, use yp_str3.
 ypAPI ypObject *yp_str(ypObject *object);
 ypAPI ypObject *yp_chrarray(ypObject *object);
 
 // Returns a new reference to an empty chrarray. (An empty str is exported as yp_str_empty.)
 ypAPI ypObject *yp_chrarray0(void);
 
-// Returns a new reference to the str representing a character whose Unicode codepoint is the
-// integer i.
-ypAPI ypObject *yp_chrC(yp_int_t i);
+// Returns a new reference to the str representing a character with the specified Unicode code
+// point.
+ypAPI ypObject *yp_chrC(yp_int_t codepoint);
 
 // Returns a new reference to a tuple/list of length n containing the given objects.
 ypAPI ypObject *yp_tupleN(int n, ...);
@@ -931,7 +931,7 @@ ypAPI ypObject *const yp_frozendict_empty;
  * String Operations
  */
 
-// These methods are supported by bytes and str (and their mutable counterparts, of course).
+// These methods are supported by binary strings (bytes/bytearray) and text strings (str/chrarray).
 // Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return ints for
 // these types, and will only accept ints for yp_setindexC. The individual elements of strs and
 // chrarrays are single-character strs. Using bytes/bytearray arguments on a str/chrarray method, or
@@ -944,6 +944,7 @@ ypAPI ypObject *const yp_frozendict_empty;
 // Unlike Python, the arguments start/end (yp_startswithC4 et al) and i/j (yp_findC5 et al) are
 // always treated as in slice notation. Python behaves peculiarly when end<start in certain edge
 // cases involving empty strings (compare "foo"[5:0].startswith("") to "foo".startswith("", 5, 0)).
+// FIXME Remove this start/end stuff?
 
 // Immortal strs representing common encodings, for convience with yp_str_frombytesC4 et al.
 ypAPI ypObject *const yp_s_ascii;     // "ascii"
@@ -979,8 +980,13 @@ ypAPI ypObject *yp_isalnum(ypObject *s);
 // defined in the Unicode Standard.
 ypAPI ypObject *yp_isalpha(ypObject *s);
 
+// Returns the immortal yp_True if all characters in s are ascii or the string is empty, otherwise
+// yp_False.
+ypAPI ypObject *yp_isascii(ypObject *s);
+
 // Returns the immortal yp_True if all characters in s are decimal characters and there is at least
-// one character, otherwise yp_False. Decimal characters are those from general category "Nd".
+// one character, otherwise yp_False. Decimal characters are those from general category "Nd". Not
+// supported on binary strings (bytes/bytearray).
 ypAPI ypObject *yp_isdecimal(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are digits and there is at least one
@@ -989,7 +995,7 @@ ypAPI ypObject *yp_isdecimal(ypObject *s);
 ypAPI ypObject *yp_isdigit(ypObject *s);
 
 // Returns the immortal yp_True if s is a valid identifier according to the Python language
-// definition, otherwise yp_False.
+// definition, otherwise yp_False. Not supported on binary strings (bytes/bytearray).
 ypAPI ypObject *yp_isidentifier(ypObject *s);
 
 // Returns the immortal yp_True if all cased characters in s are lowercase and there is at least one
@@ -999,12 +1005,13 @@ ypAPI ypObject *yp_islower(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are numeric characters and there is at least
 // one character, otherwise yp_False. Numeric characters are those that have the Unicode numeric
-// value property.
+// value property. Not supported on binary strings (bytes/bytearray).
 ypAPI ypObject *yp_isnumeric(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are printable or s is empty, otherwise
 // yp_False. Nonprintable characters are those characters defined in the Unicode character database
-// as "Other" or "Separator", excepting space (0x20) which is considered printable.
+// as "Other" or "Separator", excepting the ascii space (0x20) which is considered printable. Not
+// supported on binary strings (bytes/bytearray).
 ypAPI ypObject *yp_isprintable(ypObject *s);
 
 // Returns the immortal yp_True if there are only whitespace characters in s and there is at least
@@ -1020,13 +1027,18 @@ ypAPI ypObject *yp_isupper(ypObject *s);
 
 // Returns the immortal yp_True if s[start:end] starts with the specified prefix, otherwise
 // yp_False. prefix can also be a tuple of prefix strings for which to look. If a prefix string is
-// empty, returns yp_True. yp_startswith considers the entire string (as if start is 0 and end is
-// yp_SLICE_LAST).
+// empty, returns yp_True.
+// FIXME Remove these start/end variants? If this was useful isupper/etc would have them. What would
+// be better is a general-purpose string slice solution.
 ypAPI ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end);
+
+// Equivalent to yp_startswithC4(s, prefix, 0, yp_SLICE_LAST).
 ypAPI ypObject *yp_startswith(ypObject *s, ypObject *prefix);
 
 // Similar to yp_startswithC4, except looks for the given suffix(es) at the end of s[start:end].
 ypAPI ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end);
+
+// Equivalent to yp_endswith(s, prefix, 0, yp_SLICE_LAST).
 ypAPI ypObject *yp_endswith(ypObject *s, ypObject *suffix);
 
 // Returns a new reference to a lowercased copy of s. The lowercasing algorithm is described in
@@ -1038,54 +1050,68 @@ ypAPI ypObject *yp_lower(ypObject *s);
 ypAPI ypObject *yp_upper(ypObject *s);
 
 // Returns a new reference to a "casefolded" copy of s, for use in caseless matching. The
-// casefolding algorithm is described in section 3.13 of the Unicode Standard.
+// casefolding algorithm is described in section 3.13 of the Unicode Standard. Not supported on
+// binary strings (bytes/bytearray).
 ypAPI ypObject *yp_casefold(ypObject *s);
 
 // Returns a new reference to a copy of s with uppercase characters converted to lowercase and vice
 // versa.
 ypAPI ypObject *yp_swapcase(ypObject *s);
 
-// Returns a new reference to a copy of s with its first character capitalized and the rest
+// Returns a new reference to a copy of s with its first character titlecased and the rest
 // lowercased.
 ypAPI ypObject *yp_capitalize(ypObject *s);
 
 // Returns a new reference to s left-justified in a string of length width. Padding is done using
-// the specified ord_fillchar for yp_ljustC3, or a space for yp_ljustC. A copy of s is returned if
-// width is less than or equal to its length.
+// the specified ord_fillchar. A copy of s is returned if width is less than or equal to its length.
 ypAPI ypObject *yp_ljustC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar);
+
+// Equivalent to yp_ljustC3(s, width, 0x20) (pads using the ascii space).
 ypAPI ypObject *yp_ljustC(ypObject *s, yp_ssize_t width);
 
 // Similar to yp_ljustC3, except s is right-justified.
 ypAPI ypObject *yp_rjustC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar);
+
+// Equivalent to yp_rjustC3(s, width, 0x20) (pads using the ascii space).
 ypAPI ypObject *yp_rjustC(ypObject *s, yp_ssize_t width);
 
 // Similar to yp_ljustC3, except s is centered.
 ypAPI ypObject *yp_centerC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar);
+
+// Equivalent to yp_centerC3(s, width, 0x20) (pads using the ascii space).
 ypAPI ypObject *yp_centerC(ypObject *s, yp_ssize_t width);
 
-// Returns a new reference to s where all tab characters are replaced by one or more spaces,
-// depending on the current column and the given tabsize. Newline and return characters reset the
-// column to zero; all other characters increment the column by one regardless of how the character
-// is represented when printed. The Python-equivalent "default" for tabsize is 8.
+// Returns a new reference to s where all tab characters are replaced by one or more ascii spaces
+// (0x20), depending on the current column and the given tabsize. Newline and return characters
+// reset the column to zero; all other characters increment the column by one regardless of how the
+// character is represented when printed. The Python-equivalent "default" for tabsize is 8.
 ypAPI ypObject *yp_expandtabsC(ypObject *s, yp_ssize_t tabsize);
 
-// Returns a new reference to a copy of s with count occurrences of substring oldsub replaced by
-// newsub. For yp_replace, or if count is -1, all occurrences are replaced.
+// Returns a new reference to a copy of s with count occurrences of the substring oldsub replaced by
+// newsub. If count is -1, all occurrences are replaced.
 ypAPI ypObject *yp_replaceC4(ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count);
+
+// Equivalent to yp_replaceC4(s, oldsub, newsub, -1).
 ypAPI ypObject *yp_replace(ypObject *s, ypObject *oldsub, ypObject *newsub);
 
 // Returns a new reference to a copy of s with leading characters removed. The chars argument is a
-// string specifying the set of characters to be removed; for yp_lstrip, or if chars is yp_None,
-// this defaults to removing whitespace.
+// string specifying the set of characters to be removed; if chars is yp_None, whitespace characters
+// are removed.
 ypAPI ypObject *yp_lstrip2(ypObject *s, ypObject *chars);
+
+// Equivalent to yp_lstrip2(s, yp_None).
 ypAPI ypObject *yp_lstrip(ypObject *s);
 
 // Similar to yp_lstrip2, except trailing characters are removed.
 ypAPI ypObject *yp_rstrip2(ypObject *s, ypObject *chars);
+
+// Equivalent to yp_rstrip2(s, yp_None).
 ypAPI ypObject *yp_rstrip(ypObject *s);
 
 // Similar to yp_lstrip2, except both leading and trailing characters are removed.
 ypAPI ypObject *yp_strip2(ypObject *s, ypObject *chars);
+
+// Equivalent to yp_strip2(s, yp_None).
 ypAPI ypObject *yp_strip(ypObject *s);
 
 // Returns a new reference to the concatenation of the strings in iterable, using s as the separator
@@ -1108,26 +1134,28 @@ ypAPI void yp_partition(
 ypAPI void yp_rpartition(
         ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2);
 
-// Returns a new reference to a list of words in the string, using sep as the delimiter string. For
-// yp_splitC3, only performs the leftmost splits up to maxsplit; for yp_split2, or if maxsplit is
-// -1, there is no limit on the number of splits made. If sep is yp_None this behaves as yp_split,
-// otherwise consecutive delimiters are not grouped together and are deemed to delimit empty
-// strings.
+// Returns a new reference to a list of words in the string, using sep as the delimiter string. Only
+// performs the leftmost splits up to maxsplit; if maxsplit is -1, there is no limit on the number
+// of splits made.
 //
-// Ex: yp_split2("1,,2", ",") returns ["1", "", "2"]
+// The splitting algorithm used depends on sep. If sep is yp_None, runs of consecutive whitespace
+// are regarded as a single separator, and the result will contain no empty strings. Otherwise,
+// consecutive delimiters are not grouped together and are deemed to delimit empty strings.
+//
+//      Ex: yp_split3(" 1  2   3  ", yp_None, -1) returns ["1", "2", "3"]
+//      Ex: yp_split3(" 1  2   3  ", " ", -1) returns ["", "1", "", "2", "", "", "3", "", ""]
+//      Ex: yp_split3("1,,2,3", ",", 2) returns ["1", "", "2,3"]
 ypAPI ypObject *yp_splitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
+
+// Equivalent to yp_splitC3(s, sep, -1).
 ypAPI ypObject *yp_split2(ypObject *s, ypObject *sep);
 
-// Similar to yp_splitC3, except a different splitting algorithm is used. Runs of consecutive
-// whitespace are regarded as a single separator and the result will contain no empty strings at the
-// start or end if the string has leading or trailing whitespace.
-//
-// Ex: yp_split(" 1  2   3  ") returns ["1", "2", "3"]
+// Equivalent to yp_splitC3(s, yp_None, -1).
 ypAPI ypObject *yp_split(ypObject *s);
 
 // Similar to yp_splitC3, except only performs the rightmost splits up to maxsplit.
 //
-// Ex: yp_rsplitC3("  1  2   3  ", yp_None, 1) returns ["  1  2", "3"]
+//      Ex: yp_rsplitC3("1,,2,3", ",", 2) returns ["1,", "2", "3"]
 ypAPI ypObject *yp_rsplitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
 
 // Returns a new reference to a list of lines in the string, breaking at line boundaries. Python's
@@ -1147,13 +1175,17 @@ ypAPI ypObject *yp_decode3(ypObject *b, ypObject *encoding, ypObject *errors);
 // Equivalent to yp_decode3(b, yp_s_utf_8, yp_s_strict).
 ypAPI ypObject *yp_decode(ypObject *b);
 
+// Returns the Unicode code point of the single-character str. Returns zero and sets *exc on error.
+// This is the inverse of yp_chrC.
+ypAPI yp_int_t yp_codepointC(ypObject *character, ypObject **exc);
+
 // Immortal empty bytes and str objects.
 ypAPI ypObject *const yp_bytes_empty;
 ypAPI ypObject *const yp_str_empty;
 
 
 /*
- * String Formatting Operations
+ * Text String Formatting Operations
  */
 
 // The syntax of format strings can be found in Python's documentation:
@@ -1403,7 +1435,7 @@ ypAPI yp_float_t yp_truedivLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_floordivLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_modLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI void       yp_divmodLF(
-              yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc);
+        yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc);
 ypAPI yp_float_t yp_powLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_negLF(yp_float_t x, ypObject **exc);
 ypAPI yp_float_t yp_posLF(yp_float_t x, ypObject **exc);
@@ -1512,14 +1544,12 @@ ypAPI ypObject *yp_copy(ypObject *x);
 ypAPI ypObject *yp_deepcopy(ypObject *x);
 
 // Discards all contained objects in x, deallocates _some_ memory, and transmutes it to the
-// ypInvalidated type (rendering the object useless). If x is immortal or already invalidated this
-// is a no-op; immutable objects _can_ be invalidated. Sets *exc on error.
+// invalidated type (rendering the object useless). Immutable objects _can_ be invalidated. If x is
+// statically-allocated or already invalidated this is a no-op. Sets *exc on error.
+//
+// As nohtyP does not currently detect reference cycles during garbage collection, this is an
+// effective way to break cycles and free memory, particularly when immutables are involved.
 ypAPI void yp_invalidate(ypObject *x, ypObject **exc);
-
-// Invalidates x and, recursively, all contained objects. As nohtyP does not currently detect
-// reference cycles during garbage collection, this is an effective way to break cycles and free
-// memory. Sets *exc on error.
-ypAPI void yp_deepinvalidate(ypObject *x, ypObject **exc);
 
 
 /*
@@ -1738,7 +1768,7 @@ ypAPI void yp_i2s_setitemC5(
 //      value = yp_getitem(o, s_mykey);
 ypAPI ypObject *yp_s2o_getitemC3(ypObject *container, yp_ssize_t key_len, const yp_uint8_t *key);
 ypAPI void      yp_s2o_setitemC5(ypObject *container, yp_ssize_t key_len, const yp_uint8_t *key,
-             ypObject *x, ypObject **exc);
+        ypObject *x, ypObject **exc);
 
 // Operations on containers that map strs to integers.
 ypAPI yp_int_t yp_s2i_getitemC4(
@@ -1866,22 +1896,14 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
  * Initialization Parameters
  */
 
-// yp_initialize accepts a number of parameters to customize nohtyP behaviour.
-// XXX Offsets will not change between versions: members from this struct will never be deleted,
-// only deprecated.
-typedef struct _yp_initialize_parameters_t {
-    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_initialize_parameters_t)
-
-    // yp_malloc, yp_malloc_resize, and yp_free allow you to specify a custom memory allocation API.
-    // It is recommended to set these to NULL to use nohtyP's defaults. Any functions you supply
-    // should behave exactly as documented, and you are encouraged to run the full suite of tests
-    // with your API. (See yp_mem_default_malloc et al in nohtyP.c for examples.)
+typedef struct _yp_memory_allocator_t {
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_memory_allocator_t)
 
     // Allocates at least size bytes of memory, setting *actual to the actual amount of memory
     // allocated, and returning the pointer to the buffer. On error, returns NULL, and *actual is
     // undefined. This must succeed when size==0; the behaviour is undefined when size<0.
     // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
-    void *(*yp_malloc)(yp_ssize_t *actual, yp_ssize_t size);
+    void *(*malloc)(yp_ssize_t *actual, yp_ssize_t size);
 
     // Resizes the given buffer in-place if possible, otherwise allocates a new buffer. There are
     // three possible scenarios:
@@ -1890,17 +1912,107 @@ typedef struct _yp_initialize_parameters_t {
     // - On successful in-place resize, returns p, and *actual is the amount of memory now allocated
     //   by p
     // - Otherwise, returns a pointer to the new buffer, p is not freed, and *actual is the amount
-    //   of memory allocated to the new buffer; nohtyP will then copy the data and call yp_free(p)
+    //   of memory allocated to the new buffer; nohtyP will then copy the data and call free(p)
     //
     // The resized/new buffer will be at least size bytes; extra is a hint as to how much the buffer
     // should be over-allocated, which may be ignored. This must succeed when size==0 or extra==0;
     // the behaviour is undefined when size<0 or extra<0.
     // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
     // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
-    void *(*yp_malloc_resize)(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
+    void *(*malloc_resize)(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
 
-    // Frees memory returned by yp_malloc and yp_malloc_resize. May abort on error.
-    void (*yp_free)(void *p);
+    // FIXME I don't think we need this at all, since we get the actual size in malloc. Both
+    // TCMalloc and Mimalloc just allocate new buffers. Jemalloc _might_ expand large buffers.
+    //
+    // -
+    // https://github.com/google/tcmalloc/blob/a9f51aa745ce9cc1d6812b01d0048ea4d5b85bb6/tcmalloc/tcmalloc.cc#L1289
+    // -
+    // https://github.com/microsoft/mimalloc/blob/09a27098aa6e9286518bd9c74e6ffa7199c3f04e/src/alloc.c#L269
+    // -
+    // https://github.com/jemalloc/jemalloc/blob/1972241cd204c60fb5b66f23c48a117879636161/src/arena.c#L1504
+
+    // Frees memory returned by malloc and malloc_resize. May abort on error.
+    void (*free)(void *p);
+} yp_memory_allocator_t;
+
+// The default memory allocation APIs, exposed to allow them to be called by custom hooks.
+ypAPI const yp_memory_allocator_t *const yp_mem_default_allocator;
+
+// Bit flags used in yp_character_database_t.
+#define yp_ALNUM_ALPHA (1 << 0)
+#define yp_ALNUM_DECIMAL (1 << 1)
+#define yp_ALNUM_DIGIT (1 << 2)
+#define yp_ALNUM_NUMERIC (1 << 3)
+#define yp_CASED_LOWER (1 << 0)
+#define yp_CASED_TITLE (1 << 1)
+#define yp_CASED_UPPER (1 << 2)
+#define yp_XID_START (1 << 0)
+#define yp_XID_CONTINUE (1 << 1)
+
+// Interface for a character database. Used by yp_initialize_parameters_t to add full Unicode
+// support to text strings.
+// XXX Offsets will not change between versions: members from this struct will never be deleted,
+// only deprecated.
+typedef struct _yp_character_database_t {
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_character_database_t)
+
+    // The largest character this database supports. The methods below will not be called with
+    // larger characters; instead, yp_SystemLimitationError will be raised.
+    yp_uint32_t max_char;
+
+    // Returns a combination of the yp_ALNUM_* flags if c is alphanumeric, and 0 if it's not.
+    // FIXME Return an int, or something more specific? If int, the flags should be signed.
+    int (*isalnum)(yp_uint32_t c);
+
+    // Returns a combination of the yp_CASED_* flags if c is cased, and 0 if it's not.
+    int (*iscased)(yp_uint32_t c);
+
+    // Returns true (non-zero) if c is printable, and false if it's not.
+    int (*isprintable)(yp_uint32_t c);
+
+    // Returns true (non-zero) if c is whitespace, and false if it's not.
+    int (*isspace)(yp_uint32_t c);
+
+    // Returns true (non-zero) if c is a line break, and false if it's not.
+    int (*islinebreak)(yp_uint32_t c);
+
+    // Returns a combination of the yp_XID_* flags if c is valid in identifiers (as per Unicode's
+    // "Default Identifiers" definition), and 0 if it's not.
+    int (*isxid)(yp_uint32_t c);
+
+    // FIXME Ensure where these are called, the returned chars are within ypStringLib_MAX_UNICODE.
+
+    // Writes the lowercase form of c to converted and returns the number of characters written. If
+    // c is not cased it is written to converted unchanged. len is the allocated length of
+    // converted; if converted is not large enough -1 is returned.
+    yp_ssize_t (*tolower)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
+
+    // Similar to tolower, except converts to titlecase.
+    yp_ssize_t (*totitle)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
+
+    // Similar to tolower, except converts to uppercase.
+    yp_ssize_t (*toupper)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
+
+    // Similar to tolower, except converts to casefold.
+    yp_ssize_t (*tocasefold)(yp_uint32_t c, yp_ssize_t len, yp_uint32_t *converted);
+} yp_character_database_t;
+
+// yp_initialize accepts a number of parameters to customize nohtyP behaviour.
+// XXX Offsets will not change between versions: members from this struct will never be deleted,
+// only deprecated.
+typedef struct _yp_initialize_parameters_t {
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_initialize_parameters_t)
+
+    // Configures a custom memory allocator. Set to NULL to use nohtyP's defaults. Any functions you
+    // supply should behave exactly as documented, and you are encouraged to run the full suite of
+    // tests with your API. (See yp_mem_default_malloc et al in nohtyP.c for examples.)
+    const yp_memory_allocator_t *allocator;
+
+    // Configures an external character database for text strings (str/chrarray). Set to NULL to use
+    // nohtyP's defaults, which supports only the latin-1 characters. To enable full Unicode
+    // support, an external character database is required.
+    // FIXME Test both character databases from within munit_test.
+    const yp_character_database_t *text_character_database;
 
     // Setting everything_immortal to true forces all allocated objects to be immortal, effectively
     // disabling yp_incref and yp_decref. When false, the default and recommended option, objects
@@ -1908,15 +2020,9 @@ typedef struct _yp_initialize_parameters_t {
     // considerable amounts of memory, but if the number of objects allocated by your program is
     // bounded you may notice a small performance improvement.
     // XXX Use this option carefully, and profile to ensure it actually provides a benefit!
+    // FIXME Remove.
     int everything_immortal;
-
 } yp_initialize_parameters_t;
-
-// The default memory allocation APIs, exposed to allow them to be called by custom hooks.
-ypAPI void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
-ypAPI void *yp_mem_default_malloc_resize(
-        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
-ypAPI void yp_mem_default_free(void *p);
 
 
 /*
@@ -1958,6 +2064,10 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **
 // modified while using the array. As a special case, if size is NULL, the string must not contain
 // null characters and *encoded will point to a null-terminated string. On error, sets *size to zero
 // (if size is not NULL), *encoded to NULL, *encoding to the exception, and returns the exception.
+// FIXME Document byte ordering, absence of BOM, etc.
+// FIXME Or go away from encoding, and instead return the element size (1, 2, or 4) as an integer.
+// FIXME OR! Return a function that returns the i'th item given encoded. Or maybe a struct with
+// the element size, a getter function, and other future stuff.
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding);
 
@@ -2147,6 +2257,7 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, yp_ssize_t *
 // This structure is likely to change in future versions; it should only exist in-memory
 // XXX dicts abuse ob_alloclen to hold a search finger for popitem
 // XXX The dealloc list (i.e., yp_decref) abuses ob_hash to point to the next object to dealloc
+// FIXME I'm tracking the allocated length here, but so is the memory manager. Remove ob_alloclen?
 typedef yp_uint16_t _yp_ob_type_t;
 typedef yp_int32_t  _yp_ob_len_t;
 struct _ypObject {
@@ -2192,6 +2303,8 @@ typedef struct _ypFunctionObject {
     _yp_INLINE_DATA(yp_parameter_decl_t);
 } ypFunctionObject;
 
+// Flags used on ob_flags.
+#define _ypObject_FLAG_STATIC_ALLOC (1u << 0)  // Statically-allocated (e.x. yp_IMMORTAL_*)
 // Set ob_refcnt to this value for immortal objects
 #define _ypObject_REFCNT_IMMORTAL (0x7FFFFFFFu)
 // Set ob_hash to this value for uninitialized hashes (tp_hash will be called and ob_hash updated)
@@ -2224,9 +2337,9 @@ typedef struct _ypFunctionObject {
 #endif
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                            \
-    {(type), 0, (type_flags), _ypObject_REFCNT_IMMORTAL, (len), _ypObject_LEN_INVALID, \
-            _ypObject_HASH_INVALID, (data)}
+#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                               \
+    {(type), _ypObject_FLAG_STATIC_ALLOC, (type_flags), _ypObject_REFCNT_IMMORTAL, (len), \
+            _ypObject_LEN_INVALID, _ypObject_HASH_INVALID, (data)}
 #define _yp_IMMORTAL_INT(qual, name, value)                                                \
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, _ypObject_LEN_INVALID, NULL), (value)}; \

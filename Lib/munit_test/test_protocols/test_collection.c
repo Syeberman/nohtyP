@@ -1,3 +1,9 @@
+// Tests for objects that support the collection protocol.
+//
+// These tests are written to include fixture_type_range, which imposes a restriction: constructor
+// arguments must follow a range pattern. To support this, fixture_type_range->rand_elems->items
+// returns integers following a range pattern. As such, constructors in these tests should always be
+// called with a slice of the type's rand_elems->items, or else the constructor will fail the test.
 
 #include "munit_test/unittest.h"
 
@@ -7,7 +13,7 @@ static MunitResult test_bool(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[1];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Empty collections are falsy, all others are truthy.
     ead(x, type->newN(1, items[0]), assert_obj(yp_bool(x), is, yp_True));
@@ -23,7 +29,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic contains (and in and not_in).
     {
@@ -65,22 +71,55 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     // x is self. Recall `"abc" in "abc"` is True for strings.
     {
         ypObject *self = type->newN(N(items[0], items[1]));
-        assert_obj(yp_contains(self, self), is, type->is_string ? yp_True : yp_False);
-        assert_obj(yp_in(self, self), is, type->is_string ? yp_True : yp_False);
-        assert_obj(yp_not_in(self, self), is, type->is_string ? yp_False : yp_True);
+        if (type->is_string) {
+            assert_obj(yp_contains(self, self), is, yp_True);
+            assert_obj(yp_in(self, self), is, yp_True);
+            assert_obj(yp_not_in(self, self), is, yp_False);
+        } else if (type->original_object_return) {
+            assert_obj(yp_contains(self, self), is, yp_False);
+            assert_obj(yp_in(self, self), is, yp_False);
+            assert_obj(yp_not_in(self, self), is, yp_True);
+        } else {
+            assert_raises(yp_contains(self, self), yp_TypeError);
+            assert_raises(yp_in(self, self), yp_TypeError);
+            assert_raises(yp_not_in(self, self), yp_TypeError);
+        }
         yp_decrefN(N(self));
+    }
+
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *empty = type->newN(0);
+        assert_isexception(yp_contains(self, invalidated), yp_InvalidatedError);
+        assert_isexception(yp_in(invalidated, self), yp_InvalidatedError);
+        assert_isexception(yp_not_in(invalidated, self), yp_InvalidatedError);
+        if (type->hashable_items_only || !type->original_object_return) {
+            // Types like sets and strs operate on the value, even if empty, triggering an error.
+            assert_isexception(yp_contains(empty, invalidated), yp_InvalidatedError);
+            assert_isexception(yp_in(invalidated, empty), yp_InvalidatedError);
+            assert_isexception(yp_not_in(invalidated, empty), yp_InvalidatedError);
+        } else {
+            // Types like tuple do not operate on the value when empty.
+            assert_obj(yp_contains(empty, invalidated), is, yp_False);
+            assert_obj(yp_in(invalidated, empty), is, yp_False);
+            assert_obj(yp_not_in(invalidated, empty), is, yp_True);
+        }
+        yp_decrefN(N(self, empty, invalidated));
     }
 
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *self = type->newN(N(items[0], items[1]));
         ypObject *empty = type->newN(0);
-        assert_isexception(yp_contains(self, yp_SyntaxError), yp_SyntaxError);
-        assert_isexception(yp_in(yp_SyntaxError, self), yp_SyntaxError);
-        assert_isexception(yp_not_in(yp_SyntaxError, self), yp_SyntaxError);
-        assert_isexception(yp_contains(empty, yp_SyntaxError), yp_SyntaxError);
-        assert_isexception(yp_in(yp_SyntaxError, empty), yp_SyntaxError);
-        assert_isexception(yp_not_in(yp_SyntaxError, empty), yp_SyntaxError);
+        assert_isexception(yp_contains(self, exception), exception);
+        assert_isexception(yp_in(exception, self), exception);
+        assert_isexception(yp_not_in(exception, self), exception);
+        assert_isexception(yp_contains(empty, exception), exception);
+        assert_isexception(yp_in(exception, empty), exception);
+        assert_isexception(yp_not_in(exception, empty), exception);
         yp_decrefN(N(self, empty));
     }
 
@@ -94,7 +133,7 @@ static MunitResult test_clear(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[32];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support clear.
     if (!type->is_mutable) {
@@ -154,7 +193,7 @@ tear_down:
 //     fixture_type_t *type = fixture->type;
 //     uniqueness_t   *uq = uniqueness_new();
 //     ypObject       *items[4];
-//     obj_array_fill(items, uq, type->rand_items);
+//     obj_array_fill(items, uq, type->rand_elems->items);
 //
 //     // Basic deepcopy. Recall immortals may not actually be copied, and that newN might return an
 //     // immortal for empty or even single-item collections. But four-item collections are unlikely

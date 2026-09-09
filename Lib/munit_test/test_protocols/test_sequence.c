@@ -1,3 +1,9 @@
+// Tests for objects that support the sequence protocol.
+//
+// These tests are written to include fixture_type_range, which imposes a restriction: constructor
+// arguments must follow a range pattern. To support this, fixture_type_range->rand_elems->items
+// returns integers following a range pattern. As such, constructors in these tests should always be
+// called with a slice of the type's rand_elems->items, or else the constructor will fail the test.
 
 #include "munit_test/unittest.h"
 
@@ -44,7 +50,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Previously-deleted item.
     if (type->is_mutable) {
@@ -70,7 +76,7 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
     ypObject     *items[2];
     ypObject     *sq;
     ypObject     *empty = type->newN(0);
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
     sq = type->newN(N(items[0], items[1]));
 
 #define assert_not_supported(expression)      \
@@ -98,17 +104,30 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
     uniqueness_dealloc(uq);
 }
 
+// Some types are comparable but don't share items, for example str_1byte and str_4bytes. Currently
+// limited to string types, which are tested in test_protocols/test_string.
+static void _test_comparisons_no_peer_elems(
+        fixture_type_t *type, fixture_type_t *x_type, ypObject *(*any_cmp)(ypObject *, ypObject *))
+{
+    ypObject *sq = rand_obj(NULL, type);
+    ypObject *x = rand_obj(NULL, x_type);
+    assert_not_raises(any_cmp(sq, x));
+    assert_true(type->is_string && x_type->is_string);
+    yp_decrefN(N(x, sq));
+}
+
 // cmp_fails is what to expect when two sequences fail to compare because the corresponding items
 // cannot be compared: either an exception or a bool.
+// FIXME Have I inverted the logic/naming of x_lt/etc? It reads like "expected value when x is less
+// than sq", but it's the opposite. Should these be renamed to sq_lt/etc? Here and elsewhere.
 static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_lt, ypObject *x_eq,
         ypObject *x_gt, ypObject *cmp_fails)
 {
     fixture_type_t *x_type = peer->type;
     uniqueness_t   *uq = uniqueness_new();
-    ypObject       *items[5];  // items are in ascending order
-    // We don't have a peer->rand_ordered_items (yet): comparable sequences store the same items.
-    obj_array_fill(items, uq, type->rand_ordered_items);
+    ypObject       *items[6];  // items are in ascending order
+    obj_array_fill(items, uq, peer->rand_elems->items_ordered);
 
 #define assert_cmp_fails(expression)                 \
     do {                                             \
@@ -119,24 +138,39 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         }                                            \
     } while (0)
 
-    // Two-item sq.
+    // Two-item sq, ascending order.
     {
-        ypObject *sq = type->newN(N(items[1], items[3]));
+        ypObject *sq = type->newN(N(items[1], items[4]));
 
         // x has the same items.
-        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_eq));
+        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_eq));
+
+        // x has the same items, reversed.
+        ead(x, x_type->newN(N(items[4], items[1])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // Both items in x are different.
+        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[3], items[0])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[5])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[0])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[3], items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[2], items[5])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[5], items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // The first item in x is different.
-        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
-        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[4])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[5], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // The second item in x is different.
-        ead(x, x_type->newN(N(items[1], items[2])), assert_obj(any_cmp(sq, x), is, x_gt));
-        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[1], items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1], items[5])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // One-item x.
-        ead(x, x_type->newN(N(items[1])), assert_obj(any_cmp(sq, x), is, x_gt));
         ead(x, x_type->newN(N(items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[1])), assert_obj(any_cmp(sq, x), is, x_gt));
         ead(x, x_type->newN(N(items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // Empty x.
@@ -145,10 +179,78 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         // x is sq.
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
-        // Exception passthrough.
-        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(sq, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
 
-        assert_sequence(sq, items[1], items[3]);  // sq unchanged.
+        // Exception passthrough.
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(sq, exception), exception);
+        }
+
+        assert_sequence(sq, items[1], items[4]);  // sq unchanged.
+        yp_decrefN(N(sq));
+    }
+
+    // Two-item sq, descending order.
+    {
+        ypObject *sq = type->newN(N(items[4], items[1]));
+
+        // x has the same items.
+        ead(x, x_type->newN(N(items[4], items[1])), assert_obj(any_cmp(sq, x), is, x_eq));
+
+        // x has the same items, reversed.
+        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_gt));
+
+        // Both items in x are different.
+        ead(x, x_type->newN(N(items[3], items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[0])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[5])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[3], items[2])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[2], items[5])), assert_obj(any_cmp(sq, x), is, x_gt));
+
+        // The first item in x is different.
+        ead(x, x_type->newN(N(items[0], items[1])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[3], items[1])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5], items[1])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // The second item in x is different.
+        ead(x, x_type->newN(N(items[4], items[0])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[4], items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[4], items[5])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // One-item x.
+        ead(x, x_type->newN(N(items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[4])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[5])), assert_obj(any_cmp(sq, x), is, x_lt));
+
+        // Empty x.
+        ead(x, x_type->newN(0), assert_obj(any_cmp(sq, x), is, x_gt));
+
+        // x is sq.
+        assert_obj(any_cmp(sq, sq), is, x_eq);
+
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(sq, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
+        // Exception passthrough.
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(sq, exception), exception);
+        }
+
+        assert_sequence(sq, items[4], items[1]);  // sq unchanged.
         yp_decrefN(N(sq));
     }
 
@@ -164,9 +266,9 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ead(x, x_type->newN(N(items[2])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // Two-item x.
-        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
-        ead(x, x_type->newN(N(items[0], items[3])), assert_obj(any_cmp(sq, x), is, x_gt));
-        ead(x, x_type->newN(N(items[2], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[0], items[4])), assert_obj(any_cmp(sq, x), is, x_gt));
+        ead(x, x_type->newN(N(items[2], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // Empty x.
         ead(x, x_type->newN(0), assert_obj(any_cmp(sq, x), is, x_gt));
@@ -174,8 +276,18 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         // x is sq.
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(sq, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
         // Exception passthrough.
-        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(sq, exception), exception);
+        }
 
         assert_sequence(sq, items[1]);  // sq unchanged.
         yp_decrefN(N(sq));
@@ -186,7 +298,7 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ypObject *sq = type->newN(0);
 
         // Two-item x.
-        ead(x, x_type->newN(N(items[1], items[3])), assert_obj(any_cmp(sq, x), is, x_lt));
+        ead(x, x_type->newN(N(items[1], items[4])), assert_obj(any_cmp(sq, x), is, x_lt));
 
         // One-item x.
         ead(x, x_type->newN(N(items[1])), assert_obj(any_cmp(sq, x), is, x_lt));
@@ -197,8 +309,18 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         // x is sq.
         assert_obj(any_cmp(sq, sq), is, x_eq);
 
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(sq, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
         // Exception passthrough.
-        assert_isexception(any_cmp(sq, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(sq, exception), exception);
+        }
 
         assert_len(sq, 0);  // sq unchanged.
         yp_decrefN(N(sq));
@@ -232,15 +354,15 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
         ypObject  *sq;
         ypObject  *empty = type->newN(0);
         for (i = 0; i < yp_lengthof_array(items); i++) h_items[i] = yp_frozen_deepcopy(items[i]);
-        sq = type->newN(N(h_items[1], h_items[3]));
+        sq = type->newN(N(h_items[1], h_items[4]));
 
         // Run the tests twice: once where sq has not cached the hash, and once where it has.
         for (i = 0; i < 2; i++) {
-            ypObject *x_is_same = x_type->newN(N(items[1], items[3]));
-            ypObject *x_first_is_lt = x_type->newN(N(items[0], items[3]));
-            ypObject *x_first_is_gt = x_type->newN(N(items[2], items[3]));
-            ypObject *x_second_is_lt = x_type->newN(N(items[1], items[2]));
-            ypObject *x_second_is_gt = x_type->newN(N(items[1], items[4]));
+            ypObject *x_is_same = x_type->newN(N(items[1], items[4]));
+            ypObject *x_first_is_lt = x_type->newN(N(items[0], items[4]));
+            ypObject *x_first_is_gt = x_type->newN(N(items[2], items[4]));
+            ypObject *x_second_is_lt = x_type->newN(N(items[1], items[3]));
+            ypObject *x_second_is_gt = x_type->newN(N(items[1], items[5]));
             ypObject *x_only_is_same = x_type->newN(N(items[1]));
             ypObject *x_only_is_lt = x_type->newN(N(items[0]));
             ypObject *x_only_is_gt = x_type->newN(N(items[2]));
@@ -302,11 +424,13 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
 
     // lt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_lt, yp_TypeError);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_lt);
+        } else {
             _test_comparisons(type, peer, yp_lt, /*x_lt=*/yp_True, /*x_eq=*/yp_False,
                     /*x_gt=*/yp_False, /*cmp_fails=*/yp_TypeError);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_lt, yp_TypeError);
         }
     }
 
@@ -326,11 +450,13 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
 
     // le is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_le, yp_TypeError);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_le);
+        } else {
             _test_comparisons(type, peer, yp_le, /*x_lt=*/yp_True, /*x_eq=*/yp_True,
                     /*x_gt=*/yp_False, /*cmp_fails=*/yp_TypeError);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_le, yp_TypeError);
         }
     }
 
@@ -350,11 +476,13 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
 
     // eq is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_eq, yp_False);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_eq);
+        } else {
             _test_comparisons(type, peer, yp_eq, /*x_lt=*/yp_False, /*x_eq=*/yp_True,
                     /*x_gt=*/yp_False, /*cmp_fails=*/yp_False);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_eq, yp_False);
         }
     }
 
@@ -374,11 +502,13 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
 
     // ne is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_ne, yp_True);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_ne);
+        } else {
             _test_comparisons(type, peer, yp_ne, /*x_lt=*/yp_True, /*x_eq=*/yp_False,
                     /*x_gt=*/yp_True, /*cmp_fails=*/yp_True);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_ne, yp_True);
         }
     }
 
@@ -398,11 +528,13 @@ static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
 
     // ge is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_ge, yp_TypeError);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_ge);
+        } else {
             _test_comparisons(type, peer, yp_ge, /*x_lt=*/yp_False, /*x_eq=*/yp_True,
                     /*x_gt=*/yp_True, /*cmp_fails=*/yp_TypeError);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_ge, yp_TypeError);
         }
     }
 
@@ -422,11 +554,13 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
 
     // gt is only supported for friendly x.
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (types_are_comparable(type, peer->type)) {
+        if (!types_are_comparable(type, peer->type)) {
+            _test_comparisons_not_supported(type, peer->type, yp_gt, yp_TypeError);
+        } else if (peer->rand_elems == NULL) {
+            _test_comparisons_no_peer_elems(type, peer->type, yp_gt);
+        } else {
             _test_comparisons(type, peer, yp_gt, /*x_lt=*/yp_False, /*x_eq=*/yp_False,
                     /*x_gt=*/yp_True, /*cmp_fails=*/yp_TypeError);
-        } else {
-            _test_comparisons_not_supported(type, peer->type, yp_gt, yp_TypeError);
         }
     }
 
@@ -438,13 +572,26 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
+// Some types concatenate but don't share items, for example str_1byte and str_4bytes. Currently
+// limited to string types, which are tested in test_protocols/test_string.
+static void _test_concat_no_peer_elems(fixture_type_t *type, fixture_type_t *x_type)
+{
+    ypObject *sq = rand_obj(NULL, type);
+    ypObject *x = rand_obj(NULL, x_type);
+    ypObject *result;
+    assert_not_raises(result = yp_concat(sq, x));
+    assert_true(type->is_string && x_type->is_string);
+    yp_decrefN(N(result, x, sq));
+}
+
 static void _test_concat(fixture_type_t *type, peer_type_t *peer)
 {
     fixture_type_t *x_type = peer->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    assert_not_null(peer->rand_elems);  // FIXME Update this test.
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // range stores integers following a pattern, so doesn't support concat.
     if (type->is_patterned) {
@@ -579,10 +726,20 @@ static void _test_concat(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(sq));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_concat(sq, invalidated), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_concat(sq, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_concat(sq, exception), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decrefN(N(sq));
     }
@@ -601,7 +758,11 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     for (peer = type->peers; peer->type != NULL; peer++) {
         // TODO Support once we guarantee the order items are yielded from frozenset/etc.
         if (!peer->type->is_sequence) continue;
-        _test_concat(type, peer);
+        if (peer->rand_elems == NULL) {
+            _test_concat_no_peer_elems(type, peer->type);
+        } else {
+            _test_concat(type, peer);
+        }
     }
 
     return MUNIT_OK;
@@ -612,7 +773,7 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // range stores integers following a pattern, so doesn't support repeat.
     if (type->is_patterned) {
@@ -728,7 +889,7 @@ static void _test_getindexC(
     ypObject     *items[2];
     ypObject     *sq;
     ypObject     *empty = type->newN(0);
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
     sq = type->newN(N(items[0], items[1]));
 
     // Basic index.
@@ -786,7 +947,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[5];
     ypObject       *sq;
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
     sq = type->newN(N(items[0], items[1], items[2], items[3], items[4]));
 
     // Basic slice.
@@ -972,7 +1133,7 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     ypObject       *items[2];
     ypObject       *sq;
     ypObject       *empty = type->newN(0);
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
     sq = type->newN(N(items[0], items[1]));
 
     // Shared tests.
@@ -985,9 +1146,20 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     // Index is sq.
     assert_raises(yp_getitem(sq, sq), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_getitem(sq, invalidated), yp_InvalidatedError);
+        assert_isexception(yp_getitem(empty, invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_isexception(yp_getitem(sq, yp_SyntaxError), yp_SyntaxError);
-    assert_isexception(yp_getitem(empty, yp_SyntaxError), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_getitem(sq, exception), exception);
+        assert_isexception(yp_getitem(empty, exception), exception);
+    }
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -1012,7 +1184,7 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     ypObject       *items[3];
     ypObject       *sq;
     ypObject       *empty = type->newN(0);
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
     sq = type->newN(N(items[0], items[1]));
 
     // Basic index.
@@ -1064,12 +1236,26 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
         ead(two, yp_getdefault(sq, ist_2, items[2]), assert_obj(two, is, items[2]));
     }
 
+    // Invalidated argument. Allowed for default values.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_getdefault(sq, invalidated, items[2]), yp_InvalidatedError);
+        assert_isexception(yp_getdefault(empty, invalidated, items[2]), yp_InvalidatedError);
+        ead(zero, yp_getdefault(sq, ist_0, invalidated), assert_obj(zero, eq, items[0]));
+        ead(two, yp_getdefault(sq, ist_2, invalidated), assert_obj(two, is, invalidated));
+        ead(zero, yp_getdefault(empty, ist_0, invalidated), assert_obj(zero, is, invalidated));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_isexception(yp_getdefault(sq, yp_SyntaxError, items[2]), yp_SyntaxError);
-    assert_isexception(yp_getdefault(empty, yp_SyntaxError, items[2]), yp_SyntaxError);
-    assert_isexception(yp_getdefault(sq, ist_0, yp_SyntaxError), yp_SyntaxError);
-    assert_isexception(yp_getdefault(sq, ist_2, yp_SyntaxError), yp_SyntaxError);
-    assert_isexception(yp_getdefault(empty, ist_0, yp_SyntaxError), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_getdefault(sq, exception, items[2]), exception);
+        assert_isexception(yp_getdefault(empty, exception, items[2]), exception);
+        assert_isexception(yp_getdefault(sq, ist_0, exception), exception);
+        assert_isexception(yp_getdefault(sq, ist_2, exception), exception);
+        assert_isexception(yp_getdefault(empty, ist_0, exception), exception);
+    }
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -1090,7 +1276,7 @@ static void _test_findC(fixture_type_t *type,
     ypObject     *items[3];
     ypObject     *sq;
     ypObject     *empty = type->newN(0);
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
     sq = type->newN(N(items[0], items[1]));
 
 #define assert_not_found_exc(expression)            \
@@ -1182,13 +1368,16 @@ static void _test_findC(fixture_type_t *type,
     if (type->is_string) {
         assert_ssizeC_exc(any_findC(sq, sq, &exc), ==, 0);
         assert_ssizeC_exc(any_findC5(sq, sq, 0, 3, &exc), ==, 0);
-    } else {
+    } else if (type->original_object_return) {
         assert_not_found_exc(any_findC(sq, sq, &exc));
         assert_not_found_exc(any_findC5(sq, sq, 0, 3, &exc));
+    } else {
+        assert_raises_exc(any_findC(sq, sq, &exc), yp_TypeError);
+        assert_raises_exc(any_findC5(sq, sq, 0, 3, &exc), yp_TypeError);
     }
 
     // x is sq; sq contains sq.
-    if (!type->is_string && type->is_mutable) {
+    if (type->original_object_return && type->is_mutable) {
         ypObject *sq_sq = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_insertC(sq_sq, 1, sq_sq, &exc));
         assert_ssizeC_exc(any_findC(sq_sq, sq_sq, &exc), ==, 1);
@@ -1220,20 +1409,45 @@ static void _test_findC(fixture_type_t *type,
         if (type->is_string) {
             assert_ssizeC_exc(any_findC(sq_0_1_2, sq_0_1, &exc), ==, 0);
             assert_ssizeC_exc(any_findC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, 0);
-        } else {
+        } else if (type->original_object_return) {
             assert_not_found_exc(any_findC(sq_0_1_2, sq_0_1, &exc));
             assert_not_found_exc(any_findC5(sq_0_1_2, sq_0_1, 0, 3, &exc));
+        } else {
+            assert_raises_exc(any_findC(sq_0_1_2, sq_0_1, &exc), yp_TypeError);
+            assert_raises_exc(any_findC5(sq_0_1_2, sq_0_1, 0, 3, &exc), yp_TypeError);
         }
         yp_decrefN(N(sq_0_1_2, sq_0_1));
     }
 
+    // Invalidated argument. Some types convert the value even when empty.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception_exc(any_findC(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_isexception_exc(any_findC5(sq, invalidated, 0, 1, &exc), yp_InvalidatedError);
+        if (type->original_object_return) {
+            assert_not_found_exc(any_findC5(sq, invalidated, 0, 0, &exc));
+            assert_not_found_exc(any_findC(empty, invalidated, &exc));
+            assert_not_found_exc(any_findC5(empty, invalidated, 0, 1, &exc));
+            assert_not_found_exc(any_findC5(empty, invalidated, 0, 0, &exc));
+        } else {
+            assert_isexception_exc(any_findC5(sq, invalidated, 0, 0, &exc), yp_InvalidatedError);
+            assert_isexception_exc(any_findC(empty, invalidated, &exc), yp_InvalidatedError);
+            assert_isexception_exc(any_findC5(empty, invalidated, 0, 1, &exc), yp_InvalidatedError);
+            assert_isexception_exc(any_findC5(empty, invalidated, 0, 0, &exc), yp_InvalidatedError);
+        }
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_isexception_exc(any_findC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC5(sq, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC(empty, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC5(empty, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
-    assert_isexception_exc(any_findC5(empty, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception_exc(any_findC(sq, exception, &exc), exception);
+        assert_isexception_exc(any_findC5(sq, exception, 0, 1, &exc), exception);
+        assert_isexception_exc(any_findC5(sq, exception, 0, 0, &exc), exception);
+        assert_isexception_exc(any_findC(empty, exception, &exc), exception);
+        assert_isexception_exc(any_findC5(empty, exception, 0, 1, &exc), exception);
+        assert_isexception_exc(any_findC5(empty, exception, 0, 0, &exc), exception);
+    }
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -1275,7 +1489,7 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     ypObject       *items[3];
     ypObject       *sq;
     ypObject       *empty = type->newN(0);
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
     sq = type->newN(N(items[0], items[1]));
 
     // Basic count.
@@ -1353,11 +1567,19 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     assert_ssizeC_exc(yp_countC5(sq, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
 
     // x is sq; sq not in sq. Recall `"abc" in "abc"` is True for strings.
-    assert_ssizeC_exc(yp_countC(sq, sq, &exc), ==, type->is_string ? 1 : 0);
-    assert_ssizeC_exc(yp_countC5(sq, sq, 0, 3, &exc), ==, type->is_string ? 1 : 0);
+    if (type->is_string) {
+        assert_ssizeC_exc(yp_countC(sq, sq, &exc), ==, 1);
+        assert_ssizeC_exc(yp_countC5(sq, sq, 0, 3, &exc), ==, 1);
+    } else if (type->original_object_return) {
+        assert_ssizeC_exc(yp_countC(sq, sq, &exc), ==, 0);
+        assert_ssizeC_exc(yp_countC5(sq, sq, 0, 3, &exc), ==, 0);
+    } else {
+        assert_raises_exc(yp_countC(sq, sq, &exc), yp_TypeError);
+        assert_raises_exc(yp_countC5(sq, sq, 0, 3, &exc), yp_TypeError);
+    }
 
     // x is sq, sq contains sq.
-    if (!type->is_string && type->is_mutable) {
+    if (type->original_object_return && type->is_mutable) {
         ypObject *sq_sq = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_insertC(sq_sq, 1, sq_sq, &exc));
         assert_ssizeC_exc(yp_countC(sq_sq, sq_sq, &exc), ==, 1);
@@ -1387,18 +1609,48 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
         ypObject *sq_0_1_2 = type->newN(N(items[0], items[1], items[2]));
         ypObject *sq_0_1 = type->newN(N(items[0], items[1]));
         assert_obj(sq_0_1, ne, items[2]);  // ensure sq_0_1 isn't actually an item in sq_0_1_2
-        assert_ssizeC_exc(yp_countC(sq_0_1_2, sq_0_1, &exc), ==, type->is_string ? 1 : 0);
-        assert_ssizeC_exc(yp_countC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, type->is_string ? 1 : 0);
+        if (type->is_string) {
+            assert_ssizeC_exc(yp_countC(sq_0_1_2, sq_0_1, &exc), ==, 1);
+            assert_ssizeC_exc(yp_countC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, 1);
+        } else if (type->original_object_return) {
+            assert_ssizeC_exc(yp_countC(sq_0_1_2, sq_0_1, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(sq_0_1_2, sq_0_1, 0, 3, &exc), ==, 0);
+        } else {
+            assert_raises_exc(yp_countC(sq_0_1_2, sq_0_1, &exc), yp_TypeError);
+            assert_raises_exc(yp_countC5(sq_0_1_2, sq_0_1, 0, 3, &exc), yp_TypeError);
+        }
         yp_decrefN(N(sq_0_1_2, sq_0_1));
     }
 
+    // Invalidated argument. Some types convert the value even when empty.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception_exc(yp_countC(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_isexception_exc(yp_countC5(sq, invalidated, 0, 1, &exc), yp_InvalidatedError);
+        if (type->original_object_return) {
+            assert_ssizeC_exc(yp_countC5(sq, invalidated, 0, 0, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC(empty, invalidated, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(empty, invalidated, 0, 1, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(empty, invalidated, 0, 0, &exc), ==, 0);
+        } else {
+            assert_isexception_exc(yp_countC5(sq, invalidated, 0, 0, &exc), yp_InvalidatedError);
+            assert_isexception_exc(yp_countC(empty, invalidated, &exc), yp_InvalidatedError);
+            assert_isexception_exc(yp_countC5(empty, invalidated, 0, 1, &exc), yp_InvalidatedError);
+            assert_isexception_exc(yp_countC5(empty, invalidated, 0, 0, &exc), yp_InvalidatedError);
+        }
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_isexception_exc(yp_countC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC5(sq, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC(empty, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC5(empty, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
-    assert_isexception_exc(yp_countC5(empty, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception_exc(yp_countC(sq, exception, &exc), exception);
+        assert_isexception_exc(yp_countC5(sq, exception, 0, 1, &exc), exception);
+        assert_isexception_exc(yp_countC5(sq, exception, 0, 0, &exc), exception);
+        assert_isexception_exc(yp_countC(empty, exception, &exc), exception);
+        assert_isexception_exc(yp_countC5(empty, exception, 0, 1, &exc), exception);
+        assert_isexception_exc(yp_countC5(empty, exception, 0, 0, &exc), exception);
+    }
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -1413,7 +1665,7 @@ static void _test_setindexC(fixture_type_t *type,
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support setindex.
     if (!type->is_mutable) {
@@ -1504,10 +1756,24 @@ static void _test_setindexC(fixture_type_t *type,
         yp_decref(sq);
     }
 
+    // Invalidated argument. Allowed for values on some types.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->original_object_return) {
+            assert_not_raises_exc(any_setindexC(sq, 0, invalidated, &exc));
+        } else {
+            assert_raises_exc(any_setindexC(sq, 0, invalidated, &exc), yp_InvalidatedError);
+        }
+        assert_len(sq, 2);
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_setindexC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_setindexC(sq, 0, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1523,13 +1789,28 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     return MUNIT_OK;
 }
 
+// Some types can "set slice" but don't share items, for example str_1byte and str_4bytes. Currently
+// limited to string types, which are tested in test_protocols/test_string.
+static void _test_setsliceC_no_peer_elems(fixture_type_t *type, fixture_type_t *x_type)
+{
+    ypObject *sq = rand_obj(NULL, type);
+    ypObject *x = rand_obj(NULL, x_type);
+    if (type->is_mutable) {
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 0, 1, x, &exc));
+    } else {
+        assert_raises_exc(yp_setsliceC6(sq, 0, 0, 1, x, &exc), yp_TypeError);
+    }
+    assert_true(type->is_string && x_type->is_string);
+    yp_decrefN(N(x, sq));
+}
+
 static void _test_setsliceC(fixture_type_t *type, peer_type_t *peer)
 {
     fixture_type_t *x_type = peer->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *items[32];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Immutables don't support setslice.
     if (!type->is_mutable) {
@@ -1811,10 +2092,20 @@ static void _test_setsliceC(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(sq));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_setsliceC6(sq, 0, 1, 1, invalidated, &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_setsliceC6(sq, 0, 1, 1, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setsliceC6(sq, 0, 1, 1, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1833,7 +2124,11 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
     for (peer = type->peers; peer->type != NULL; peer++) {
         // TODO Support once we guarantee the order items are yielded from frozenset/etc.
         if (!peer->type->is_sequence) continue;
-        _test_setsliceC(type, peer);
+        if (peer->rand_elems == NULL) {
+            _test_setsliceC_no_peer_elems(type, peer->type);
+        } else {
+            _test_setsliceC(type, peer);
+        }
     }
 
     return MUNIT_OK;
@@ -1854,7 +2149,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     ypObject       *int_0_ist_0[] = {yp_i_zero, ist_0, NULL};  // borrowed
     ypObject      **int_or_ist_0;
     ypObject       *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Shared tests.
     _test_setindexC(fixture->type, setindexC_to_setitem);
@@ -1878,10 +2173,20 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_setitem(sq, invalidated, items[2], &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_setitem(sq, yp_SyntaxError, items[2], &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setitem(sq, exception, items[2], &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1898,7 +2203,7 @@ static void _test_delindexC(fixture_type_t *type,
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support delindex.
     if (!type->is_mutable) {
@@ -2001,7 +2306,7 @@ static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixt
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[9];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support delslice.
     if (!type->is_mutable) {
@@ -2140,7 +2445,7 @@ static void _test_delitem(fixture_type_t *type,
     ypObject     *int_0_ist_0[] = {yp_i_zero, ist_0, NULL};  // borrowed
     ypObject    **int_or_ist_0;
     ypObject     *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Shared tests.
     _test_delindexC(type, any_delindexC, raises);
@@ -2164,10 +2469,20 @@ static void _test_delitem(fixture_type_t *type,
         yp_decref(sq);
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(any_delitem(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_delitem(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_delitem(sq, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2210,7 +2525,7 @@ static void _test_appendC(
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[3];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support append.
     if (!type->is_mutable) {
@@ -2260,10 +2575,25 @@ static void _test_appendC(
         yp_decref(sq);
     }
 
+    // Invalidated argument. Allowed for values on some types.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->original_object_return) {
+            assert_not_raises_exc(any_append(sq, invalidated, &exc));
+            assert_len(sq, 3);
+        } else {
+            assert_raises_exc(any_append(sq, invalidated, &exc), yp_InvalidatedError);
+            assert_sequence(sq, items[0], items[1]);
+        }
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_append(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_append(sq, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2285,13 +2615,28 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
+// Some types extend but don't share items, for example str_1byte and str_4bytes. Currently limited
+// to string types, which are tested in test_protocols/test_string.
+static void _test_extend_no_peer_elems(fixture_type_t *type, fixture_type_t *x_type)
+{
+    ypObject *sq = rand_obj(NULL, type);
+    ypObject *x = rand_obj(NULL, x_type);
+    if (type->is_mutable) {
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+    } else {
+        assert_raises_exc(yp_extend(sq, x, &exc), yp_MethodError);
+    }
+    assert_true(type->is_string && x_type->is_string);
+    yp_decrefN(N(x, sq));
+}
+
 static void _test_extend(fixture_type_t *type, peer_type_t *peer)
 {
     fixture_type_t *x_type = peer->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *items[32];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Immutables don't support extend.
     if (!type->is_mutable) {
@@ -2422,10 +2767,20 @@ static void _test_extend(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(sq));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_extend(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_extend(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_extend(sq, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2444,7 +2799,11 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     for (peer = type->peers; peer->type != NULL; peer++) {
         // TODO Support once we guarantee the order items are yielded from frozenset/etc.
         if (!peer->type->is_sequence) continue;
-        _test_extend(type, peer);
+        if (peer->rand_elems == NULL) {
+            _test_extend_no_peer_elems(type, peer->type);
+        } else {
+            _test_extend(type, peer);
+        }
     }
 
     return MUNIT_OK;
@@ -2455,7 +2814,7 @@ static MunitResult test_irepeatC(const MunitParameter params[], fixture_t *fixtu
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support irepeat.
     if (!type->is_mutable) {
@@ -2543,7 +2902,7 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support insert.
     if (!type->is_mutable) {
@@ -2635,10 +2994,25 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
+    // Invalidated argument. Allowed for values on some types.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        if (type->original_object_return) {
+            assert_not_raises_exc(yp_insertC(sq, 0, invalidated, &exc));
+            assert_len(sq, 3);
+        } else {
+            assert_raises_exc(yp_insertC(sq, 0, invalidated, &exc), yp_InvalidatedError);
+            assert_sequence(sq, items[0], items[1]);
+        }
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_insertC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_insertC(sq, 0, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2654,7 +3028,7 @@ static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixt
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support popindex.
     if (!type->is_mutable) {
@@ -2753,7 +3127,7 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support pop.
     if (!type->is_mutable) {
@@ -2812,7 +3186,7 @@ static void _test_remove(
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[3];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support remove.
     if (!type->is_mutable) {
@@ -2901,10 +3275,20 @@ static void _test_remove(
         yp_decrefN(N(sq_0_1_2, sq_0_1));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(any_remove(sq, invalidated, &exc), yp_InvalidatedError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_remove(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_remove(sq, exception, &exc), exception);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2933,7 +3317,7 @@ static MunitResult test_reverse(const MunitParameter params[], fixture_t *fixtur
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[3];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support reverse.
     if (!type->is_mutable) {
@@ -3002,7 +3386,7 @@ static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
     ypObject       *ist_1 = yp_intstoreC(1);
     ypObject       *ist_2 = yp_intstoreC(2);
     ypObject       *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Sort is only implemented for list; it's not currently part of the sequence protocol.
     if (type->yp_type != yp_t_list) {

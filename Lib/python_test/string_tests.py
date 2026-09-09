@@ -383,13 +383,11 @@ class BaseTest:
         self.checkequal(len(text2) - N*len("de") - len(pattern2),
                         text2, 'find', pattern2)
 
-    @yp_unittest.skip_str_case
     def test_lower(self):
         self.checkequal('hello', 'HeLLo', 'lower')
         self.checkequal('hello', 'hello', 'lower')
         self.checkraises(TypeError, 'hello', 'lower', 42)
 
-    @yp_unittest.skip_str_case
     def test_upper(self):
         self.checkequal('HELLO', 'HeLLo', 'upper')
         self.checkequal('HELLO', 'HELLO', 'upper')
@@ -793,7 +791,6 @@ class BaseTest:
         self.checkraises(TypeError, 'hello', 'removesuffix', 'h', 42)
         self.checkraises(TypeError, 'hello', 'removesuffix', ("lo", "l"))
 
-    @yp_unittest.skip_str_case
     def test_capitalize(self):
         self.checkequal(' hello ', ' hello ', 'capitalize')
         self.checkequal('Hello ', 'Hello ','capitalize')
@@ -942,7 +939,6 @@ class BaseTest:
         self.checkequal('***abc****', 'abc', 'center', 10, '*')
         self.checkraises(TypeError, 'abc', 'center')
 
-    @yp_unittest.skip_str_case
     def test_swapcase(self):
         self.checkequal('hEllO CoMPuTErS', 'HeLLo cOmpUteRs', 'swapcase')
 
@@ -965,7 +961,6 @@ class BaseTest:
 
         self.checkraises(TypeError, '123', 'zfill')
 
-    @yp_unittest.skip_str_case
     def test_islower(self):
         self.checkequal(False, '', 'islower')
         self.checkequal(True, 'a', 'islower')
@@ -976,7 +971,6 @@ class BaseTest:
         self.checkequal(True, 'abc\n', 'islower')
         self.checkraises(TypeError, 'abc', 'islower', 42)
 
-    @yp_unittest.skip_str_case
     def test_isupper(self):
         self.checkequal(False, '', 'isupper')
         self.checkequal(False, 'a', 'isupper')
@@ -987,7 +981,7 @@ class BaseTest:
         self.checkequal(True, 'ABC\n', 'isupper')
         self.checkraises(TypeError, 'abc', 'isupper', 42)
 
-    @yp_unittest.skip_str_case
+    @yp_unittest.skip_string_title
     def test_istitle(self):
         self.checkequal(False, '', 'istitle')
         self.checkequal(False, 'a', 'istitle')
@@ -1002,7 +996,6 @@ class BaseTest:
         self.checkequal(False, 'NOT', 'istitle')
         self.checkraises(TypeError, 'abc', 'istitle', 42)
 
-    @yp_unittest.skip_str_space
     def test_isspace(self):
         self.checkequal(False, '', 'isspace')
         self.checkequal(False, 'a', 'isspace')
@@ -1014,7 +1007,6 @@ class BaseTest:
         self.checkequal(False, ' \t\r\na', 'isspace')
         self.checkraises(TypeError, 'abc', 'isspace', 42)
 
-    @yp_unittest.skip_str_unicode_db
     def test_isalpha(self):
         self.checkequal(False, '', 'isalpha')
         self.checkequal(True, 'a', 'isalpha')
@@ -1025,7 +1017,6 @@ class BaseTest:
         self.checkequal(False, 'abc\n', 'isalpha')
         self.checkraises(TypeError, 'abc', 'isalpha', 42)
 
-    @yp_unittest.skip_str_unicode_db
     def test_isalnum(self):
         self.checkequal(False, '', 'isalnum')
         self.checkequal(True, 'a', 'isalnum')
@@ -1037,7 +1028,6 @@ class BaseTest:
         self.checkequal(False, 'abc\n', 'isalnum')
         self.checkraises(TypeError, 'abc', 'isalnum', 42)
 
-    @yp_unittest.skip_str_unicode_db
     def test_isascii(self):
         self.checkequal(True, '', 'isascii')
         self.checkequal(True, '\x00', 'isascii')
@@ -1053,7 +1043,6 @@ class BaseTest:
             self.checkequal(True, ' '*p + '\x7f' + ' '*8, 'isascii')
             self.checkequal(False, ' '*p + '\x80' + ' '*8, 'isascii')
 
-    @yp_unittest.skip_str_unicode_db
     def test_isdigit(self):
         self.checkequal(False, '', 'isdigit')
         self.checkequal(False, 'a', 'isdigit')
@@ -1063,7 +1052,7 @@ class BaseTest:
 
         self.checkraises(TypeError, 'abc', 'isdigit', 42)
 
-    @yp_unittest.skip_str_case
+    @yp_unittest.skip_string_title
     def test_title(self):
         self.checkequal(' Hello ', ' hello ', 'title')
         self.checkequal('Hello ', 'hello ', 'title')
@@ -1106,7 +1095,7 @@ class CommonTest(BaseTest):
             yp_hash(b)
         self.assertEqual(yp_hash(a), yp_hash(b))
 
-    @yp_unittest.skip_str_case
+    @yp_unittest.skip_str_big_chars
     def test_capitalize_nonascii(self):
         # check that titlecased chars are lowered correctly
         # \u1ffc is the titlecased char
@@ -1410,7 +1399,6 @@ class MixinStrUnicodeUserStringTest:
                 value = value * 3.14159265359 / 3.0 * 10.0
                 self.checkcall(format, "__mod__", value)
 
-    @yp_unittest.skip_str_case
     def test_inplace_rewrites(self):
         # Check that strings don't copy and modify cached single-character strings
         self.checkequal('a', 'A', 'lower')
@@ -1427,7 +1415,8 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal('A', 'a', 'swapcase')
         self.checkequal(True, 'a', 'islower')
 
-        self.checkequal('A', 'a', 'title')
+        # (skip_string_title) Not supported in nohtyP.
+        # self.checkequal('A', 'a', 'title')
         self.checkequal(True, 'a', 'islower')
 
     @yp_unittest.skip_str_split

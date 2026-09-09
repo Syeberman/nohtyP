@@ -1,5 +1,4 @@
-"""Creates the build environments for the various compilers nohtyP is built with.
-"""
+"""Creates the build environments for the various compilers nohtyP is built with."""
 
 import itertools
 import traceback
@@ -14,8 +13,9 @@ from site_scons.utilities import AliasIfNotEmpty
 # output directory)
 # TODO Would love to make this more dynamic, finding any known compiler, and then trimming.
 # TODO Clang/LLVM support
-# TODO GCC 6 can't be found on AppVeyor's Ubuntu1604
 compiler_names = (
+    "gcc_15",  # April 2025
+    "gcc_14",  # May 2024
     "gcc_13",  # April 2023
     "gcc_12",  # May 2022
     "msvs_17",  # November 2021

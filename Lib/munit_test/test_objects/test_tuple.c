@@ -7,7 +7,7 @@ static void _test_newN(
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic newN.
     {
@@ -47,10 +47,19 @@ static void _test_newN(
         assert_obj(any_newN(-1), is, type->falsy);
     }
 
+    // Invalidated argument. Allowed for items.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ead(sq, any_newN(N(invalidated)), assert_len(sq, 1));
+        ead(sq, any_newN(N(yp_None, invalidated)), assert_len(sq, 2));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_newN(N(yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception(any_newN(N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_newN(N(exception)), exception);
+        assert_isexception(any_newN(N(yp_None, exception)), exception);
     }
 
     obj_array_decref(items);
@@ -63,7 +72,7 @@ static void _test_new(fixture_type_t *type, fixture_type_t *x_type,
     uniqueness_t *uq = uniqueness_new();
     ypObject     *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject     *items[2];
-    obj_array_fill(items, uq, x_type->rand_items);  // Note that we use x_type's items.
+    obj_array_fill(items, uq, x_type->rand_elems->items);  // Note that we use x_type's items.
 
     // Basic new. Recall that x_type may not guarantee iteration order.
     {
@@ -122,9 +131,17 @@ static void _test_new(fixture_type_t *type, fixture_type_t *x_type,
     // x is not an iterable.
     assert_raises(any_new(not_iterable), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_new(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_new(yp_SyntaxError), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_new(exception), exception);
     }
 
     obj_array_decref(items);
@@ -328,8 +345,18 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(N(kwargs_rand, kwargs_cls, kwargs_iterable, args_two, list_empty));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_callN(type->yp_type, N(invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_isexception(yp_callN(type->yp_type, N(yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_callN(type->yp_type, N(exception)), exception);
+    }
 
     yp_decrefN(N(str_iterable, str_cls, str_rand));
     uniqueness_dealloc(uq);
@@ -341,7 +368,7 @@ static void _test_new_repeatCN(
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic new_repeatCN.
     {
@@ -421,10 +448,22 @@ static void _test_new_repeatCN(
     assert_raises(
             any_new_repeatCN(yp_SSIZE_T_MAX, N(items[0], items[1])), yp_MemorySizeOverflowError);
 
+    // Invalidated argument. Allowed for items.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ead(sq, any_new_repeatCN(2, N(invalidated)), assert_len(sq, 2));
+        ead(sq, any_new_repeatCN(0, N(invalidated)), assert_len(sq, 0));
+        ead(sq, any_new_repeatCN(2, N(yp_None, invalidated)), assert_len(sq, 4));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_isexception(any_new_repeatCN(2, N(yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(any_new_repeatCN(0, N(yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(any_new_repeatCN(2, N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_new_repeatCN(2, N(exception)), exception);
+        assert_isexception(any_new_repeatCN(0, N(exception)), exception);
+        assert_isexception(any_new_repeatCN(2, N(yp_None, exception)), exception);
+    }
 
     obj_array_decref(items);
     uniqueness_dealloc(uq);
@@ -510,7 +549,7 @@ static MunitResult test_itemarrayCX(const MunitParameter params[], fixture_t *fi
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject       *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic itemarrayCX.
     {
@@ -544,11 +583,23 @@ static MunitResult test_itemarrayCX(const MunitParameter params[], fixture_t *fi
         assert_null(array);
     }
 
-    // Exception passthrough.
+    // Invalidated argument.
     {
+        ypObject        *invalidated = rand_obj(NULL, fixture_type_invalidated);
         yp_ssize_t       len;
         ypObject *const *array;
-        assert_raises(yp_itemarrayCX(yp_SyntaxError, &len, &array), yp_SyntaxError);
+        assert_raises(yp_itemarrayCX(invalidated, &len, &array), yp_InvalidatedError);
+        assert_ssizeC(len, ==, 0);
+        assert_null(array);
+        yp_decref(invalidated);
+    }
+
+    // Exception passthrough.
+    {
+        ypObject        *exception = rand_obj(NULL, fixture_type_exception);
+        yp_ssize_t       len;
+        ypObject *const *array;
+        assert_raises(yp_itemarrayCX(exception, &len, &array), exception);
         assert_ssizeC(len, ==, 0);
         assert_null(array);
     }
@@ -564,7 +615,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[8];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // _ypTuple_copy
     {

@@ -1,13 +1,16 @@
 
 #include "munit_test/unittest.h"
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wunused-function"  // FIXME Remove
+#endif
 
-// TODO We go to the trouble of having fixture_type_t.rand_items/etc to allow the type to control
-// what types of items are stored inside it. But then we use functions like
-// rand_obj_any_hashability_pair, etc that could return objects that aren't supported by the types
-// under test. If this becomes a problem the tests will fail, but it may become a problem.
+// TODO We go to the trouble of having rand_elems to allow the type to control what types of items
+// are stored inside it. But then we use functions like rand_obj_any_hashability_pair, etc that
+// could return objects that aren't supported by the types under test. If this becomes a problem the
+// tests will fail, but it may become a problem.
 
 
-#define FIXTURE_TYPES_ALL_LEN 24  // Verified in initialize_fixture_types.
+#define FIXTURE_TYPES_ALL_LEN 32  // Verified in initialize_fixture_types.
 
 
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
@@ -18,6 +21,48 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
     }
     return FALSE;
 }
+
+extern yp_uint32_t yp_getindex_asordC(ypObject *sequence, yp_ssize_t i, ypObject **exc)
+{
+    yp_int_t  result;
+    ypObject *item = yp_getindexC(sequence, i);  // new ref
+    if (yp_isexceptionC(item)) {
+        *exc = item;
+        return 0;
+    }
+
+    if (yp_type(item) == yp_t_int) {
+        // The elements of bytes and bytearray are ints in range(256).
+        result = yp_asintC(item, exc);
+        if (result < 0 || result > 0xFF) {
+            *exc = yp_ValueError;
+        }
+    } else {
+        // The elements of str and chrarray are one-character strs.
+        result = yp_codepointC(item, exc);
+    }
+    yp_decref(item);
+    return (yp_uint32_t)result;
+}
+
+// Asserts that obj is a text string in the given, or larger, encoding.
+#define assert_str_min_encoding(obj, expected)                                                  \
+    do {                                                                                        \
+        ypObject         *_ypmt_STR_ENC_obj = (obj);                                            \
+        ypObject         *_ypmt_STR_ENC_expected = (expected);                                  \
+        yp_ssize_t        _ypmt_STR_ENC_size;                                                   \
+        const yp_uint8_t *_ypmt_STR_ENC_encoded;                                                \
+        ypObject         *_ypmt_STR_ENC_encoding;                                               \
+        ypObject *_ypmt_STR_ENC_result = yp_asencodedCX(_ypmt_STR_ENC_obj, &_ypmt_STR_ENC_size, \
+                &_ypmt_STR_ENC_encoded, &_ypmt_STR_ENC_encoding);                               \
+        _assert_not_raises(                                                                     \
+                _ypmt_STR_ENC_result, "yp_asencodedCX(%s, &size, &encoded, &encoding)", #obj);  \
+        if (_ypmt_STR_ENC_encoding == yp_s_ucs_4 || _ypmt_STR_ENC_expected == yp_s_latin_1) {   \
+            /* pass */                                                                          \
+        } else if (_ypmt_STR_ENC_encoding != _ypmt_STR_ENC_expected) {                          \
+            munit_errorf("assertion failed: <%s encoding> >= %s", #obj, #expected);             \
+        }                                                                                       \
+    } while (0)
 
 
 // Helper function for assert_setlike. If yp_miniiter_next succeeds, sets *actual to a new reference
@@ -107,6 +152,25 @@ static void array_sort(yp_ssize_t n, ypObject **array)
     qsort(array, (size_t)n, sizeof(ypObject *), _array_sort_cmp);
 }
 
+// Takes a va_list of values and returns a malloc'd array containing the values. Ensures malloc
+// succeeds and that the values are not truncated.
+#define DEFINE_ARRAY_FROM_VA_LIST_FUNC(name, out_t, in_t)                 \
+    static out_t *name(int n, va_list args)                               \
+    {                                                                     \
+        out_t *result;                                                    \
+        int    i;                                                         \
+        assert_not_null(result = malloc((size_t)(n * yp_sizeof(out_t)))); \
+        for (i = 0; i < n; i++) {                                         \
+            in_t value = va_arg(args, in_t);                              \
+            result[i] = (out_t)value;                                     \
+            munit_assert((yp_int64_t)result[i] == (yp_int64_t)value);     \
+        }                                                                 \
+        return result;                                                    \
+    }
+// Integer variable arguments are promoted to int by default.
+DEFINE_ARRAY_FROM_VA_LIST_FUNC(array_fromuint8NV, yp_uint8_t, int)
+#undef DEFINE_ARRAY_FROM_VA_LIST_FUNC
+
 
 // If something should happen 2 in 23 times: RAND_BOOL_FRACTION(2, 23)
 // TODO Better name? Better argument names?
@@ -117,8 +181,13 @@ static void array_sort(yp_ssize_t n, ypObject **array)
 #define RAND_OBJ_RETURN_FALSY() (RAND_BOOL_FRACTION(1, 50))
 
 #define RAND_OBJ_DEFAULT_DEPTH (3)
+// The maximum length of a random object that does not create sub-objects (range, str).
+#define RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS (256)
+// The maximum length of a random object that **does** create sub-objects (tuple, dict).
+#define RAND_OBJ_MAX_LEN_SUB_OBJECTS (8)
 
-
+static fixture_type_t fixture_type_invalidated_struct;
+static fixture_type_t fixture_type_exception_struct;
 static fixture_type_t fixture_type_type_struct;
 static fixture_type_t fixture_type_NoneType_struct;
 static fixture_type_t fixture_type_bool_struct;
@@ -132,6 +201,12 @@ static fixture_type_t fixture_type_bytes_struct;
 static fixture_type_t fixture_type_bytearray_struct;
 static fixture_type_t fixture_type_str_struct;
 static fixture_type_t fixture_type_chrarray_struct;
+static fixture_type_t fixture_type_str_1byte_struct;
+static fixture_type_t fixture_type_chrarray_1byte_struct;
+static fixture_type_t fixture_type_str_2bytes_struct;
+static fixture_type_t fixture_type_chrarray_2bytes_struct;
+static fixture_type_t fixture_type_str_4bytes_struct;
+static fixture_type_t fixture_type_chrarray_4bytes_struct;
 static fixture_type_t fixture_type_tuple_struct;
 static fixture_type_t fixture_type_list_struct;
 static fixture_type_t fixture_type_frozenset_struct;
@@ -167,6 +242,18 @@ static void rand_objs_func_error(uniqueness_t *uq, yp_ssize_t n, ypObject **arra
 // GCOVR_EXCL_STOP
 
 
+// Chooses a random element from the array with the given length
+#define rand_choice(len, array) ((array)[munit_rand_int_range(0, ((int)(len)) - 1)])
+
+// Chooses a random element from the array. Only call for arrays of fixed size that haven't been
+// coerced to pointers.
+#define rand_choice_array(array) rand_choice(yp_lengthof_array(array), (array))
+
+static fixture_type_t *rand_choice_fixture_types(fixture_types_t *types)
+{
+    return rand_choice(types->len, types->types);
+}
+
 // Returns a random yp_int_t value. Prioritizes zero and small numbers.
 static yp_int_t rand_intC(void)
 {
@@ -194,25 +281,48 @@ static yp_float_t rand_floatCF(void)
     }
 }
 
-// Populates source with len random ascii bytes.
-static void rand_ascii(yp_ssize_t len, yp_uint8_t *source)
+// Returns a random ascii ordinal.
+static yp_int_t rand_ord_asciiC(void) { return munit_rand_int_range(0x00u, 0x7Fu); }
+
+// Returns a random 1-byte Unicode ordinal.
+static yp_int_t rand_ord_1byteC(void) { return munit_rand_int_range(0x00u, 0xFFu); }
+
+// Returns a random 2-byte Unicode ordinal. Will not return a surrogate ordinal, as those cannot be
+// encoded with utf-8.
+static yp_int_t rand_ord_2bytesC(void)
 {
-    yp_ssize_t i;
-    for (i = 0; i < len; i++) {
-        source[i] = (yp_uint8_t)munit_rand_int_range(0, 0x7F);
-    }
+    yp_int_t result = munit_rand_int_range(0x0100u, 0xFFFFu - ypStringLib_NUM_SURROGATES);
+    if (result >= ypStringLib_MIN_SURROGATE) result += ypStringLib_NUM_SURROGATES;
+    return result;
 }
 
-// Chooses a random element from the array with the given length
-#define rand_choice(len, array) ((array)[munit_rand_int_range(0, ((int)(len)) - 1)])
-
-// Chooses a random element from the array. Only call for arrays of fixed size that haven't been
-// coerced to pointers.
-#define rand_choice_array(array) rand_choice(yp_lengthof_array(array), (array))
-
-static fixture_type_t *rand_choice_fixture_types(fixture_types_t *types)
+// Returns a random surrogate Unicode ordinal. Recall these are 2-byte values which cannot be
+// encoded with utf-8.
+static yp_int_t rand_ord_surrC(void)
 {
-    return rand_choice(types->len, types->types);
+    return munit_rand_int_range(ypStringLib_MIN_SURROGATE, ypStringLib_MAX_SURROGATE);
+}
+
+// Returns a random 4-byte Unicode ordinal.
+static yp_int_t rand_ord_4bytesC(void)
+{
+    return munit_rand_int_range(0x00010000u, ypStringLib_MAX_UNICODE);
+}
+
+// Returns a random 1- or 2-byte Unicode ordinal. Will not return a surrogate ordinal, as those
+// cannot be encoded with utf-8.
+static yp_int_t rand_ord_1or2bytesC(void)
+{
+    yp_int_t (*funcs[])(void) = {rand_ord_1byteC, rand_ord_2bytesC};
+    return rand_choice_array(funcs)();
+}
+
+// Returns a random Unicode ordinal (1-, 2-, or 4-byte). Will not return a surrogate ordinal, as
+// those cannot be encoded with utf-8.
+static yp_int_t rand_ordC(void)
+{
+    yp_int_t (*funcs[])(void) = {rand_ord_1byteC, rand_ord_2bytesC, rand_ord_4bytesC};
+    return rand_choice_array(funcs)();
 }
 
 
@@ -228,6 +338,7 @@ typedef struct _uniqueness_t {
 extern uniqueness_t *uniqueness_new(void)
 {
     uniqueness_t *uq = malloc(sizeof(uniqueness_t));
+    assert_not_null(uq);
     uq->duplicates = 0;
     uq->len = 0;
     return uq;
@@ -285,11 +396,12 @@ extern void uniqueness_dealloc(uniqueness_t *uq)
 
 // A convenience macro to execute statement repeatedly until uniqueness_push indicates a unique
 // object was produced, at which point that object is returned.
-#define _return_unique(uq, statement)               \
-    do {                                            \
-        ypObject *obj = (statement); /* new ref */  \
-        if (uniqueness_push((uq), obj)) return obj; \
-        yp_decref(obj); /* loop until unique */     \
+#define _return_unique(uq, statement)                       \
+    do {                                                    \
+        ypObject *obj;                                      \
+        assert_not_raises(obj = (statement)); /* new ref */ \
+        if (uniqueness_push((uq), obj)) return obj;         \
+        yp_decref(obj); /* loop until unique */             \
     } while (1)
 
 
@@ -314,7 +426,7 @@ static ypObject *rand_obj_any_memo(const rand_obj_supplier_memo_t *memo)
     } else {
         rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/FALSE};
         assert_ssizeC(sub_memo.depth, >=, 0);
-        return rand_choice_fixture_types(fixture_types_all)->_new_rand(&sub_memo);
+        return rand_choice_fixture_types(fixture_types_most)->_new_rand(&sub_memo);
     }
 }
 
@@ -332,18 +444,34 @@ static ypObject *rand_obj_any_keyvalue_memo(const rand_obj_supplier_memo_t *memo
 static ypObject *rand_obj_int(uniqueness_t *uq) { _return_unique(uq, yp_intC(rand_intC())); }
 
 // XXX Interesting. 0 is a falsy byte, but '\x00' is not a falsy char.
-// TODO Could also return an intstore.
-static ypObject *rand_obj_byte(uniqueness_t *uq)
+// FIXME Could also return an intstore?
+static ypObject *rand_obj_byte(uniqueness_t *uq) { _return_unique(uq, yp_intC(rand_ord_1byteC())); }
+
+static ypObject *rand_obj_chr_1byte(uniqueness_t *uq)
 {
-    _return_unique(uq, yp_intC(munit_rand_int_range(0, 255)));
+    _return_unique(uq, yp_chrC(rand_ord_1byteC()));
 }
 
-// TODO Return more than just latin-1 characters
-// TODO Could also return a chrarray.
-static ypObject *rand_obj_chr(uniqueness_t *uq)
+// Will not return a surrogate character, as those cannot be encoded with utf-8.
+static ypObject *rand_obj_chr_2bytes(uniqueness_t *uq)
 {
-    _return_unique(uq, yp_chrC(munit_rand_int_range(0, 255)));
+    _return_unique(uq, yp_chrC(rand_ord_2bytesC()));
 }
+
+static ypObject *rand_obj_chr_4bytes(uniqueness_t *uq)
+{
+    _return_unique(uq, yp_chrC(rand_ord_4bytesC()));
+}
+
+// Will not return a surrogate character, as those cannot be encoded with utf-8.
+static ypObject *rand_obj_chr_1or2bytes(uniqueness_t *uq)
+{
+    _return_unique(uq, yp_chrC(rand_ord_1or2bytesC()));
+}
+
+// Will not return a surrogate character, as those cannot be encoded with utf-8.
+// FIXME Could also return a chrarray?
+static ypObject *rand_obj_chr(uniqueness_t *uq) { _return_unique(uq, yp_chrC(rand_ordC())); }
 
 static ypObject *_rand_obj_hashable(fixture_type_t *type)
 {
@@ -363,8 +491,14 @@ static ypObject *_rand_obj(fixture_type_t *type)
 
 extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type)
 {
-    // None and bool have limited possible values, making uniqueness impossible.
-    if (type->yp_type == yp_t_NoneType || type->yp_type == yp_t_bool) {
+    if (type->yp_type == yp_t_invalidated || type->yp_type == yp_t_exception) {
+        if (uq != NULL) {
+            munit_error(
+                    "cannot ensure uniqueness for invalidated and exception");  // GCOVR_EXCL_LINE
+        }
+        return _rand_obj(type);
+    } else if (type->yp_type == yp_t_NoneType || type->yp_type == yp_t_bool) {
+        // None and bool have limited possible values, making uniqueness impossible.
         if (uq != NULL) {
             munit_error("cannot ensure uniqueness for None and bool");  // GCOVR_EXCL_LINE
         }
@@ -416,55 +550,35 @@ extern ypObject *rand_obj_any_hashable(uniqueness_t *uq)
 
 extern ypObject *rand_obj_any(uniqueness_t *uq)
 {
-    _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_all)));
+    _return_unique(uq, _rand_obj(rand_choice_fixture_types(fixture_types_most)));
 }
 
-static void rand_objs_int(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    yp_ssize_t i;
-    for (i = 0; i < n; i++) array[i] = rand_obj_int(uq);  // new ref
-}
-
-static void rand_objs_byte(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    yp_ssize_t i;
-    for (i = 0; i < n; i++) array[i] = rand_obj_byte(uq);  // new ref
-}
-
-static void rand_objs_chr(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    yp_ssize_t i;
-    for (i = 0; i < n; i++) array[i] = rand_obj_chr(uq);  // new ref
-}
+// Most "random objects" functions fill an array with the output of a "random object" function, and
+// then have an *_ordered variant that sorts the array afterwards.
+#define DEFINE_RAND_OBJS_FUNC(name, rand_obj_func)                               \
+    static void name(uniqueness_t *uq, yp_ssize_t n, ypObject **array)           \
+    {                                                                            \
+        yp_ssize_t i;                                                            \
+        for (i = 0; i < n; i++) array[i] = rand_obj_func(uq); /* new ref */      \
+    }                                                                            \
+    static void name##_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array) \
+    {                                                                            \
+        name(uq, n, array);                                                      \
+        array_sort(n, array);                                                    \
+    }
+DEFINE_RAND_OBJS_FUNC(rand_objs_int, rand_obj_int)
+DEFINE_RAND_OBJS_FUNC(rand_objs_byte, rand_obj_byte)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr_1byte, rand_obj_chr_1byte)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr_2bytes, rand_obj_chr_2bytes)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr_4bytes, rand_obj_chr_4bytes)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr_1or2bytes, rand_obj_chr_1or2bytes)
+DEFINE_RAND_OBJS_FUNC(rand_objs_chr, rand_obj_chr)
+#undef DEFINE_RAND_OBJS_FUNC
 
 static void rand_objs_any_hashable(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
     yp_ssize_t i;
     for (i = 0; i < n; i++) array[i] = rand_obj_any_hashable(uq);  // new ref
-}
-
-static void rand_objs_any(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    yp_ssize_t i;
-    for (i = 0; i < n; i++) array[i] = rand_obj_any(uq);  // new ref
-}
-
-static void rand_objs_int_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    rand_objs_int(uq, n, array);
-    array_sort(n, array);
-}
-
-static void rand_objs_byte_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    rand_objs_byte(uq, n, array);
-    array_sort(n, array);
-}
-
-static void rand_objs_chr_ordered(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
-{
-    rand_objs_chr(uq, n, array);
-    array_sort(n, array);
 }
 
 // All objects will be of the same type that supports yp_hash and total ordering.
@@ -475,6 +589,12 @@ static void rand_objs_any_hashable_ordered(uniqueness_t *uq, yp_ssize_t n, ypObj
     void (*funcs[])(uniqueness_t *uq, yp_ssize_t n, ypObject **array) = {
             rand_objs_int_ordered, rand_objs_byte_ordered, rand_objs_chr_ordered};
     rand_choice_array(funcs)(uq, n, array);
+}
+
+static void rand_objs_any(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+{
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) array[i] = rand_obj_any(uq);  // new ref
 }
 
 // All objects will be of the same type that supports total ordering.
@@ -602,32 +722,142 @@ extern ypObject *new_faulty_iter(
 }
 
 
+// Returns a random invalidated object.
+static ypObject *new_rand_invalidated(const rand_obj_supplier_memo_t *memo)
+{
+    // Immutable objects may be one of the built-in immortals, so start with mutable objects only.
+    ypObject *result = rand_obj_any_mutable(NULL);
+    assert_not_raises_exc(yp_invalidate(result, &exc));
+    return result;
+}
+
+static peer_type_t peers_invalidated[] = {{&fixture_type_invalidated_struct}, {NULL}};
+
+static fixture_type_t fixture_type_invalidated_struct = {
+        "invalidated",                     // name
+        NULL,                              // type (initialized at runtime)
+        NULL,                              // falsy (initialized at runtime, maybe)
+        &fixture_type_invalidated_struct,  // pair
+        NULL,                              // variant_of
+
+        new_rand_invalidated,  // _new_rand
+
+        NULL,               // new_
+        peers_invalidated,  // peers
+        NULL,               // rand_elems
+
+        objvarargfunc_error,  // newN
+
+        objvarargfunc_error,  // newK
+
+        objvarargfunc_error,  // fromordsCN
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        FALSE,  // is_iterable
+        FALSE,  // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_setlike
+        FALSE,  // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
+};
+
+fixture_type_t *fixture_type_invalidated = &fixture_type_invalidated_struct;
+
+static void initialize_fixture_type_invalidated(void)
+{
+    fixture_type_invalidated->yp_type = yp_t_invalidated;
+}
+
+
+// Returns a random exception object.
+static ypObject *new_rand_exception(const rand_obj_supplier_memo_t *memo)
+{
+    // FIXME Statically initialize
+    ypObject *exceptions[] = {yp_BaseException, yp_SystemExit, yp_KeyboardInterrupt,
+            yp_GeneratorExit, yp_Exception, yp_StopIteration, yp_ArithmeticError,
+            yp_FloatingPointError, yp_OverflowError, yp_ZeroDivisionError, yp_AssertionError,
+            yp_AttributeError, yp_BufferError, yp_EOFError, yp_ImportError, yp_LookupError,
+            yp_IndexError, yp_KeyError, yp_MemoryError, yp_NameError, yp_UnboundLocalError,
+            yp_OSError, yp_ReferenceError, yp_RuntimeError, yp_NotImplementedError, yp_SyntaxError,
+            yp_SystemError, yp_TypeError, yp_ValueError, yp_UnicodeError, yp_UnicodeEncodeError,
+            yp_UnicodeDecodeError, yp_UnicodeTranslateError};
+    return rand_choice_array(exceptions);
+}
+
+static peer_type_t peers_exception[] = {{&fixture_type_exception_struct}, {NULL}};
+
+static fixture_type_t fixture_type_exception_struct = {
+        "exception",                     // name
+        NULL,                            // type (initialized at runtime)
+        NULL,                            // falsy (initialized at runtime, maybe)
+        &fixture_type_exception_struct,  // pair
+        NULL,                            // variant_of
+
+        new_rand_exception,  // _new_rand
+
+        NULL,             // new_
+        peers_exception,  // peers
+        NULL,             // rand_elems
+
+        objvarargfunc_error,  // newN
+
+        objvarargfunc_error,  // newK
+
+        objvarargfunc_error,  // fromordsCN
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        FALSE,  // is_iterable
+        FALSE,  // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_setlike
+        FALSE,  // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_patterned
+        FALSE,  // original_object_return
+        FALSE,  // hashable_items_only
+};
+
+fixture_type_t *fixture_type_exception = &fixture_type_exception_struct;
+
+static void initialize_fixture_type_exception(void)
+{
+    fixture_type_exception->yp_type = yp_t_exception;
+}
+
+
 // Returns a random type object, except invalidated and exception objects.
 static ypObject *new_rand_type(const rand_obj_supplier_memo_t *memo)
 {
-    return rand_choice_fixture_types(fixture_types_all)->yp_type;
+    return rand_choice_fixture_types(fixture_types_most)->yp_type;
 }
 
-static peer_type_t peers_type[] = {{&fixture_type_type_struct, rand_objs_func_error}, {NULL}};
+static peer_type_t peers_type[] = {{&fixture_type_type_struct}, {NULL}};
 
 static fixture_type_t fixture_type_type_struct = {
         "type",                     // name
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_type_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_type,  // _new_rand
 
         yp_type,     // new_
         peers_type,  // peers
+        NULL,        // rand_elems
 
-        objvarargfunc_error,   // newN
-        rand_objs_func_error,  // rand_items
+        objvarargfunc_error,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_func_error,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -651,27 +881,26 @@ static void initialize_fixture_type_type(void) { fixture_type_type->yp_type = yp
 // There is only one NoneType object: yp_None.
 static ypObject *new_rand_NoneType(const rand_obj_supplier_memo_t *memo) { return yp_None; }
 
-static peer_type_t peers_NoneType[] = {
-        {&fixture_type_NoneType_struct, rand_objs_func_error}, {NULL}};
+static peer_type_t peers_NoneType[] = {{&fixture_type_NoneType_struct}, {NULL}};
 
 static fixture_type_t fixture_type_NoneType_struct = {
         "NoneType",                     // name
         NULL,                           // type (initialized at runtime)
         NULL,                           // falsy (initialized at runtime, maybe)
         &fixture_type_NoneType_struct,  // pair
+        NULL,                           // variant_of
 
         new_rand_NoneType,  // _new_rand
 
         objobjfunc_error,  // new_
         peers_NoneType,    // peers
+        NULL,              // rand_elems
 
-        objvarargfunc_error,   // newN
-        rand_objs_func_error,  // rand_items
+        objvarargfunc_error,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_func_error,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -705,26 +934,26 @@ static ypObject *new_rand_bool(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-static peer_type_t peers_bool[] = {{&fixture_type_bool_struct, rand_objs_func_error}, {NULL}};
+static peer_type_t peers_bool[] = {{&fixture_type_bool_struct}, {NULL}};
 
 static fixture_type_t fixture_type_bool_struct = {
         "bool",                     // name
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_bool_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_bool,  // _new_rand
 
         yp_bool,     // new_
         peers_bool,  // peers
+        NULL,        // rand_elems
 
-        objvarargfunc_error,   // newN
-        rand_objs_func_error,  // rand_items
+        objvarargfunc_error,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_func_error,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -757,29 +986,27 @@ static ypObject *new_rand_int(const rand_obj_supplier_memo_t *memo)
 }
 
 // All numbers (int, float, etc) have the same peers.
-static peer_type_t peers_numeric[] = {{&fixture_type_int_struct, rand_objs_func_error},
-        {&fixture_type_intstore_struct, rand_objs_func_error},
-        {&fixture_type_float_struct, rand_objs_func_error},
-        {&fixture_type_floatstore_struct, rand_objs_func_error}, {NULL}};
+static peer_type_t peers_numeric[] = {{&fixture_type_int_struct}, {&fixture_type_intstore_struct},
+        {&fixture_type_float_struct}, {&fixture_type_floatstore_struct}, {NULL}};
 
 static fixture_type_t fixture_type_int_struct = {
         "int",                          // name
         NULL,                           // type (initialized at runtime)
         NULL,                           // falsy (initialized at runtime, maybe)
         &fixture_type_intstore_struct,  // pair
+        NULL,                           // variant_of
 
         new_rand_int,  // _new_rand
 
         yp_int,         // new_
         peers_numeric,  // peers
+        NULL,           // rand_elems
 
-        objvarargfunc_error,   // newN
-        rand_objs_func_error,  // rand_items
+        objvarargfunc_error,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_func_error,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -809,19 +1036,19 @@ static fixture_type_t fixture_type_intstore_struct = {
         NULL,                      // type (initialized at runtime)
         NULL,                      // falsy (initialized at runtime, maybe)
         &fixture_type_int_struct,  // pair
+        NULL,                      // variant_of
 
         new_rand_intstore,  // _new_rand
 
         yp_intstore,    // new_
         peers_numeric,  // peers
+        NULL,           // rand_elems
 
-        objvarargfunc_error,   // newN
-        rand_objs_func_error,  // rand_items
+        objvarargfunc_error,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_func_error,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -859,19 +1086,19 @@ static fixture_type_t fixture_type_float_struct = {
         NULL,                             // type (initialized at runtime)
         NULL,                             // falsy (initialized at runtime, maybe)
         &fixture_type_floatstore_struct,  // pair
+        NULL,                             // variant_of
 
         new_rand_float,  // _new_rand
 
         yp_float,       // new_
         peers_numeric,  // peers
+        NULL,           // rand_elems
 
-        objvarargfunc_error,   // newN
-        rand_objs_func_error,  // rand_items
+        objvarargfunc_error,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_func_error,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -901,19 +1128,19 @@ static fixture_type_t fixture_type_floatstore_struct = {
         NULL,                        // type (initialized at runtime)
         NULL,                        // falsy (initialized at runtime, maybe)
         &fixture_type_float_struct,  // pair
+        NULL,                        // variant_of
 
         new_rand_floatstore,  // _new_rand
 
         yp_floatstore,  // new_
         peers_numeric,  // peers
+        NULL,           // rand_elems
 
-        objvarargfunc_error,   // newN
-        rand_objs_func_error,  // rand_items
+        objvarargfunc_error,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_func_error,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -941,7 +1168,14 @@ static void initialize_fixture_type_float(void)
 
 static ypObject *new_rand_iter(const rand_obj_supplier_memo_t *memo)
 {
-    yp_ssize_t n = memo->depth < 1 ? 0 : munit_rand_int_range(0, 16);
+    yp_ssize_t n;
+    if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
+        // iters are always truthy, but we still want empty iters to be more frequent.
+        n = 0;
+    } else {
+        // We use "no sub objects" here because iter only creates objects on iteration.
+        n = munit_rand_int_range(0, RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS);
+    }
     return new_rand_iter3(n, rand_obj_any_memo, memo);
 }
 
@@ -978,6 +1212,13 @@ static ypObject *newK_iter(int k, ...)
     return result;
 }
 
+// Random elements for types that accept keys and values of any type.
+static rand_elements_t rand_elements_any = {
+        rand_objs_any,         // items
+        rand_objs_any,         // values
+        rand_objs_any_ordered  // items_ordered
+};
+
 // Shared amongst iter, tuple, and list, as these types work with any given iterable.
 static peer_type_t peers_all_iterables[FIXTURE_TYPES_ALL_LEN + 1] = {0};
 
@@ -986,19 +1227,19 @@ static fixture_type_t fixture_type_iter_struct = {
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_iter_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_iter,  // _new_rand
 
         yp_iter,              // new_
         peers_all_iterables,  // peers
+        &rand_elements_any,   // rand_elems
 
-        new_iterN,      // newN
-        rand_objs_any,  // rand_items
+        new_iterN,  // newN
 
-        newK_iter,      // newK
-        rand_objs_any,  // rand_values
+        newK_iter,  // newK
 
-        rand_objs_any_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1027,10 +1268,7 @@ static void initialize_fixture_type_iter(void)
     peer = peers_all_iterables;
     for (iterable = fixture_types_iterable->types; (*iterable) != NULL; iterable++) {
         peer->type = (*iterable);
-        peer->rand_items = (*iterable)->rand_items;
-        if ((*iterable)->is_mapping) {
-            peer->rand_values = (*iterable)->rand_values;
-        }
+        peer->rand_elems = (*iterable)->rand_elems;
         peer++;
     }
 }
@@ -1051,7 +1289,7 @@ static ypObject *new_rand_range(const rand_obj_supplier_memo_t *memo)
         return yp_range_empty;
     } else {
         yp_int_t  start = range_rand_start();
-        yp_int_t  len = (yp_int_t)munit_rand_int_range(1, 256);
+        yp_int_t  len = (yp_int_t)munit_rand_int_range(1, RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS);
         yp_int_t  step = range_rand_step();
         ypObject *result = yp_rangeC3(start, start + (step * len), step);
         assert_not_exception(result);
@@ -1105,7 +1343,7 @@ static void _rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array, 
         yp_ssize_t i;
         yp_int_t   start = range_rand_start();
         yp_int_t   step = range_rand_step();
-        if (ordered && step < 0) step = -step;  // rand_ordered_items requires ascending values.
+        if (ordered && step < 0) step = -step;  // items_ordered requires ascending values.
 
         for (i = 0; i < n; i++) {
             assert_not_raises(array[i] = yp_intC(start + (i * step)));
@@ -1123,34 +1361,41 @@ static void rand_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
     _rand_items_range(uq, n, array, /*ordered=*/FALSE);
 }
 
-static void rand_ordered_items_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
+static void rand_items_ordered_range(uniqueness_t *uq, yp_ssize_t n, ypObject **array)
 {
     _rand_items_range(uq, n, array, /*ordered=*/TRUE);
 }
 
-static peer_type_t peers_range[] = {{&fixture_type_iter_struct, rand_items_range},
-        {&fixture_type_range_struct, rand_items_range},
-        {&fixture_type_tuple_struct, rand_items_range},
-        {&fixture_type_list_struct, rand_items_range}, {NULL}};
+// Random elements for range.
+static rand_elements_t rand_elements_range = {
+        rand_items_range,         // items
+        NULL,                     // values
+        rand_items_ordered_range  // items_ordered
+};
+
+static peer_type_t peers_range[] = {{&fixture_type_iter_struct, &rand_elements_range},
+        {&fixture_type_range_struct, &rand_elements_range},
+        {&fixture_type_tuple_struct, &rand_elements_range},
+        {&fixture_type_list_struct, &rand_elements_range}, {NULL}};
 
 static fixture_type_t fixture_type_range_struct = {
         "range",                     // name
         NULL,                        // type (initialized at runtime)
         NULL,                        // falsy (initialized at runtime, maybe)
         &fixture_type_range_struct,  // pair
+        NULL,                        // variant_of
 
         new_rand_range,  // _new_rand
 
-        objobjfunc_error,  // new_
-        peers_range,       // peers
+        objobjfunc_error,      // new_
+        peers_range,           // peers
+        &rand_elements_range,  // rand_elems
 
-        newN_range,        // newN
-        rand_items_range,  // rand_items
+        newN_range,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_ordered_items_range,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1175,13 +1420,24 @@ static void initialize_fixture_type_range(void)
 }
 
 
+// Takes a va_list of int values, stores them in an array, and returns the results of frombytesC.
+static ypObject *_fromordsCN_bytes(
+        ypObject *(*frombytesC)(yp_ssize_t, const yp_uint8_t *), int n, va_list args)
+{
+    ypObject *result;
+    void     *source = array_fromuint8NV(n, args);
+    assert_not_exception(result = frombytesC(n, source));
+    free(source);
+    return result;
+}
+
 static ypObject *new_rand_bytes(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_bytes_empty;
     } else {
         ypObject  *result;
-        yp_uint8_t source[16];
+        yp_uint8_t source[RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS];
         yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
         munit_rand_memory((size_t)len, source);
         result = yp_bytesC(len, source);
@@ -1207,38 +1463,56 @@ static ypObject *newN_bytes(int n, ...)
     return result;
 }
 
+static ypObject *fromordsCN_bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_bytes(yp_bytesC, n, args);
+    va_end(args);
+    return result;
+}
+
+// Random elements for bytes.
+static rand_elements_t rand_elements_bytes = {
+        rand_objs_byte,          // items
+        NULL,                    // values
+        rand_objs_byte_ordered,  // items_ordered
+};
+
 // TODO _Could_ support range here, for ints in range(256) that follow a pattern.
-static peer_type_t peers_bytes[] = {{&fixture_type_iter_struct, rand_objs_byte},
-        {&fixture_type_bytes_struct, rand_objs_byte},
-        {&fixture_type_bytearray_struct, rand_objs_byte},
-        {&fixture_type_tuple_struct, rand_objs_byte}, {&fixture_type_list_struct, rand_objs_byte},
-        {&fixture_type_frozenset_struct, rand_objs_byte},
-        {&fixture_type_set_struct, rand_objs_byte},
-        {&fixture_type_frozenset_dirty_struct, rand_objs_byte},
-        {&fixture_type_set_dirty_struct, rand_objs_byte},
-        {&fixture_type_frozendict_struct, rand_objs_byte},
-        {&fixture_type_dict_struct, rand_objs_byte},
-        {&fixture_type_frozendict_dirty_struct, rand_objs_byte},
-        {&fixture_type_dict_dirty_struct, rand_objs_byte}, {NULL}};
+static peer_type_t peers_bytes[] = {{&fixture_type_iter_struct, &rand_elements_bytes},
+        {&fixture_type_bytes_struct, &rand_elements_bytes},
+        {&fixture_type_bytearray_struct, &rand_elements_bytes},
+        {&fixture_type_tuple_struct, &rand_elements_bytes},
+        {&fixture_type_list_struct, &rand_elements_bytes},
+        {&fixture_type_frozenset_struct, &rand_elements_bytes},
+        {&fixture_type_set_struct, &rand_elements_bytes},
+        {&fixture_type_frozenset_dirty_struct, &rand_elements_bytes},
+        {&fixture_type_set_dirty_struct, &rand_elements_bytes},
+        {&fixture_type_frozendict_struct, &rand_elements_bytes},
+        {&fixture_type_dict_struct, &rand_elements_bytes},
+        {&fixture_type_frozendict_dirty_struct, &rand_elements_bytes},
+        {&fixture_type_dict_dirty_struct, &rand_elements_bytes}, {NULL}};
 
 static fixture_type_t fixture_type_bytes_struct = {
         "bytes",                         // name
         NULL,                            // type (initialized at runtime)
         NULL,                            // falsy (initialized at runtime, maybe)
         &fixture_type_bytearray_struct,  // pair
+        NULL,                            // variant_of
 
         new_rand_bytes,  // _new_rand
 
-        yp_bytes,     // new_
-        peers_bytes,  // peers
+        yp_bytes,              // new_
+        peers_bytes,           // peers
+        &rand_elements_bytes,  // rand_elems
 
-        newN_bytes,      // newN
-        rand_objs_byte,  // rand_items
+        newN_bytes,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_byte_ordered,  // rand_ordered_items
+        fromordsCN_bytes,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1262,7 +1536,7 @@ static ypObject *new_rand_bytearray(const rand_obj_supplier_memo_t *memo)
         return yp_bytearray0();
     } else {
         ypObject  *result;
-        yp_uint8_t source[16];
+        yp_uint8_t source[RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS];
         yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
         munit_rand_memory((size_t)len, source);
         result = yp_bytearrayC(len, source);
@@ -1288,24 +1562,34 @@ static ypObject *newN_bytearray(int n, ...)
     return result;
 }
 
+static ypObject *fromordsCN_bytearray(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_bytes(yp_bytearrayC, n, args);
+    va_end(args);
+    return result;
+}
+
 static fixture_type_t fixture_type_bytearray_struct = {
         "bytearray",                 // name
         NULL,                        // type (initialized at runtime)
         NULL,                        // falsy (initialized at runtime, maybe)
         &fixture_type_bytes_struct,  // pair
+        NULL,                        // variant_of
 
         new_rand_bytearray,  // _new_rand
 
-        yp_bytearray,  // new_
-        peers_bytes,   // peers
+        yp_bytearray,          // new_
+        peers_bytes,           // peers
+        &rand_elements_bytes,  // rand_elems
 
         newN_bytearray,  // newN
-        rand_objs_byte,  // rand_items
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_byte_ordered,  // rand_ordered_items
+        fromordsCN_bytearray,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1331,162 +1615,543 @@ static void initialize_fixture_type_bytes(void)
 }
 
 
-// TODO Return larger characters than just ascii.
+// The rand_ord functions used in fixture_type_str and fixture_type_chrarray. For each string, one
+// of these functions is chosen, and used to generate all characters. As such, these fixture types
+// can contain a variety of characters, up to a maximum.
+yp_int_t (*_max_rand_ord_funcs[])(void) = {
+        rand_ord_asciiC, rand_ord_1byteC, rand_ord_1or2bytesC, rand_ordC};
+
+// Returns a random str of a random length (but not empty), using characters from rand_ord.
+static ypObject *_new_rand_str(yp_int_t (*rand_ord)(void))
+{
+    yp_ssize_t len;
+    ypObject  *source;
+    ypObject  *result;
+
+    len = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS);
+    assert_not_raises(source = yp_listN(0));  // new ref
+    for (/*len already set*/; len > 0; len--) {
+        ypObject *chr = yp_chrC(rand_ord());  // new ref
+        assert_not_raises_exc(yp_append(source, chr, &exc));
+        yp_decref(chr);
+    }
+    assert_not_raises(result = yp_concat(yp_str_empty, source));
+    yp_decref(source);
+    assert_type_is(result, yp_t_str);
+    return result;
+}
+
+// Returns a random chrarray of a random length (but not empty), using characters from rand_ord.
+static ypObject *_new_rand_chrarray(yp_int_t (*rand_ord)(void))
+{
+    yp_ssize_t len;
+    ypObject  *result;
+
+    len = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_NO_SUB_OBJECTS);
+    assert_not_raises(result = yp_chrarray0());  // new ref
+    for (/*len already set*/; len > 0; len--) {
+        ypObject *chr = yp_chrC(rand_ord());  // new ref
+        assert_not_raises_exc(yp_append(result, chr, &exc));
+        yp_decref(chr);
+    }
+    assert_type_is(result, yp_t_chrarray);
+    return result;
+}
+
+// There is no yp_strN, because this is an odd way to construct a str.
+static ypObject *_newN_str(int n, va_list args)
+{
+    ypObject *source;
+    ypObject *result;
+    assert_not_raises(source = yp_tupleNV(n, args));  // new ref
+    assert_not_raises(result = yp_concat(yp_str_empty, source));
+    yp_decref(source);
+    assert_type_is(result, yp_t_str);
+    return result;
+}
+
+// There is no yp_chrarrayN, because this is an odd way to construct a chrarray.
+static ypObject *_newN_chrarray(int n, va_list args)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray0());  // new ref
+    for (/*n already set*/; n > 0; n--) {
+        ypObject *chr = va_arg(args, ypObject *);  // borrowed
+        assert_not_raises_exc(yp_append(result, chr, &exc));
+    }
+    assert_type_is(result, yp_t_chrarray);
+    return result;
+}
+
+static ypObject *_fromordsCN_str(int n, va_list args)
+{
+    ypObject *source;
+    ypObject *result;
+
+    assert_not_raises(source = yp_listN(0));  // new ref
+    for (/*n already set*/; n > 0; n--) {
+        // Integer variable arguments are promoted to int by default.
+        ypObject *chr = yp_chrC(va_arg(args, int));  // new ref
+        assert_not_raises_exc(yp_append(source, chr, &exc));
+        yp_decref(chr);
+    }
+    assert_not_raises(result = yp_concat(yp_str_empty, source));
+    yp_decref(source);
+    assert_type_is(result, yp_t_str);
+    return result;
+}
+
+static ypObject *_fromordsCN_chrarray(int n, va_list args)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray0());  // new ref
+    for (/*n already set*/; n > 0; n--) {
+        // Integer variable arguments are promoted to int by default.
+        ypObject *chr = yp_chrC(va_arg(args, int));  // new ref
+        assert_not_raises_exc(yp_append(result, chr, &exc));
+        yp_decref(chr);
+    }
+    assert_type_is(result, yp_t_chrarray);
+    return result;
+}
+
+// Random elements for strs of any element size.
+static rand_elements_t rand_elements_str = {
+        rand_objs_chr,          // items
+        NULL,                   // values
+        rand_objs_chr_ordered,  // items_ordered
+};
+
+// Random elements for strs with 1-byte elements.
+static rand_elements_t rand_elements_str_1byte = {
+        rand_objs_chr_1byte,          // items
+        NULL,                         // values
+        rand_objs_chr_1byte_ordered,  // items_ordered
+};
+
+// Random elements for strs with 2-byte elements.
+static rand_elements_t rand_elements_str_2bytes = {
+        rand_objs_chr_2bytes,          // items
+        NULL,                          // values
+        rand_objs_chr_2bytes_ordered,  // items_ordered
+};
+
+// Random elements for strs with 4-byte elements.
+static rand_elements_t rand_elements_str_4bytes = {
+        rand_objs_chr_4bytes,          // items
+        NULL,                          // values
+        rand_objs_chr_4bytes_ordered,  // items_ordered
+};
+
+#define DEFINE_PEERS_STR(name, elems_self, elems_1byte, elems_2bytes, elems_4bytes)                \
+    static peer_type_t name[] = {{&fixture_type_iter_struct, (elems_self)},                        \
+            {&fixture_type_str_struct, (elems_self)},                                              \
+            {&fixture_type_chrarray_struct, (elems_self)},                                         \
+            {&fixture_type_str_1byte_struct, (elems_1byte)},                                       \
+            {&fixture_type_chrarray_1byte_struct, (elems_1byte)},                                  \
+            {&fixture_type_str_2bytes_struct, (elems_2bytes)},                                     \
+            {&fixture_type_chrarray_2bytes_struct, (elems_2bytes)},                                \
+            {&fixture_type_str_4bytes_struct, (elems_4bytes)},                                     \
+            {&fixture_type_chrarray_4bytes_struct, (elems_4bytes)},                                \
+            {&fixture_type_tuple_struct, (elems_self)}, {&fixture_type_list_struct, (elems_self)}, \
+            {&fixture_type_frozenset_struct, (elems_self)},                                        \
+            {&fixture_type_set_struct, (elems_self)},                                              \
+            {&fixture_type_frozenset_dirty_struct, (elems_self)},                                  \
+            {&fixture_type_set_dirty_struct, (elems_self)},                                        \
+            {&fixture_type_frozendict_struct, (elems_self)},                                       \
+            {&fixture_type_dict_struct, (elems_self)},                                             \
+            {&fixture_type_frozendict_dirty_struct, (elems_self)},                                 \
+            {&fixture_type_dict_dirty_struct, (elems_self)}, {NULL}}
+
+#define DEFINE_FIXTURE_TYPE_STR_STRUCT(name, pair_name, variant_of, peers, rand_elems, is_mutable) \
+    static fixture_type_t fixture_type_##name##_struct = {                                         \
+            #name,                              /* name */                                         \
+            NULL,                               /* type (initialized at runtime) */                \
+            NULL,                               /* falsy (initialized at runtime, maybe) */        \
+            &fixture_type_##pair_name##_struct, /* pair */                                         \
+            (variant_of),                       /* variant_of */                                   \
+                                                                                                   \
+            new_rand_##name, /* _new_rand */                                                       \
+                                                                                                   \
+            new_##name,   /* new_ */                                                               \
+            (peers),      /* peers */                                                              \
+            (rand_elems), /* rand_elems */                                                         \
+                                                                                                   \
+            newN_##name, /* newN */                                                                \
+                                                                                                   \
+            objvarargfunc_error, /* newK */                                                        \
+                                                                                                   \
+            fromordsCN_##name, /* fromordsCN */                                                    \
+                                                                                                   \
+            (is_mutable), /* is_mutable */                                                         \
+            FALSE,        /* is_numeric */                                                         \
+            TRUE,         /* is_iterable */                                                        \
+            TRUE,         /* is_collection */                                                      \
+            TRUE,         /* is_sequence */                                                        \
+            TRUE,         /* is_string */                                                          \
+            FALSE,        /* is_setlike */                                                         \
+            FALSE,        /* is_mapping */                                                         \
+            FALSE,        /* is_callable */                                                        \
+            FALSE,        /* is_patterned */                                                       \
+            FALSE,        /* original_object_return */                                             \
+            TRUE,         /* hashable_items_only */                                                \
+    }
+
 static ypObject *new_rand_str(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_str_empty;
     } else {
-        ypObject  *result;
-        yp_uint8_t source[16];
-        yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
-        rand_ascii(len, source);
-        result = yp_str_frombytesC4(len, source, yp_s_utf_8, yp_s_strict);
-        assert_not_exception(result);
-        return result;
+        return _new_rand_str(rand_choice_array(_max_rand_ord_funcs));
     }
 }
 
-// There is no yp_strN, because this is an odd way to construct a str.
-static ypObject *newN_str(int n, ...)
+static ypObject *new_str(ypObject *object)
 {
-    va_list   args;
-    ypObject *tuple;
     ypObject *result;
-
-    va_start(args, n);
-    tuple = yp_tupleNV(n, args);  // new ref
-    va_end(args);
-
-    // Recall that yp_str isn't a typical container constructor, so we use yp_concat.
-    result = yp_concat(yp_str_empty, tuple);
-    yp_decref(tuple);
-    assert_not_exception(result);
+    assert_not_raises(result = yp_str(object));
     return result;
 }
 
-static peer_type_t peers_str[] = {{&fixture_type_iter_struct, rand_objs_chr},
-        {&fixture_type_str_struct, rand_objs_chr}, {&fixture_type_chrarray_struct, rand_objs_chr},
-        {&fixture_type_tuple_struct, rand_objs_chr}, {&fixture_type_list_struct, rand_objs_chr},
-        {&fixture_type_frozenset_struct, rand_objs_chr}, {&fixture_type_set_struct, rand_objs_chr},
-        {&fixture_type_frozenset_dirty_struct, rand_objs_chr},
-        {&fixture_type_set_dirty_struct, rand_objs_chr},
-        {&fixture_type_frozendict_struct, rand_objs_chr},
-        {&fixture_type_dict_struct, rand_objs_chr},
-        {&fixture_type_frozendict_dirty_struct, rand_objs_chr},
-        {&fixture_type_dict_dirty_struct, rand_objs_chr}, {NULL}};
+static ypObject *newN_str(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_str(n, args);  // new ref
+    va_end(args);
+    return result;
+}
 
-static fixture_type_t fixture_type_str_struct = {
-        "str",                          // name
-        NULL,                           // type (initialized at runtime)
-        NULL,                           // falsy (initialized at runtime, maybe)
-        &fixture_type_chrarray_struct,  // pair
+static ypObject *fromordsCN_str(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_str(n, args);  // new ref
+    va_end(args);
+    return result;
+}
 
-        new_rand_str,  // _new_rand
-
-        yp_str,     // new_
-        peers_str,  // peers
-
-        newN_str,       // newN
-        rand_objs_chr,  // rand_items
-
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
-
-        rand_objs_chr_ordered,  // rand_ordered_items
-
-        FALSE,  // is_mutable
-        FALSE,  // is_numeric
-        TRUE,   // is_iterable
-        TRUE,   // is_collection
-        TRUE,   // is_sequence
-        TRUE,   // is_string
-        FALSE,  // is_setlike
-        FALSE,  // is_mapping
-        FALSE,  // is_callable
-        FALSE,  // is_patterned
-        FALSE,  // original_object_return
-        TRUE,   // hashable_items_only
-};
-
+DEFINE_PEERS_STR(peers_str, &rand_elements_str, &rand_elements_str_1byte, &rand_elements_str_2bytes,
+        &rand_elements_str_4bytes);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(str, chrarray, NULL, peers_str, &rand_elements_str, FALSE);
 fixture_type_t *fixture_type_str = &fixture_type_str_struct;
 
-// TODO Return larger characters than just ascii.
 static ypObject *new_rand_chrarray(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_chrarray0();
     } else {
-        ypObject  *result;
-        yp_uint8_t source[16];
-        yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
-        rand_ascii(len, source);
-        result = yp_chrarray_frombytesC4(len, source, yp_s_utf_8, yp_s_strict);
-        assert_not_exception(result);
+        return _new_rand_chrarray(rand_choice_array(_max_rand_ord_funcs));
+    }
+}
+
+static ypObject *new_chrarray(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray(object));
+    return result;
+}
+
+static ypObject *newN_chrarray(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_chrarray(n, args);  // new ref
+    va_end(args);
+    return result;
+}
+
+static ypObject *fromordsCN_chrarray(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_chrarray(n, args);  // new ref
+    va_end(args);
+    return result;
+}
+
+DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray, str, NULL, peers_str, &rand_elements_str, TRUE);
+fixture_type_t *fixture_type_chrarray = &fixture_type_chrarray_struct;
+
+static ypObject *new_rand_str_1byte(const rand_obj_supplier_memo_t *memo)
+{
+    if (RAND_OBJ_RETURN_FALSY()) {
+        return yp_str_empty;
+    } else {
+        ypObject *result = _new_rand_str(rand_ord_1byteC);
+        assert_str_min_encoding(result, yp_s_latin_1);
         return result;
     }
 }
 
-// There is no yp_chrarrayN, because this is an odd way to construct a chrarray.
-static ypObject *newN_chrarray(int n, ...)
+static ypObject *new_str_1byte(ypObject *object)
 {
-    va_list   args;
-    ypObject *tuple;
     ypObject *result;
-
-    va_start(args, n);
-    tuple = yp_tupleNV(n, args);  // new ref
-    va_end(args);
-
-    // Recall that yp_chrarray isn't a typical container constructor, so we use yp_extend.
-    result = yp_chrarray0();
-    assert_not_exception(result);
-    assert_not_raises_exc(yp_extend(result, tuple, &exc));
-    yp_decref(tuple);
+    assert_not_raises(result = yp_str(object));
+    assert_str_min_encoding(result, yp_s_latin_1);
     return result;
 }
 
-static fixture_type_t fixture_type_chrarray_struct = {
-        "chrarray",                // name
-        NULL,                      // type (initialized at runtime)
-        NULL,                      // falsy (initialized at runtime, maybe)
-        &fixture_type_str_struct,  // pair
+static ypObject *newN_str_1byte(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_str(n, args);  // new ref
+    va_end(args);
+    assert_str_min_encoding(result, yp_s_latin_1);
+    return result;
+}
 
-        new_rand_chrarray,  // _new_rand
+static ypObject *fromordsCN_str_1byte(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_str(n, args);  // new ref
+    va_end(args);
+    assert_str_min_encoding(result, yp_s_latin_1);
+    return result;
+}
 
-        yp_chrarray,  // new_
-        peers_str,    // peers
+DEFINE_PEERS_STR(peers_str_1byte, &rand_elements_str_1byte, &rand_elements_str_1byte, NULL, NULL);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(str_1byte, chrarray_1byte, &fixture_type_str_struct, peers_str_1byte,
+        &rand_elements_str_1byte, FALSE);
+fixture_type_t *fixture_type_str_1byte = &fixture_type_str_1byte_struct;
 
-        newN_chrarray,  // newN
-        rand_objs_chr,  // rand_items
+static ypObject *new_rand_chrarray_1byte(const rand_obj_supplier_memo_t *memo)
+{
+    if (RAND_OBJ_RETURN_FALSY()) {
+        return yp_chrarray0();
+    } else {
+        ypObject *result = _new_rand_chrarray(rand_ord_1byteC);
+        assert_str_min_encoding(result, yp_s_latin_1);
+        return result;
+    }
+}
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+static ypObject *new_chrarray_1byte(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray(object));
+    assert_str_min_encoding(result, yp_s_latin_1);
+    return result;
+}
 
-        rand_objs_chr_ordered,  // rand_ordered_items
+static ypObject *newN_chrarray_1byte(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_chrarray(n, args);  // new ref
+    va_end(args);
+    assert_str_min_encoding(result, yp_s_latin_1);
+    return result;
+}
 
-        TRUE,   // is_mutable
-        FALSE,  // is_numeric
-        TRUE,   // is_iterable
-        TRUE,   // is_collection
-        TRUE,   // is_sequence
-        TRUE,   // is_string
-        FALSE,  // is_setlike
-        FALSE,  // is_mapping
-        FALSE,  // is_callable
-        FALSE,  // is_patterned
-        FALSE,  // original_object_return
-        TRUE,   // hashable_items_only
-};
+static ypObject *fromordsCN_chrarray_1byte(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_chrarray(n, args);  // new ref
+    va_end(args);
+    assert_str_min_encoding(result, yp_s_latin_1);
+    return result;
+}
 
-fixture_type_t *fixture_type_chrarray = &fixture_type_chrarray_struct;
+DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray_1byte, str_1byte, &fixture_type_chrarray_struct,
+        peers_str_1byte, &rand_elements_str_1byte, TRUE);
+fixture_type_t *fixture_type_chrarray_1byte = &fixture_type_chrarray_1byte_struct;
+
+static ypObject *new_rand_str_2bytes(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = _new_rand_str(rand_ord_2bytesC);
+    assert_str_min_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *new_str_2bytes(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_str(object));
+    if (yp_lenC_not_raises(result) > 0) assert_str_min_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *newN_str_2bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_str(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *fromordsCN_str_2bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_str(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+DEFINE_PEERS_STR(
+        peers_str_2bytes, &rand_elements_str_2bytes, NULL, &rand_elements_str_2bytes, NULL);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(str_2bytes, chrarray_2bytes, &fixture_type_str_struct,
+        peers_str_2bytes, &rand_elements_str_2bytes, FALSE);
+fixture_type_t *fixture_type_str_2bytes = &fixture_type_str_2bytes_struct;
+
+static ypObject *new_rand_chrarray_2bytes(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = _new_rand_chrarray(rand_ord_2bytesC);
+    assert_str_min_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *new_chrarray_2bytes(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray(object));
+    if (yp_lenC_not_raises(result) > 0) assert_str_min_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *newN_chrarray_2bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_chrarray(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+static ypObject *fromordsCN_chrarray_2bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_chrarray(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_2);
+    return result;
+}
+
+DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray_2bytes, str_2bytes, &fixture_type_chrarray_struct,
+        peers_str_2bytes, &rand_elements_str_2bytes, TRUE);
+fixture_type_t *fixture_type_chrarray_2bytes = &fixture_type_chrarray_2bytes_struct;
+
+static ypObject *new_rand_str_4bytes(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = _new_rand_str(rand_ord_4bytesC);
+    assert_str_min_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *new_str_4bytes(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_str(object));
+    if (yp_lenC_not_raises(result) > 0) assert_str_min_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *newN_str_4bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_str(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *fromordsCN_str_4bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_str(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+DEFINE_PEERS_STR(
+        peers_str_4bytes, &rand_elements_str_4bytes, NULL, NULL, &rand_elements_str_4bytes);
+DEFINE_FIXTURE_TYPE_STR_STRUCT(str_4bytes, chrarray_4bytes, &fixture_type_str_struct,
+        peers_str_4bytes, &rand_elements_str_4bytes, FALSE);
+fixture_type_t *fixture_type_str_4bytes = &fixture_type_str_4bytes_struct;
+
+static ypObject *new_rand_chrarray_4bytes(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = _new_rand_chrarray(rand_ord_4bytesC);
+    assert_str_min_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *new_chrarray_4bytes(ypObject *object)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_chrarray(object));
+    if (yp_lenC_not_raises(result) > 0) assert_str_min_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *newN_chrarray_4bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _newN_chrarray(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+static ypObject *fromordsCN_chrarray_4bytes(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = _fromordsCN_chrarray(n, args);  // new ref
+    va_end(args);
+    if (n > 0) assert_str_min_encoding(result, yp_s_ucs_4);
+    return result;
+}
+
+DEFINE_FIXTURE_TYPE_STR_STRUCT(chrarray_4bytes, str_4bytes, &fixture_type_chrarray_struct,
+        peers_str_4bytes, &rand_elements_str_4bytes, TRUE);
+fixture_type_t *fixture_type_chrarray_4bytes = &fixture_type_chrarray_4bytes_struct;
 
 static void initialize_fixture_type_str(void)
 {
     fixture_type_str->yp_type = yp_t_str;
     fixture_type_str->falsy = yp_str_empty;
     fixture_type_chrarray->yp_type = yp_t_chrarray;
+    fixture_type_str_1byte->yp_type = yp_t_str;
+    fixture_type_str_1byte->falsy = yp_str_empty;
+    fixture_type_chrarray_1byte->yp_type = yp_t_chrarray;
+    fixture_type_str_2bytes->yp_type = yp_t_str;
+    fixture_type_chrarray_2bytes->yp_type = yp_t_chrarray;
+    fixture_type_str_4bytes->yp_type = yp_t_str;
+    fixture_type_chrarray_4bytes->yp_type = yp_t_chrarray;
 }
+
+#undef DEFINE_PEERS_STR
+#undef DEFINE_FIXTURE_TYPE_STR_STRUCT
 
 
 static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
@@ -1494,7 +2159,7 @@ static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
     if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_tuple_empty;
     } else {
-        yp_ssize_t len = munit_rand_int_range(1, 16);
+        yp_ssize_t len = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(len, rand_obj_any_memo, memo);
         ypObject  *result = yp_tuple(iter);
         yp_decref(iter);
@@ -1520,19 +2185,19 @@ static fixture_type_t fixture_type_tuple_struct = {
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_list_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_tuple,  // _new_rand
 
         yp_tuple,             // new_
         peers_all_iterables,  // peers
+        &rand_elements_any,   // rand_elems
 
-        yp_tupleN,      // newN
-        rand_objs_any,  // rand_items
+        yp_tupleN,  // newN
 
-        newK_tuple,     // newK
-        rand_objs_any,  // rand_values
+        newK_tuple,  // newK
 
-        rand_objs_any_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1555,7 +2220,7 @@ static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
     if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_listN(0);
     } else {
-        yp_ssize_t len = munit_rand_int_range(1, 16);
+        yp_ssize_t len = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(len, rand_obj_any_memo, memo);
         ypObject  *result = yp_list(iter);
         yp_decref(iter);
@@ -1581,19 +2246,19 @@ static fixture_type_t fixture_type_list_struct = {
         NULL,                        // type (initialized at runtime)
         NULL,                        // falsy (initialized at runtime, maybe)
         &fixture_type_tuple_struct,  // pair
+        NULL,                        // variant_of
 
         new_rand_list,  // _new_rand
 
         yp_list,              // new_
         peers_all_iterables,  // peers
+        &rand_elements_any,   // rand_elems
 
-        yp_listN,       // newN
-        rand_objs_any,  // rand_items
+        yp_listN,  // newN
 
-        newK_list,      // newK
-        rand_objs_any,  // rand_values
+        newK_list,  // newK
 
-        rand_objs_any_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1625,7 +2290,7 @@ static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
         return yp_frozenset_empty;
     } else {
         // n may not be the final length, as duplicates are discarded.
-        yp_ssize_t n = munit_rand_int_range(1, 16);
+        yp_ssize_t n = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable_memo, memo);
         ypObject  *result = yp_frozenset(iter);
         yp_decref(iter);
@@ -1646,6 +2311,13 @@ static ypObject *newK_frozenset(int k, ...)
     return result;
 }
 
+// Random elements for frozensets.
+static rand_elements_t rand_elements_frozenset = {
+        rand_objs_any_hashable,         // items
+        rand_objs_any_hashable,         // values
+        rand_objs_any_hashable_ordered  // items_ordered
+};
+
 static peer_type_t peers_frozenset[FIXTURE_TYPES_ALL_LEN + 1] = {0};
 
 static fixture_type_t fixture_type_frozenset_struct = {
@@ -1653,19 +2325,19 @@ static fixture_type_t fixture_type_frozenset_struct = {
         NULL,                      // type (initialized at runtime)
         NULL,                      // falsy (initialized at runtime, maybe)
         &fixture_type_set_struct,  // pair
+        NULL,                      // variant_of
 
         new_rand_frozenset,  // _new_rand
 
-        yp_frozenset,     // new_
-        peers_frozenset,  // peers
+        yp_frozenset,              // new_
+        peers_frozenset,           // peers
+        &rand_elements_frozenset,  // rand_elems
 
-        yp_frozensetN,           // newN
-        rand_objs_any_hashable,  // rand_items
+        yp_frozensetN,  // newN
 
-        newK_frozenset,          // newK
-        rand_objs_any_hashable,  // rand_values
+        newK_frozenset,  // newK
 
-        rand_objs_any_hashable_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1689,7 +2361,7 @@ static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
         return yp_setN(0);
     } else {
         // n may not be the final length, as duplicates are discarded.
-        yp_ssize_t n = munit_rand_int_range(1, 16);
+        yp_ssize_t n = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable_memo, memo);
         ypObject  *result = yp_set(iter);
         yp_decref(iter);
@@ -1715,19 +2387,19 @@ static fixture_type_t fixture_type_set_struct = {
         NULL,                            // type (initialized at runtime)
         NULL,                            // falsy (initialized at runtime, maybe)
         &fixture_type_frozenset_struct,  // pair
+        NULL,                            // variant_of
 
         new_rand_set,  // _new_rand
 
-        yp_set,           // new_
-        peers_frozenset,  // peers
+        yp_set,                    // new_
+        peers_frozenset,           // peers
+        &rand_elements_frozenset,  // rand_elems
 
-        yp_setN,                 // newN
-        rand_objs_any_hashable,  // rand_items
+        yp_setN,  // newN
 
-        newK_set,                // newK
-        rand_objs_any_hashable,  // rand_values
+        newK_set,  // newK
 
-        rand_objs_any_hashable_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1818,19 +2490,19 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         NULL,                            // type (initialized at runtime)
         NULL,                            // falsy (initialized at runtime, maybe)
         &fixture_type_set_dirty_struct,  // pair
+        &fixture_type_frozenset_struct,  // variant_of
 
         new_rand_frozenset_dirty,  // _new_rand
 
-        new_frozenset_dirty,  // new_
-        peers_frozenset,      // peers
+        new_frozenset_dirty,       // new_
+        peers_frozenset,           // peers
+        &rand_elements_frozenset,  // rand_elems
 
-        new_frozenset_dirtyN,    // newN
-        rand_objs_any_hashable,  // rand_items
+        new_frozenset_dirtyN,  // newN
 
-        newK_frozenset_dirty,    // newK
-        rand_objs_any_hashable,  // rand_values
+        newK_frozenset_dirty,  // newK
 
-        rand_objs_any_hashable_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1894,19 +2566,19 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         NULL,                                  // type (initialized at runtime)
         NULL,                                  // falsy (initialized at runtime, maybe)
         &fixture_type_frozenset_dirty_struct,  // pair
+        &fixture_type_set_struct,              // variant_of
 
         new_rand_set_dirty,  // _new_rand
 
-        new_set_dirty,    // new_
-        peers_frozenset,  // peers
+        new_set_dirty,             // new_
+        peers_frozenset,           // peers
+        &rand_elements_frozenset,  // rand_elems
 
-        new_set_dirtyN,          // newN
-        rand_objs_any_hashable,  // rand_items
+        new_set_dirtyN,  // newN
 
-        newK_set_dirty,          // newK
-        rand_objs_any_hashable,  // rand_values
+        newK_set_dirty,  // newK
 
-        rand_objs_any_hashable_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1924,7 +2596,8 @@ static fixture_type_t fixture_type_set_dirty_struct = {
 
 fixture_type_t *fixture_type_set_dirty = &fixture_type_set_dirty_struct;
 
-static void initialize_fixture_type_frozenset(void)
+static rand_elements_t rand_elements_frozendict;
+static void            initialize_fixture_type_frozenset(void)
 {
     fixture_type_t **iterable;
     peer_type_t     *peer;
@@ -1943,15 +2616,17 @@ static void initialize_fixture_type_frozenset(void)
         // TODO Once the order items are yielded is guaranteed, we can support range.
         if ((*iterable)->is_patterned) continue;
 
+        // As with tuple we would typically defer to the peer type's rand_elems, except we require
+        // hashable types for items and values, so there's a lot of special-casing here.
         peer->type = (*iterable);
         if ((*iterable)->is_mapping) {
-            peer->rand_items = (*iterable)->rand_items;
-            peer->rand_values = rand_objs_any_hashable;
+            assert_ptr((*iterable)->rand_elems, ==, &rand_elements_frozendict);
+            peer->rand_elems = &rand_elements_frozenset;
         } else if ((*iterable)->hashable_items_only) {
-            peer->rand_items = (*iterable)->rand_items;
+            peer->rand_elems = (*iterable)->rand_elems;
         } else {
-            assert_true((*iterable)->original_object_return);
-            peer->rand_items = rand_objs_any_hashable;
+            assert_ptr((*iterable)->rand_elems, ==, &rand_elements_any);
+            peer->rand_elems = &rand_elements_frozenset;
         }
         peer++;
     }
@@ -1964,7 +2639,7 @@ static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
         return yp_frozendict_empty;
     } else {
         // n may not be the final length, as duplicate keys are discarded.
-        yp_ssize_t n = munit_rand_int_range(1, 16);
+        yp_ssize_t n = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue_memo, memo);
         ypObject  *result = yp_frozendict(iter);
         yp_decref(iter);
@@ -2021,6 +2696,13 @@ static ypObject *new_frozendictN(int n, ...)
     return result;
 }
 
+// Random elements for frozendicts.
+static rand_elements_t rand_elements_frozendict = {
+        rand_objs_any_hashable,         // items
+        rand_objs_any,                  // values
+        rand_objs_any_hashable_ordered  // items_ordered
+};
+
 static peer_type_t peers_frozendict[FIXTURE_TYPES_ALL_LEN + 1] = {0};
 
 static fixture_type_t fixture_type_frozendict_struct = {
@@ -2028,19 +2710,19 @@ static fixture_type_t fixture_type_frozendict_struct = {
         NULL,                       // type (initialized at runtime)
         NULL,                       // falsy (initialized at runtime, maybe)
         &fixture_type_dict_struct,  // pair
+        NULL,                       // variant_of
 
         new_rand_frozendict,  // _new_rand
 
-        yp_frozendict,     // new_
-        peers_frozendict,  // peers
+        yp_frozendict,              // new_
+        peers_frozendict,           // peers
+        &rand_elements_frozendict,  // rand_elems
 
-        new_frozendictN,         // newN
-        rand_objs_any_hashable,  // rand_items
+        new_frozendictN,  // newN
 
         yp_frozendictK,  // newK
-        rand_objs_any,   // rand_values
 
-        rand_objs_any_hashable_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -2064,7 +2746,7 @@ static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
         return yp_dictK(0);
     } else {
         // n may not be the final length, as duplicate keys are discarded.
-        yp_ssize_t n = munit_rand_int_range(1, 16);
+        yp_ssize_t n = munit_rand_int_range(1, RAND_OBJ_MAX_LEN_SUB_OBJECTS);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue_memo, memo);
         ypObject  *result = yp_dict(iter);
         yp_decref(iter);
@@ -2097,19 +2779,19 @@ static fixture_type_t fixture_type_dict_struct = {
         NULL,                             // type (initialized at runtime)
         NULL,                             // falsy (initialized at runtime, maybe)
         &fixture_type_frozendict_struct,  // pair
+        NULL,                             // variant_of
 
         new_rand_dict,  // _new_rand
 
-        yp_dict,           // new_
-        peers_frozendict,  // peers
+        yp_dict,                    // new_
+        peers_frozendict,           // peers
+        &rand_elements_frozendict,  // rand_elems
 
-        new_dictN,               // newN
-        rand_objs_any_hashable,  // rand_items
+        new_dictN,  // newN
 
-        yp_dictK,       // newK
-        rand_objs_any,  // rand_values
+        yp_dictK,  // newK
 
-        rand_objs_any_hashable_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -2204,19 +2886,19 @@ static fixture_type_t fixture_type_frozendict_dirty_struct = {
         NULL,                             // type (initialized at runtime)
         NULL,                             // falsy (initialized at runtime, maybe)
         &fixture_type_dict_dirty_struct,  // pair
+        &fixture_type_frozendict_struct,  // variant_of
 
         new_rand_frozendict_dirty,  // _new_rand
 
-        new_frozendict_dirty,  // new_
-        peers_frozendict,      // peers
+        new_frozendict_dirty,       // new_
+        peers_frozendict,           // peers
+        &rand_elements_frozendict,  // rand_elems
 
-        new_frozendict_dirtyN,   // newN
-        rand_objs_any_hashable,  // rand_items
+        new_frozendict_dirtyN,  // newN
 
         new_frozendict_dirtyK,  // newK
-        rand_objs_any,          // rand_values
 
-        rand_objs_any_hashable_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -2280,19 +2962,19 @@ static fixture_type_t fixture_type_dict_dirty_struct = {
         NULL,                                   // type (initialized at runtime)
         NULL,                                   // falsy (initialized at runtime, maybe)
         &fixture_type_frozendict_dirty_struct,  // pair
+        &fixture_type_dict_struct,              // variant_of
 
         new_rand_dict_dirty,  // _new_rand
 
-        new_dict_dirty,    // new_
-        peers_frozendict,  // peers
+        new_dict_dirty,             // new_
+        peers_frozendict,           // peers
+        &rand_elements_frozendict,  // rand_elems
 
-        new_dict_dirtyN,         // newN
-        rand_objs_any_hashable,  // rand_items
+        new_dict_dirtyN,  // newN
 
         new_dict_dirtyK,  // newK
-        rand_objs_any,    // rand_values
 
-        rand_objs_any_hashable_ordered,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -2329,19 +3011,16 @@ static void initialize_fixture_type_frozendict(void)
         // TODO Once the order items are yielded is guaranteed, we can support range.
         if ((*iterable)->is_patterned) continue;
 
+        // As with tuple we would typically defer to the peer type's rand_elems, except we require
+        // hashable types for items, so there's some special-casing here.
         peer->type = (*iterable);
         if ((*iterable)->is_mapping) {
-            peer->rand_items = (*iterable)->rand_items;
-            peer->rand_values = (*iterable)->rand_values;
+            peer->rand_elems = (*iterable)->rand_elems;
         } else if ((*iterable)->hashable_items_only) {
-            peer->rand_items = (*iterable)->rand_items;
-            if (!(*iterable)->is_string) {
-                peer->rand_values = (*iterable)->rand_values;
-            }
+            peer->rand_elems = (*iterable)->rand_elems;
         } else {
-            assert_true((*iterable)->original_object_return);
-            peer->rand_items = rand_objs_any_hashable;
-            peer->rand_values = rand_objs_any;
+            assert_ptr((*iterable)->rand_elems, ==, &rand_elements_any);
+            peer->rand_elems = &rand_elements_frozendict;
         }
         peer++;
     }
@@ -2374,19 +3053,19 @@ static fixture_type_t fixture_type_function_struct = {
         NULL,                           // type (initialized at runtime)
         NULL,                           // falsy (initialized at runtime, maybe)
         &fixture_type_function_struct,  // pair
+        NULL,                           // variant_of
 
         new_rand_function,  // _new_rand
 
         objobjfunc_error,  // new_
         peers_function,    // peers
+        NULL,              // rand_elems
 
-        objvarargfunc_error,   // newN
-        rand_objs_func_error,  // rand_items
+        objvarargfunc_error,  // newN
 
-        objvarargfunc_error,   // newK
-        rand_objs_func_error,  // rand_values
+        objvarargfunc_error,  // newK
 
-        rand_objs_func_error,  // rand_ordered_items
+        objvarargfunc_error,  // fromordsCN
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -2410,20 +3089,28 @@ static void initialize_fixture_type_function(void)
 }
 
 
-static fixture_type_t *fixture_types_all_types[] = {&fixture_type_type_struct,
-        &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
-        &fixture_type_intstore_struct, &fixture_type_float_struct, &fixture_type_floatstore_struct,
-        &fixture_type_iter_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
-        &fixture_type_bytearray_struct, &fixture_type_str_struct, &fixture_type_chrarray_struct,
-        &fixture_type_tuple_struct, &fixture_type_list_struct, &fixture_type_frozenset_struct,
-        &fixture_type_set_struct, &fixture_type_frozenset_dirty_struct,
-        &fixture_type_set_dirty_struct, &fixture_type_frozendict_struct, &fixture_type_dict_struct,
+static fixture_type_t *fixture_types_all_types[] = {&fixture_type_invalidated_struct,
+        &fixture_type_exception_struct, &fixture_type_type_struct, &fixture_type_NoneType_struct,
+        &fixture_type_bool_struct, &fixture_type_int_struct, &fixture_type_intstore_struct,
+        &fixture_type_float_struct, &fixture_type_floatstore_struct, &fixture_type_iter_struct,
+        &fixture_type_range_struct, &fixture_type_bytes_struct, &fixture_type_bytearray_struct,
+        &fixture_type_str_struct, &fixture_type_chrarray_struct, &fixture_type_str_1byte_struct,
+        &fixture_type_chrarray_1byte_struct, &fixture_type_str_2bytes_struct,
+        &fixture_type_chrarray_2bytes_struct, &fixture_type_str_4bytes_struct,
+        &fixture_type_chrarray_4bytes_struct, &fixture_type_tuple_struct, &fixture_type_list_struct,
+        &fixture_type_frozenset_struct, &fixture_type_set_struct,
+        &fixture_type_frozenset_dirty_struct, &fixture_type_set_dirty_struct,
+        &fixture_type_frozendict_struct, &fixture_type_dict_struct,
         &fixture_type_frozendict_dirty_struct, &fixture_type_dict_dirty_struct,
         &fixture_type_function_struct, NULL};
-// param_values_types_all is populated in initialize_fixture_types.
 static fixture_types_t fixture_types_all_struct = {FIXTURE_TYPES_ALL_LEN, fixture_types_all_types};
 fixture_types_t       *fixture_types_all = &fixture_types_all_struct;
-char                  *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
+static fixture_types_t fixture_types_most_struct = {
+        FIXTURE_TYPES_ALL_LEN - 2, &(fixture_types_all_types[2])};
+fixture_types_t *fixture_types_most = &fixture_types_most_struct;
+// param_values_types_all and *_most are populated in initialize_fixture_types.
+char *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
+char *param_values_types_most[FIXTURE_TYPES_ALL_LEN + 1];
 
 // Defines the type arrays (i.e. fixture_types_mutable and param_values_types_mutable). Also defines
 // the filter functions used by FILL_FIXTURE_TYPES_ARRAYS to fill these type arrays. These are
@@ -2448,10 +3135,17 @@ DEFINE_FIXTURE_TYPES(setlike, not_setlike);
 DEFINE_FIXTURE_TYPES(mapping, not_mapping);
 DEFINE_FIXTURE_TYPES(callable, not_callable);
 #undef DEFINE_FIXTURE_TYPES
+DEFINE_FIXTURE_TYPES_ARRAYS(string_not_variant);
+static int fixture_type_is_string_not_variant(fixture_type_t *type)
+{
+    return type->is_string && type->variant_of == NULL;
+}
 DEFINE_FIXTURE_TYPES_ARRAYS(immutable_not_str);
 static int fixture_type_is_immutable_not_str(fixture_type_t *type)
 {
-    return !type->is_mutable && type != fixture_type_str;
+    // `type->yp_type != yp_t_str` would be convenient here, but yp_type is not yet initialized.
+    return !type->is_mutable && type != fixture_type_str && type != fixture_type_str_1byte &&
+           type != fixture_type_str_2bytes && type != fixture_type_str_4bytes;
 }
 DEFINE_FIXTURE_TYPES_ARRAYS(immutable_paired);
 static int fixture_type_is_immutable_paired(fixture_type_t *type)
@@ -2464,7 +3158,7 @@ static void fill_fixture_types_arrays(fixture_types_t *fixture_types, char **par
         int (*is_of_type)(fixture_type_t *))
 {
     fixture_type_t **type;
-    for (type = fixture_types_all->types; *type != NULL; type++) {
+    for (type = fixture_types_most->types; *type != NULL; type++) {
         if (is_of_type(*type)) {
             fixture_types->types[fixture_types->len] = *type;
             param_values_types[fixture_types->len] = (*type)->name;
@@ -2480,12 +3174,12 @@ static void initialize_fixture_types(void)
     // The fixture_types_* and param_values_types_* arrays above were sized based on
     // FIXTURE_TYPES_ALL_LEN, so make sure that value is correct.
     if (yp_lengthof_array(fixture_types_all_types) != FIXTURE_TYPES_ALL_LEN + 1) {
-        fprintf(stderr, "Update FIXTURE_TYPES_ALL_LEN in unittest.h to %" PRIssize "\n",
+        fprintf(stderr, "Update FIXTURE_TYPES_ALL_LEN in unittest.c to %" PRIssize "\n",
                 yp_lengthof_array(fixture_types_all_types) - 1);
         abort();
     }
 
-    // Fill param_values_types_all. fixture_types_all was initialized statically.
+    // Fill param_values_types_all and *_most. fixture_types_all was initialized statically.
     {
         fixture_type_t **type;
         char           **param_values = param_values_types_all;
@@ -2495,6 +3189,8 @@ static void initialize_fixture_types(void)
         }
         *param_values = NULL;
     }
+    memcpy(param_values_types_most, param_values_types_all + 2,
+            sizeof(char *) * (FIXTURE_TYPES_ALL_LEN - 2 + 1));
 
     // Fill the remaining fixture_types_* and param_values_types_* arrays.
 #define FILL_FIXTURE_TYPES_ARRAYS(protocol) \
@@ -2518,12 +3214,15 @@ static void initialize_fixture_types(void)
     FILL_FIXTURE_TYPES_ARRAYS(not_setlike);
     FILL_FIXTURE_TYPES_ARRAYS(not_mapping);
     FILL_FIXTURE_TYPES_ARRAYS(not_callable);
+    FILL_FIXTURE_TYPES_ARRAYS(string_not_variant);
     FILL_FIXTURE_TYPES_ARRAYS(immutable_not_str);
     FILL_FIXTURE_TYPES_ARRAYS(immutable_paired);
 #undef FILL_FIXTURE_TYPES_ARRAYS
 
     // Some fixture_type_t initialization needs to happen at runtime, as it references DLL pointers.
     // This happens after FILL_FIXTURE_TYPES_ARRAYS as some of these reference these arrays.
+    initialize_fixture_type_invalidated();
+    initialize_fixture_type_exception();
     initialize_fixture_type_type();
     initialize_fixture_type_NoneType();
     initialize_fixture_type_bool();
@@ -2591,6 +3290,13 @@ extern yp_ssize_t yp_lenC_not_raises(ypObject *container)
     return result;
 }
 
+extern int yp_ltC_not_raises(ypObject *x, ypObject *y)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_lt(x, y));
+    return result == yp_True;
+}
+
 extern yp_int_t yp_asintC_not_raises(ypObject *number)
 {
     yp_int_t result;
@@ -2599,7 +3305,7 @@ extern yp_int_t yp_asintC_not_raises(ypObject *number)
 }
 
 
-#define MALLOC_TRACKER_MAX_LEN 4000
+#define MALLOC_TRACKER_MAX_LEN 2000
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {
@@ -2622,32 +3328,32 @@ static void malloc_tracker_push(void *p)
     assert_not_null(p);  // NULL should be handled before push is called.
 
     // Increase the size of the mallocs array as necessary.
-    assert_ssizeC(malloc_tracker.len, <, MALLOC_TRACKER_MAX_LEN);
+    if (malloc_tracker.len >= MALLOC_TRACKER_MAX_LEN) {
+        munit_error("too many allocations to track, increase MALLOC_TRACKER_MAX_LEN");
+    }
 
     // Don't bother deduplicating; that should never happen!
     malloc_tracker.mallocs[malloc_tracker.len] = p;
     malloc_tracker.len++;
 }
 
+// XXX This function used to leave NULLs in place for freed pointers, removing them only once they
+// were the last entry in the array. This left the array full of mostly NULLs: consider how
+// new_dictN allocates a supplier which is freed before the dict itself. So don't do that.
 static void malloc_tracker_pop(void *p)
 {
     yp_ssize_t i;
     assert_not_null(p);  // NULL should be handled before pop is called.
 
-    // Find the pointer and set it to NULL. Ignore unknown pointers: we are only concerned with
-    // allocations during the test.
-    // TODO Report on deep pointers, i.e. that are not deallocated in reverse order.
+    // Find the pointer and replace it with the last entry. Notice that if p is the last entry, it
+    // is replaced with itself, then dropped from the array (len--). Ignore unknown pointers: we are
+    // only concerned with tracking allocations made during the test.
     for (i = malloc_tracker.len - 1; i >= 0; i--) {
         if (malloc_tracker.mallocs[i] == p) {
-            malloc_tracker.mallocs[i] = NULL;
+            malloc_tracker.mallocs[i] = malloc_tracker.mallocs[malloc_tracker.len - 1];
+            malloc_tracker.len--;
             break;
         }
-    }
-
-    // Trim trailing NULL entries from the list.
-    // TODO Report on long runs of NULLs, i.e. that are not deallocated in reverse order.
-    while (malloc_tracker.len > 0 && malloc_tracker.mallocs[malloc_tracker.len - 1] == NULL) {
-        malloc_tracker.len--;
     }
 }
 
@@ -2672,7 +3378,7 @@ extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
     if (malloc_tracker_oom_fail_alloc()) return NULL;
-    assert_not_null(p = yp_mem_default_malloc(actual, size));
+    assert_not_null(p = yp_mem_default_allocator->malloc(actual, size));
     malloc_tracker_push(p);
     return p;
 }
@@ -2682,22 +3388,21 @@ extern void *malloc_tracker_malloc_resize(
 {
     void *newP;
     if (malloc_tracker_oom_fail_alloc()) return NULL;
-    assert_not_null(newP = yp_mem_default_malloc_resize(actual, p, size, extra));
+    assert_not_null(newP = yp_mem_default_allocator->malloc_resize(actual, p, size, extra));
     if (newP != p) malloc_tracker_push(newP);
     return newP;
 }
 
 extern void malloc_tracker_free(void *p)
 {
-    yp_mem_default_free(p);
+    yp_mem_default_allocator->free(p);
     if (p != NULL) malloc_tracker_pop(p);
 }
 
 static void malloc_tracker_fixture_tear_down(void)
 {
     if (malloc_tracker.len > 0) {
-        munit_errorf("memory leak: %p",  // GCOVR_EXCL_LINE
-                malloc_tracker.mallocs[malloc_tracker.len - 1]);
+        munit_errorf("memory leak: %p", malloc_tracker.mallocs[0]);  // GCOVR_EXCL_LINE
     }
 }
 

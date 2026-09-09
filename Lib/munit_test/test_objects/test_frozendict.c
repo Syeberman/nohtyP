@@ -41,8 +41,8 @@ static void _test_newK(
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Basic newK.
     {
@@ -96,14 +96,24 @@ static void _test_newK(
         assert_obj(any_newK(-1), is, type->falsy);
     }
 
+    // Invalidated argument. Allowed for values but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_newK(K(invalidated, yp_None)), yp_InvalidatedError);
+        ead(mp, any_newK(K(yp_None, invalidated)), assert_len(mp, 1));
+        assert_isexception(
+                any_newK(K(keys[0], values[0], invalidated, values[1])), yp_InvalidatedError);
+        ead(mp, any_newK(K(keys[0], values[0], keys[1], invalidated)), assert_len(mp, 2));
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_newK(K(yp_SyntaxError, yp_None)), yp_SyntaxError);
-        assert_isexception(any_newK(K(yp_None, yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception(
-                any_newK(K(keys[0], values[0], yp_SyntaxError, yp_None)), yp_SyntaxError);
-        assert_isexception(
-                any_newK(K(keys[0], values[0], yp_None, yp_SyntaxError)), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_newK(K(exception, yp_None)), exception);
+        assert_isexception(any_newK(K(yp_None, exception)), exception);
+        assert_isexception(any_newK(K(keys[0], values[0], exception, values[1])), exception);
+        assert_isexception(any_newK(K(keys[0], values[0], keys[1], exception)), exception);
     }
 
     obj_array_decref(values);
@@ -121,8 +131,8 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, peer->rand_items);
-    obj_array_fill(values, uq, peer->rand_values);
+    obj_array_fill(keys, uq, peer->rand_elems->items);
+    obj_array_fill(values, uq, peer->rand_elems->values);
 
     // Basic new.
     {
@@ -199,9 +209,17 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
     // x is not an iterable.
     assert_raises(any_new(not_iterable), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_new(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_new(yp_SyntaxError), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_new(exception), exception);
     }
 
     obj_array_decref(values);
@@ -303,7 +321,7 @@ static MunitResult test_new(const MunitParameter params[], fixture_t *fixture)
     // Shared tests.
     _test_newK(type, newK_to_new, /*test_exception_passthrough=*/FALSE);
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        if (peer->rand_elems->values == NULL) continue;  // Skip peers that don't support newK.
         _test_new(type, peer, new_, /*test_exception_passthrough=*/TRUE);
     }
 
@@ -369,8 +387,8 @@ static void _test_call_type(fixture_type_t *type, peer_type_t *peer)
     ypObject       *str_object = yp_str_frombytesC2(-1, "object");
     ypObject       *keys[4];
     ypObject       *values[4];
-    obj_array_fill(keys, uq, peer->rand_items);
-    obj_array_fill(values, uq, peer->rand_values);
+    obj_array_fill(keys, uq, peer->rand_elems->items);
+    obj_array_fill(values, uq, peer->rand_elems->values);
 
     // Zero arguments.
     {
@@ -480,8 +498,18 @@ static void _test_call_type(fixture_type_t *type, peer_type_t *peer)
         yp_decref(kwargs);
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_callN(type->yp_type, N(invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_isexception(yp_callN(type->yp_type, N(yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_callN(type->yp_type, N(exception)), exception);
+    }
 
     obj_array_decref(values);
     obj_array_decref(keys);
@@ -507,7 +535,7 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 
     _test_newK(type, newK_to_call_args_type, /*test_exception_passthrough=*/FALSE);
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        if (peer->rand_elems->values == NULL) continue;  // Skip peers that don't support newK.
         _test_new(type, peer, new_to_call_args_type, /*test_exception_passthrough=*/TRUE);
         _test_call_type(type, peer);
     }
@@ -522,8 +550,8 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Basic fromkeysN.
     {
@@ -576,12 +604,23 @@ static void _test_fromkeysN(fixture_type_t *type, ypObject *(*any_fromkeysN)(ypO
         assert_obj(any_fromkeysN(values[0], -1), is, type->falsy);
     }
 
+    // Invalidated argument. Allowed for values but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ead(mp, any_fromkeysN(invalidated, 0), assert_len(mp, 0));
+        ead(mp, any_fromkeysN(invalidated, N(yp_None)), assert_len(mp, 1));
+        assert_isexception(any_fromkeysN(yp_None, N(invalidated)), yp_InvalidatedError);
+        assert_isexception(any_fromkeysN(yp_None, N(yp_None, invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_fromkeysN(yp_SyntaxError, 0), yp_SyntaxError);
-        assert_isexception(any_fromkeysN(yp_SyntaxError, N(yp_None)), yp_SyntaxError);
-        assert_isexception(any_fromkeysN(yp_None, N(yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception(any_fromkeysN(yp_None, N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_fromkeysN(exception, 0), exception);
+        assert_isexception(any_fromkeysN(exception, N(yp_None)), exception);
+        assert_isexception(any_fromkeysN(yp_None, N(exception)), exception);
+        assert_isexception(any_fromkeysN(yp_None, N(yp_None, exception)), exception);
     }
 
     obj_array_decref(values);
@@ -599,8 +638,8 @@ static void _test_fromkeys(fixture_type_t *type, peer_type_t  *peer,
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *keys[4];
     ypObject          *values[4];
-    obj_array_fill(keys, uq, peer->rand_items);
-    obj_array_fill(values, uq, peer->rand_values);
+    obj_array_fill(keys, uq, peer->rand_elems->items);
+    obj_array_fill(values, uq, peer->rand_elems->values);
 
     // Basic fromkeys.
     {
@@ -665,11 +704,21 @@ static void _test_fromkeys(fixture_type_t *type, peer_type_t  *peer,
     // x is not an iterable.
     assert_raises(any_fromkeys(not_iterable, values[0]), yp_TypeError);
 
+    // Invalidated argument. Allowed for values but not for keys.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *list_one = yp_listN(1, yp_None);
+        assert_isexception(any_fromkeys(invalidated, yp_None), yp_InvalidatedError);
+        ead(mp, any_fromkeys(list_one, invalidated), assert_len(mp, 1));
+        yp_decrefN(N(list_one, invalidated));
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *list_empty = yp_listN(0);
-        assert_isexception(any_fromkeys(yp_SyntaxError, list_empty), yp_SyntaxError);
-        assert_isexception(any_fromkeys(list_empty, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(any_fromkeys(exception, list_empty), exception);
+        assert_isexception(any_fromkeys(list_empty, exception), exception);
         yp_decrefN(N(list_empty));
     }
 
@@ -772,7 +821,7 @@ static MunitResult test_fromkeys(const MunitParameter params[], fixture_t *fixtu
     // Shared tests.
     _test_fromkeysN(type, fromkeysN_to_fromkeys, /*test_exception_passthrough=*/TRUE);
     for (peer = type->peers; peer->type != NULL; peer++) {
-        if (peer->rand_values == NULL) continue;  // Skip peers that don't support newK.
+        if (peer->rand_elems->values == NULL) continue;  // Skip peers that don't support newK.
         _test_fromkeys(type, peer, fromkeys, /*test_exception_passthrough=*/TRUE);
     }
 
@@ -793,8 +842,8 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     uniqueness_t *uq = uniqueness_new();
     ypObject     *keys[4];
     ypObject     *values[4];
-    obj_array_fill(keys, uq, type->rand_items);
-    obj_array_fill(values, uq, type->rand_values);
+    obj_array_fill(keys, uq, type->rand_elems->items);
+    obj_array_fill(values, uq, type->rand_elems->values);
 
     // Corrupted states.
     {
@@ -884,7 +933,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *str_keys[] = obj_array_init(16, rand_obj(uq, fixture_type_str));
     ypObject       *keys[16];
-    obj_array_fill(keys, uq, type->rand_items);
+    obj_array_fill(keys, uq, type->rand_elems->items);
 
     // Ensure that the function object has been validated first. _ypFunction_validate_parameters is
     // called once per object, and always allocates a set; this allocation interferes with our

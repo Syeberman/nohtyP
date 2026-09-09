@@ -618,195 +618,253 @@ class UnicodeTest(string_tests.CommonTest,
         # Surrogates on both sides, no fixup required
         self.assertTrue(yp_str('\ud800\udc02') < yp_str('\ud84d\udc56'))
 
-    @yp_unittest.skip_str_case
+    @yp_unittest.skip_str_big_chars
     def test_islower(self):
         super().test_islower()
-        self.checkequalnofix(yp_False, '\u1FFc', 'islower')
-        self.assertFalse('\u2167'.islower())
-        self.assertTrue('\u2177'.islower())
+        self.checkequalnofix(yp_False, yp_str('\u1FFc'), 'islower')
+        self.assertFalse(yp_str('\u2167').islower())
+        self.assertTrue(yp_str('\u2177').islower())
         # non-BMP, uppercase
-        self.assertFalse('\U00010401'.islower())
-        self.assertFalse('\U00010427'.islower())
+        self.assertFalse(yp_str('\U00010401').islower())
+        self.assertFalse(yp_str('\U00010427').islower())
         # non-BMP, lowercase
-        self.assertTrue('\U00010429'.islower())
-        self.assertTrue('\U0001044E'.islower())
+        self.assertTrue(yp_str('\U00010429').islower())
+        self.assertTrue(yp_str('\U0001044E').islower())
         # non-BMP, non-cased
-        self.assertFalse('\U0001F40D'.islower())
-        self.assertFalse('\U0001F46F'.islower())
+        self.assertFalse(yp_str('\U0001F40D').islower())
+        self.assertFalse(yp_str('\U0001F46F').islower())
 
-    @yp_unittest.skip_str_case
+    def test_islower_latin_1(self):
+        super().test_islower()
+
+    @yp_unittest.skip_str_big_chars
     def test_isupper(self):
         super().test_isupper()
         if not sys.platform.startswith('java'):
-            self.checkequalnofix(yp_False, '\u1FFc', 'isupper')
-        self.assertTrue('\u2167'.isupper())
-        self.assertFalse('\u2177'.isupper())
+            self.checkequalnofix(yp_False, yp_str('\u1FFc'), 'isupper')
+        self.assertTrue(yp_str('\u2167').isupper())
+        self.assertFalse(yp_str('\u2177').isupper())
         # non-BMP, uppercase
-        self.assertTrue('\U00010401'.isupper())
-        self.assertTrue('\U00010427'.isupper())
+        self.assertTrue(yp_str('\U00010401').isupper())
+        self.assertTrue(yp_str('\U00010427').isupper())
         # non-BMP, lowercase
-        self.assertFalse('\U00010429'.isupper())
-        self.assertFalse('\U0001044E'.isupper())
+        self.assertFalse(yp_str('\U00010429').isupper())
+        self.assertFalse(yp_str('\U0001044E').isupper())
         # non-BMP, non-cased
-        self.assertFalse('\U0001F40D'.isupper())
-        self.assertFalse('\U0001F46F'.isupper())
+        self.assertFalse(yp_str('\U0001F40D').isupper())
+        self.assertFalse(yp_str('\U0001F46F').isupper())
 
-    @yp_unittest.skip_str_case
+    def test_isupper_latin_1(self):
+        super().test_isupper()
+
+    @yp_unittest.skip_string_title
     def test_istitle(self):
         super().test_istitle()
-        self.checkequalnofix(yp_True, '\u1FFc', 'istitle')
-        self.checkequalnofix(yp_True, 'Greek \u1FFcitlecases ...', 'istitle')
+        self.checkequalnofix(yp_True, yp_str('\u1FFc'), 'istitle')
+        self.checkequalnofix(yp_True, yp_str('Greek \u1FFcitlecases ...'), 'istitle')
 
         # non-BMP, uppercase + lowercase
-        self.assertTrue('\U00010401\U00010429'.istitle())
-        self.assertTrue('\U00010427\U0001044E'.istitle())
+        self.assertTrue(yp_str('\U00010401\U00010429').istitle())
+        self.assertTrue(yp_str('\U00010427\U0001044E').istitle())
         # apparently there are no titlecased (Lt) non-BMP chars in Unicode 6
         for ch in ['\U00010429', '\U0001044E', '\U0001F40D', '\U0001F46F']:
-            self.assertFalse(ch.istitle(), '{!a} is not title'.format(ch))
+            self.assertFalse(yp_str(ch).istitle(), '{!a} is not title'.format(ch))
 
-    @yp_unittest.skip_str_space
+    @yp_unittest.skip_str_big_chars
     def test_isspace(self):
         super().test_isspace()
-        self.checkequalnofix(yp_True, '\u2000', 'isspace')
-        self.checkequalnofix(yp_True, '\u200a', 'isspace')
-        self.checkequalnofix(yp_False, '\u2014', 'isspace')
+        self.checkequalnofix(yp_True, yp_str('\u2000'), 'isspace')
+        self.checkequalnofix(yp_True, yp_str('\u200a'), 'isspace')
+        self.checkequalnofix(yp_False, yp_str('\u2014'), 'isspace')
         # There are no non-BMP whitespace chars as of Unicode 12.
         for ch in ['\U00010401', '\U00010427', '\U00010429', '\U0001044E',
                    '\U0001F40D', '\U0001F46F']:
-            self.assertFalse(ch.isspace(), '{!a} is not space.'.format(ch))
+            self.assertFalse(yp_str(ch).isspace(), '{!a} is not space.'.format(ch))
+
+    def test_isspace_latin_1(self):
+        super().test_isspace()
 
     @support.requires_resource('cpu')
     def test_isspace_invariant(self):
         for codepoint in range(sys.maxunicode + 1):
-            char = chr(codepoint)
+            char = yp_chr(codepoint)
             bidirectional = unicodedata.bidirectional(char)
             category = unicodedata.category(char)
             self.assertEqual(char.isspace(),
                              (bidirectional in ('WS', 'B', 'S')
                               or category == 'Zs'))
 
-    @yp_unittest.skip_str_unicode_db
+    @yp_unittest.skip_str_big_chars
     def test_isalnum(self):
         super().test_isalnum()
         for ch in ['\U00010401', '\U00010427', '\U00010429', '\U0001044E',
                    '\U0001D7F6', '\U00011066', '\U000104A0', '\U0001F107']:
-            self.assertTrue(ch.isalnum(), '{!a} is alnum.'.format(ch))
+            self.assertTrue(yp_str(ch).isalnum(), '{!a} is alnum.'.format(ch))
 
-    @yp_unittest.skip_str_unicode_db
+    def test_isalnum_latin_1(self):
+        super().test_isalnum()
+
+    @yp_unittest.skip_str_big_chars
     def test_isalpha(self):
         super().test_isalpha()
-        self.checkequalnofix(yp_True, '\u1FFc', 'isalpha')
+        self.checkequalnofix(yp_True, yp_str('\u1FFc'), 'isalpha')
         # non-BMP, cased
-        self.assertTrue('\U00010401'.isalpha())
-        self.assertTrue('\U00010427'.isalpha())
-        self.assertTrue('\U00010429'.isalpha())
-        self.assertTrue('\U0001044E'.isalpha())
+        self.assertTrue(yp_str('\U00010401').isalpha())
+        self.assertTrue(yp_str('\U00010427').isalpha())
+        self.assertTrue(yp_str('\U00010429').isalpha())
+        self.assertTrue(yp_str('\U0001044E').isalpha())
         # non-BMP, non-cased
-        self.assertFalse('\U0001F40D'.isalpha())
-        self.assertFalse('\U0001F46F'.isalpha())
+        self.assertFalse(yp_str('\U0001F40D').isalpha())
+        self.assertFalse(yp_str('\U0001F46F').isalpha())
 
-    @yp_unittest.skip_str_unicode_db
+    def test_isalpha_latin_1(self):
+        super().test_isalpha()
+
     def test_isascii(self):
         super().test_isascii()
-        self.assertFalse("\u20ac".isascii())
-        self.assertFalse("\U0010ffff".isascii())
+        self.assertFalse(yp_str("\u20ac").isascii())
+        self.assertFalse(yp_str("\U0010ffff").isascii())
 
-    @yp_unittest.skip_str_unicode_db
+    @yp_unittest.skip_str_big_chars
     def test_isdecimal(self):
-        self.checkequalnofix(yp_False, '', 'isdecimal')
-        self.checkequalnofix(yp_False, 'a', 'isdecimal')
-        self.checkequalnofix(yp_True, '0', 'isdecimal')
-        self.checkequalnofix(yp_False, '\u2460', 'isdecimal') # CIRCLED DIGIT ONE
-        self.checkequalnofix(yp_False, '\xbc', 'isdecimal') # VULGAR FRACTION ONE QUARTER
-        self.checkequalnofix(yp_True, '\u0660', 'isdecimal') # ARABIC-INDIC DIGIT ZERO
-        self.checkequalnofix(yp_True, '0123456789', 'isdecimal')
-        self.checkequalnofix(yp_False, '0123456789a', 'isdecimal')
+        self.checkequalnofix(yp_False, yp_str(''), 'isdecimal')
+        self.checkequalnofix(yp_False, yp_str('a'), 'isdecimal')
+        self.checkequalnofix(yp_True, yp_str('0'), 'isdecimal')
+        self.checkequalnofix(yp_False, yp_str('\u2460'), 'isdecimal') # CIRCLED DIGIT ONE
+        self.checkequalnofix(yp_False, yp_str('\xbc'), 'isdecimal') # VULGAR FRACTION ONE QUARTER
+        self.checkequalnofix(yp_True, yp_str('\u0660'), 'isdecimal') # ARABIC-INDIC DIGIT ZERO
+        self.checkequalnofix(yp_True, yp_str('0123456789'), 'isdecimal')
+        self.checkequalnofix(yp_False, yp_str('0123456789a'), 'isdecimal')
 
-        self.checkraises(TypeError, 'abc', 'isdecimal', 42)
+        self.checkraises(TypeError, yp_str('abc'), 'isdecimal', 42)
 
         for ch in ['\U00010401', '\U00010427', '\U00010429', '\U0001044E',
                    '\U0001F40D', '\U0001F46F', '\U00011065', '\U0001F107']:
-            self.assertFalse(ch.isdecimal(), '{!a} is not decimal.'.format(ch))
+            self.assertFalse(yp_str(ch).isdecimal(), '{!a} is not decimal.'.format(ch))
         for ch in ['\U0001D7F6', '\U00011066', '\U000104A0']:
-            self.assertTrue(ch.isdecimal(), '{!a} is decimal.'.format(ch))
+            self.assertTrue(yp_str(ch).isdecimal(), '{!a} is decimal.'.format(ch))
 
-    @yp_unittest.skip_str_unicode_db
+    def test_isdecimal_latin_1(self):
+        self.checkequalnofix(yp_False, yp_str(''), 'isdecimal')
+        self.checkequalnofix(yp_False, yp_str('a'), 'isdecimal')
+        self.checkequalnofix(yp_True, yp_str('0'), 'isdecimal')
+        self.checkequalnofix(yp_False, yp_str('\xbc'), 'isdecimal') # VULGAR FRACTION ONE QUARTER
+        self.checkequalnofix(yp_True, yp_str('0123456789'), 'isdecimal')
+        self.checkequalnofix(yp_False, yp_str('0123456789a'), 'isdecimal')
+
+        self.checkraises(TypeError, yp_str('abc'), 'isdecimal', 42)
+
+    @yp_unittest.skip_str_big_chars
     def test_isdigit(self):
         super().test_isdigit()
-        self.checkequalnofix(yp_True, '\u2460', 'isdigit')
-        self.checkequalnofix(yp_False, '\xbc', 'isdigit')
-        self.checkequalnofix(yp_True, '\u0660', 'isdigit')
+        self.checkequalnofix(yp_True, yp_str('\u2460'), 'isdigit')
+        self.checkequalnofix(yp_False, yp_str('\xbc'), 'isdigit')
+        self.checkequalnofix(yp_True, yp_str('\u0660'), 'isdigit')
 
         for ch in ['\U00010401', '\U00010427', '\U00010429', '\U0001044E',
                    '\U0001F40D', '\U0001F46F', '\U00011065']:
-            self.assertFalse(ch.isdigit(), '{!a} is not a digit.'.format(ch))
+            self.assertFalse(yp_str(ch).isdigit(), '{!a} is not a digit.'.format(ch))
         for ch in ['\U0001D7F6', '\U00011066', '\U000104A0', '\U0001F107']:
-            self.assertTrue(ch.isdigit(), '{!a} is a digit.'.format(ch))
+            self.assertTrue(yp_str(ch).isdigit(), '{!a} is a digit.'.format(ch))
 
-    @yp_unittest.skip_str_unicode_db
+    def test_isdigit_latin_1(self):
+        super().test_isdigit()
+        self.checkequalnofix(yp_False, yp_str('\xbc'), 'isdigit')
+
+    @yp_unittest.skip_str_big_chars
     def test_isnumeric(self):
-        self.checkequalnofix(yp_False, '', 'isnumeric')
-        self.checkequalnofix(yp_False, 'a', 'isnumeric')
-        self.checkequalnofix(yp_True, '0', 'isnumeric')
-        self.checkequalnofix(yp_True, '\u2460', 'isnumeric')
-        self.checkequalnofix(yp_True, '\xbc', 'isnumeric')
-        self.checkequalnofix(yp_True, '\u0660', 'isnumeric')
-        self.checkequalnofix(yp_True, '0123456789', 'isnumeric')
-        self.checkequalnofix(yp_False, '0123456789a', 'isnumeric')
+        self.checkequalnofix(yp_False, yp_str(''), 'isnumeric')
+        self.checkequalnofix(yp_False, yp_str('a'), 'isnumeric')
+        self.checkequalnofix(yp_True, yp_str('0'), 'isnumeric')
+        self.checkequalnofix(yp_True, yp_str('\u2460'), 'isnumeric')
+        self.checkequalnofix(yp_True, yp_str('\xbc'), 'isnumeric')
+        self.checkequalnofix(yp_True, yp_str('\u0660'), 'isnumeric')
+        self.checkequalnofix(yp_True, yp_str('0123456789'), 'isnumeric')
+        self.checkequalnofix(yp_False, yp_str('0123456789a'), 'isnumeric')
 
-        self.assertRaises(TypeError, "abc".isnumeric, 42)
+        self.assertRaises(TypeError, yp_str("abc").isnumeric, 42)
 
         for ch in ['\U00010401', '\U00010427', '\U00010429', '\U0001044E',
                    '\U0001F40D', '\U0001F46F']:
-            self.assertFalse(ch.isnumeric(), '{!a} is not numeric.'.format(ch))
+            self.assertFalse(yp_str(ch).isnumeric(), '{!a} is not numeric.'.format(ch))
         for ch in ['\U00011065', '\U0001D7F6', '\U00011066',
                    '\U000104A0', '\U0001F107']:
-            self.assertTrue(ch.isnumeric(), '{!a} is numeric.'.format(ch))
+            self.assertTrue(yp_str(ch).isnumeric(), '{!a} is numeric.'.format(ch))
 
-    @yp_unittest.skip_str_unicode_db
+    def test_isnumeric_latin_1(self):
+        self.checkequalnofix(yp_False, yp_str(''), 'isnumeric')
+        self.checkequalnofix(yp_False, yp_str('a'), 'isnumeric')
+        self.checkequalnofix(yp_True, yp_str('0'), 'isnumeric')
+        self.checkequalnofix(yp_True, yp_str('\xbc'), 'isnumeric')
+        self.checkequalnofix(yp_True, yp_str('0123456789'), 'isnumeric')
+        self.checkequalnofix(yp_False, yp_str('0123456789a'), 'isnumeric')
+
+        self.assertRaises(TypeError, yp_str("abc").isnumeric, 42)
+
+    @yp_unittest.skip_str_big_chars
     def test_isidentifier(self):
-        self.assertTrue("a".isidentifier())
-        self.assertTrue("Z".isidentifier())
-        self.assertTrue("_".isidentifier())
-        self.assertTrue("b0".isidentifier())
-        self.assertTrue("bc".isidentifier())
-        self.assertTrue("b_".isidentifier())
-        self.assertTrue("µ".isidentifier())
-        self.assertTrue("𝔘𝔫𝔦𝔠𝔬𝔡𝔢".isidentifier())
+        self.assertTrue(yp_str("a").isidentifier())
+        self.assertTrue(yp_str("Z").isidentifier())
+        self.assertTrue(yp_str("_").isidentifier())
+        self.assertTrue(yp_str("b0").isidentifier())
+        self.assertTrue(yp_str("bc").isidentifier())
+        self.assertTrue(yp_str("b_").isidentifier())
+        self.assertTrue(yp_str("µ").isidentifier())
+        self.assertTrue(yp_str("𝔘𝔫𝔦𝔠𝔬𝔡𝔢").isidentifier())
 
-        self.assertFalse(" ".isidentifier())
-        self.assertFalse("[".isidentifier())
-        self.assertFalse("©".isidentifier())
-        self.assertFalse("0".isidentifier())
+        self.assertFalse(yp_str(" ").isidentifier())
+        self.assertFalse(yp_str("[").isidentifier())
+        self.assertFalse(yp_str("©").isidentifier())
+        self.assertFalse(yp_str("0").isidentifier())
+
+    def test_isidentifier_latin_1(self):
+        self.assertTrue(yp_str("a").isidentifier())
+        self.assertTrue(yp_str("Z").isidentifier())
+        self.assertTrue(yp_str("_").isidentifier())
+        self.assertTrue(yp_str("b0").isidentifier())
+        self.assertTrue(yp_str("bc").isidentifier())
+        self.assertTrue(yp_str("b_").isidentifier())
+        self.assertTrue(yp_str("µ").isidentifier())
+
+        self.assertFalse(yp_str(" ").isidentifier())
+        self.assertFalse(yp_str("[").isidentifier())
+        self.assertFalse(yp_str("©").isidentifier())
+        self.assertFalse(yp_str("0").isidentifier())
 
     @support.cpython_only
     @support.requires_legacy_unicode_capi
     @yp_unittest.skip_not_applicable
     def test_isidentifier_legacy(self):
         import _testcapi
-        u = '𝖀𝖓𝖎𝖈𝖔𝖉𝖊'
+        u = yp_str('𝖀𝖓𝖎𝖈𝖔𝖉𝖊')
         self.assertTrue(u.isidentifier())
         with warnings_helper.check_warnings():
             warnings.simplefilter('ignore', DeprecationWarning)
             self.assertTrue(_testcapi.unicode_legacy_string(u).isidentifier())
 
-    @yp_unittest.skip_str_unicode_db
+    @yp_unittest.skip_str_big_chars
     def test_isprintable(self):
-        self.assertTrue("".isprintable())
-        self.assertTrue(" ".isprintable())
-        self.assertTrue("abcdefg".isprintable())
-        self.assertFalse("abcdefg\n".isprintable())
+        self.assertTrue(yp_str("").isprintable())
+        self.assertTrue(yp_str(" ").isprintable())
+        self.assertTrue(yp_str("abcdefg").isprintable())
+        self.assertFalse(yp_str("abcdefg\n").isprintable())
         # some defined Unicode character
-        self.assertTrue("\u0374".isprintable())
+        self.assertTrue(yp_str("\u0374").isprintable())
         # undefined character
-        self.assertFalse("\u0378".isprintable())
+        self.assertFalse(yp_str("\u0378").isprintable())
         # single surrogate character
-        self.assertFalse("\ud800".isprintable())
+        self.assertFalse(yp_str("\ud800").isprintable())
 
-        self.assertTrue('\U0001F46F'.isprintable())
-        self.assertFalse('\U000E0020'.isprintable())
+        self.assertTrue(yp_str('\U0001F46F').isprintable())
+        self.assertFalse(yp_str('\U000E0020').isprintable())
 
-    @yp_unittest.skip_str_case
+    def test_isprintable_latin_1(self):
+        self.assertTrue(yp_str("").isprintable())
+        self.assertTrue(yp_str(" ").isprintable())
+        self.assertTrue(yp_str("abcdefg").isprintable())
+        self.assertFalse(yp_str("abcdefg\n").isprintable())
+
+    @yp_unittest.skip_str_big_chars
     def test_surrogates(self):
         for s in (yp_str('a\uD800b\uDFFF'), yp_str('a\uDFFFb\uD800'),
                   yp_str('a\uD800b\uDFFFa'), yp_str('a\uDFFFb\uD800a')):
@@ -834,119 +892,138 @@ class UnicodeTest(string_tests.CommonTest,
                 self.assertFalse(meth(s), '%a.%s() is yp_False' % (s, meth_name))
 
 
-    @yp_unittest.skip_str_case
+    @yp_unittest.skip_str_big_chars
     def test_lower(self):
         string_tests.CommonTest.test_lower(self)
-        self.assertEqual('\U00010427'.lower(), '\U0001044F')
-        self.assertEqual('\U00010427\U00010427'.lower(),
+        self.assertEqual(yp_str('\U00010427').lower(), '\U0001044F')
+        self.assertEqual(yp_str('\U00010427\U00010427').lower(),
                          '\U0001044F\U0001044F')
-        self.assertEqual('\U00010427\U0001044F'.lower(),
+        self.assertEqual(yp_str('\U00010427\U0001044F').lower(),
                          '\U0001044F\U0001044F')
-        self.assertEqual('X\U00010427x\U0001044F'.lower(),
+        self.assertEqual(yp_str('X\U00010427x\U0001044F').lower(),
                          'x\U0001044Fx\U0001044F')
-        self.assertEqual('ﬁ'.lower(), 'ﬁ')
-        self.assertEqual('\u0130'.lower(), '\u0069\u0307')
+        self.assertEqual(yp_str('ﬁ').lower(), 'ﬁ')
+        self.assertEqual(yp_str('\u0130').lower(), '\u0069\u0307')
         # Special case for GREEK CAPITAL LETTER SIGMA U+03A3
-        self.assertEqual('\u03a3'.lower(), '\u03c3')
-        self.assertEqual('\u0345\u03a3'.lower(), '\u0345\u03c3')
-        self.assertEqual('A\u0345\u03a3'.lower(), 'a\u0345\u03c2')
-        self.assertEqual('A\u0345\u03a3a'.lower(), 'a\u0345\u03c3a')
-        self.assertEqual('A\u0345\u03a3'.lower(), 'a\u0345\u03c2')
-        self.assertEqual('A\u03a3\u0345'.lower(), 'a\u03c2\u0345')
-        self.assertEqual('\u03a3\u0345 '.lower(), '\u03c3\u0345 ')
-        self.assertEqual('\U0008fffe'.lower(), '\U0008fffe')
-        self.assertEqual('\u2177'.lower(), '\u2177')
+        self.assertEqual(yp_str('\u03a3').lower(), '\u03c3')
+        self.assertEqual(yp_str('\u0345\u03a3').lower(), '\u0345\u03c3')
+        self.assertEqual(yp_str('A\u0345\u03a3').lower(), 'a\u0345\u03c2')
+        self.assertEqual(yp_str('A\u0345\u03a3a').lower(), 'a\u0345\u03c3a')
+        self.assertEqual(yp_str('A\u0345\u03a3').lower(), 'a\u0345\u03c2')
+        self.assertEqual(yp_str('A\u03a3\u0345').lower(), 'a\u03c2\u0345')
+        self.assertEqual(yp_str('\u03a3\u0345 ').lower(), '\u03c3\u0345 ')
+        self.assertEqual(yp_str('\U0008fffe').lower(), '\U0008fffe')
+        self.assertEqual(yp_str('\u2177').lower(), '\u2177')
 
-    @yp_unittest.skip_str_case
+    def test_lower_latin_1(self):
+        string_tests.CommonTest.test_lower(self)
+
+    @yp_unittest.skip_str_big_chars
     def test_casefold(self):
-        self.assertEqual('hello'.casefold(), 'hello')
-        self.assertEqual('hELlo'.casefold(), 'hello')
-        self.assertEqual('ß'.casefold(), 'ss')
-        self.assertEqual('ﬁ'.casefold(), 'fi')
-        self.assertEqual('\u03a3'.casefold(), '\u03c3')
-        self.assertEqual('A\u0345\u03a3'.casefold(), 'a\u03b9\u03c3')
-        self.assertEqual('\u00b5'.casefold(), '\u03bc')
+        self.assertEqual(yp_str('hello').casefold(), 'hello')
+        self.assertEqual(yp_str('hELlo').casefold(), 'hello')
+        self.assertEqual(yp_str('ß').casefold(), 'ss')
+        self.assertEqual(yp_str('ﬁ').casefold(), 'fi')
+        self.assertEqual(yp_str('\u03a3').casefold(), '\u03c3')
+        self.assertEqual(yp_str('A\u0345\u03a3').casefold(), 'a\u03b9\u03c3')
+        self.assertEqual(yp_str('\u00b5').casefold(), '\u03bc')
 
-    @yp_unittest.skip_str_case
+    def test_casefold_latin_1(self):
+        self.assertEqual(yp_str('hello').casefold(), 'hello')
+        self.assertEqual(yp_str('hELlo').casefold(), 'hello')
+        self.assertEqual(yp_str('ß').casefold(), 'ss')
+
+    @yp_unittest.skip_str_big_chars
     def test_upper(self):
         string_tests.CommonTest.test_upper(self)
-        self.assertEqual('\U0001044F'.upper(), '\U00010427')
-        self.assertEqual('\U0001044F\U0001044F'.upper(),
+        self.assertEqual(yp_str('\U0001044F').upper(), '\U00010427')
+        self.assertEqual(yp_str('\U0001044F\U0001044F').upper(),
                          '\U00010427\U00010427')
-        self.assertEqual('\U00010427\U0001044F'.upper(),
+        self.assertEqual(yp_str('\U00010427\U0001044F').upper(),
                          '\U00010427\U00010427')
-        self.assertEqual('X\U00010427x\U0001044F'.upper(),
+        self.assertEqual(yp_str('X\U00010427x\U0001044F').upper(),
                          'X\U00010427X\U00010427')
-        self.assertEqual('ﬁ'.upper(), 'FI')
-        self.assertEqual('\u0130'.upper(), '\u0130')
-        self.assertEqual('\u03a3'.upper(), '\u03a3')
-        self.assertEqual('ß'.upper(), 'SS')
-        self.assertEqual('\u1fd2'.upper(), '\u0399\u0308\u0300')
-        self.assertEqual('\U0008fffe'.upper(), '\U0008fffe')
-        self.assertEqual('\u2177'.upper(), '\u2167')
+        self.assertEqual(yp_str('ﬁ').upper(), 'FI')
+        self.assertEqual(yp_str('\u0130').upper(), '\u0130')
+        self.assertEqual(yp_str('\u03a3').upper(), '\u03a3')
+        self.assertEqual(yp_str('ß').upper(), 'SS')
+        self.assertEqual(yp_str('\u1fd2').upper(), '\u0399\u0308\u0300')
+        self.assertEqual(yp_str('\U0008fffe').upper(), '\U0008fffe')
+        self.assertEqual(yp_str('\u2177').upper(), '\u2167')
 
-    @yp_unittest.skip_str_case
+    def test_upper_latin_1(self):
+        string_tests.CommonTest.test_upper(self)
+        self.assertEqual(yp_str('ß').upper(), 'SS')
+
+    @yp_unittest.skip_str_big_chars
     def test_capitalize(self):
         string_tests.CommonTest.test_capitalize(self)
-        self.assertEqual('\U0001044F'.capitalize(), '\U00010427')
-        self.assertEqual('\U0001044F\U0001044F'.capitalize(),
+        self.assertEqual(yp_str('\U0001044F').capitalize(), '\U00010427')
+        self.assertEqual(yp_str('\U0001044F\U0001044F').capitalize(),
                          '\U00010427\U0001044F')
-        self.assertEqual('\U00010427\U0001044F'.capitalize(),
+        self.assertEqual(yp_str('\U00010427\U0001044F').capitalize(),
                          '\U00010427\U0001044F')
-        self.assertEqual('\U0001044F\U00010427'.capitalize(),
+        self.assertEqual(yp_str('\U0001044F\U00010427').capitalize(),
                          '\U00010427\U0001044F')
-        self.assertEqual('X\U00010427x\U0001044F'.capitalize(),
+        self.assertEqual(yp_str('X\U00010427x\U0001044F').capitalize(),
                          'X\U0001044Fx\U0001044F')
-        self.assertEqual('h\u0130'.capitalize(), 'H\u0069\u0307')
+        self.assertEqual(yp_str('h\u0130').capitalize(), 'H\u0069\u0307')
         exp = '\u0399\u0308\u0300\u0069\u0307'
-        self.assertEqual('\u1fd2\u0130'.capitalize(), exp)
-        self.assertEqual('ﬁnnish'.capitalize(), 'Finnish')
-        self.assertEqual('A\u0345\u03a3'.capitalize(), 'A\u0345\u03c2')
+        self.assertEqual(yp_str('\u1fd2\u0130').capitalize(), exp)
+        self.assertEqual(yp_str('ﬁnnish').capitalize(), 'Finnish')
+        self.assertEqual(yp_str('A\u0345\u03a3').capitalize(), 'A\u0345\u03c2')
 
-    @yp_unittest.skip_str_case
+    def test_capitalize_latin_1(self):
+        string_tests.CommonTest.test_capitalize(self)
+
+    @yp_unittest.skip_string_title
     def test_title(self):
         super().test_title()
-        self.assertEqual('\U0001044F'.title(), '\U00010427')
-        self.assertEqual('\U0001044F\U0001044F'.title(),
+        self.assertEqual(yp_str('\U0001044F').title(), '\U00010427')
+        self.assertEqual(yp_str('\U0001044F\U0001044F').title(),
                          '\U00010427\U0001044F')
-        self.assertEqual('\U0001044F\U0001044F \U0001044F\U0001044F'.title(),
+        self.assertEqual(yp_str('\U0001044F\U0001044F \U0001044F\U0001044F').title(),
                          '\U00010427\U0001044F \U00010427\U0001044F')
-        self.assertEqual('\U00010427\U0001044F \U00010427\U0001044F'.title(),
+        self.assertEqual(yp_str('\U00010427\U0001044F \U00010427\U0001044F').title(),
                          '\U00010427\U0001044F \U00010427\U0001044F')
-        self.assertEqual('\U0001044F\U00010427 \U0001044F\U00010427'.title(),
+        self.assertEqual(yp_str('\U0001044F\U00010427 \U0001044F\U00010427').title(),
                          '\U00010427\U0001044F \U00010427\U0001044F')
-        self.assertEqual('X\U00010427x\U0001044F X\U00010427x\U0001044F'.title(),
+        self.assertEqual(yp_str('X\U00010427x\U0001044F X\U00010427x\U0001044F').title(),
                          'X\U0001044Fx\U0001044F X\U0001044Fx\U0001044F')
-        self.assertEqual('ﬁNNISH'.title(), 'Finnish')
-        self.assertEqual('A\u03a3 \u1fa1xy'.title(), 'A\u03c2 \u1fa9xy')
-        self.assertEqual('A\u03a3A'.title(), 'A\u03c3a')
+        self.assertEqual(yp_str('ﬁNNISH').title(), 'Finnish')
+        self.assertEqual(yp_str('A\u03a3 \u1fa1xy').title(), 'A\u03c2 \u1fa9xy')
+        self.assertEqual(yp_str('A\u03a3A').title(), 'A\u03c3a')
 
-    @yp_unittest.skip_str_case
+    @yp_unittest.skip_str_big_chars
     def test_swapcase(self):
         string_tests.CommonTest.test_swapcase(self)
-        self.assertEqual('\U0001044F'.swapcase(), '\U00010427')
-        self.assertEqual('\U00010427'.swapcase(), '\U0001044F')
-        self.assertEqual('\U0001044F\U0001044F'.swapcase(),
+        self.assertEqual(yp_str('\U0001044F').swapcase(), '\U00010427')
+        self.assertEqual(yp_str('\U00010427').swapcase(), '\U0001044F')
+        self.assertEqual(yp_str('\U0001044F\U0001044F').swapcase(),
                          '\U00010427\U00010427')
-        self.assertEqual('\U00010427\U0001044F'.swapcase(),
+        self.assertEqual(yp_str('\U00010427\U0001044F').swapcase(),
                          '\U0001044F\U00010427')
-        self.assertEqual('\U0001044F\U00010427'.swapcase(),
+        self.assertEqual(yp_str('\U0001044F\U00010427').swapcase(),
                          '\U00010427\U0001044F')
-        self.assertEqual('X\U00010427x\U0001044F'.swapcase(),
+        self.assertEqual(yp_str('X\U00010427x\U0001044F').swapcase(),
                          'x\U0001044FX\U00010427')
-        self.assertEqual('ﬁ'.swapcase(), 'FI')
-        self.assertEqual('\u0130'.swapcase(), '\u0069\u0307')
+        self.assertEqual(yp_str('ﬁ').swapcase(), 'FI')
+        self.assertEqual(yp_str('\u0130').swapcase(), '\u0069\u0307')
         # Special case for GREEK CAPITAL LETTER SIGMA U+03A3
-        self.assertEqual('\u03a3'.swapcase(), '\u03c3')
-        self.assertEqual('\u0345\u03a3'.swapcase(), '\u0399\u03c3')
-        self.assertEqual('A\u0345\u03a3'.swapcase(), 'a\u0399\u03c2')
-        self.assertEqual('A\u0345\u03a3a'.swapcase(), 'a\u0399\u03c3A')
-        self.assertEqual('A\u0345\u03a3'.swapcase(), 'a\u0399\u03c2')
-        self.assertEqual('A\u03a3\u0345'.swapcase(), 'a\u03c2\u0399')
-        self.assertEqual('\u03a3\u0345 '.swapcase(), '\u03c3\u0399 ')
-        self.assertEqual('\u03a3'.swapcase(), '\u03c3')
-        self.assertEqual('ß'.swapcase(), 'SS')
-        self.assertEqual('\u1fd2'.swapcase(), '\u0399\u0308\u0300')
+        self.assertEqual(yp_str('\u03a3').swapcase(), '\u03c3')
+        self.assertEqual(yp_str('\u0345\u03a3').swapcase(), '\u0399\u03c3')
+        self.assertEqual(yp_str('A\u0345\u03a3').swapcase(), 'a\u0399\u03c2')
+        self.assertEqual(yp_str('A\u0345\u03a3a').swapcase(), 'a\u0399\u03c3A')
+        self.assertEqual(yp_str('A\u0345\u03a3').swapcase(), 'a\u0399\u03c2')
+        self.assertEqual(yp_str('A\u03a3\u0345').swapcase(), 'a\u03c2\u0399')
+        self.assertEqual(yp_str('\u03a3\u0345 ').swapcase(), '\u03c3\u0399 ')
+        self.assertEqual(yp_str('\u03a3').swapcase(), '\u03c3')
+        self.assertEqual(yp_str('ß').swapcase(), 'SS')
+        self.assertEqual(yp_str('\u1fd2').swapcase(), '\u0399\u0308\u0300')
+
+    def test_swapcase_latin_1(self):
+        string_tests.CommonTest.test_swapcase(self)
+        self.assertEqual(yp_str('ß').swapcase(), 'SS')
 
     @yp_unittest.skip_str_space
     def test_center(self):
@@ -959,7 +1036,7 @@ class UnicodeTest(string_tests.CommonTest,
                          '\U0010FFFFx\U0010FFFF\U0010FFFF')
 
     @yp_unittest.skipUnless(sys.maxsize == 2**31 - 1, "requires 32-bit system")
-    @yp_unittest.skip_str_case
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_case_operation_overflow(self):
         # Issue #22643

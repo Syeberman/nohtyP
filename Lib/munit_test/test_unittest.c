@@ -51,7 +51,7 @@ static MunitResult test_assert_setlike_helper(const MunitParameter params[], fix
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, fixture_type_frozenset->rand_items);
+    obj_array_fill(items, uq, fixture_type_frozenset->rand_elems->items);
 
     // "mi is exhausted"
     {
@@ -109,8 +109,8 @@ static MunitResult test_assert_mapping_helper(const MunitParameter params[], fix
     uniqueness_t *uq = uniqueness_new();
     ypObject     *keys[2];
     ypObject     *values[2];
-    obj_array_fill(keys, uq, fixture_type_frozendict->rand_items);
-    obj_array_fill(values, uq, fixture_type_frozendict->rand_values);
+    obj_array_fill(keys, uq, fixture_type_frozendict->rand_elems->items);
+    obj_array_fill(values, uq, fixture_type_frozendict->rand_elems->values);
 
     // "mi is exhausted"
     {
@@ -180,47 +180,71 @@ static MunitResult test_assert_mapping_helper(const MunitParameter params[], fix
 // Ensure the various fixture_types_* arrays were initialzed properly.
 static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *fixture)
 {
-    assert_ssizeC(fixture_types_all->len, ==, 24);
-    assert_ptr_array(fixture_types_all->types, fixture_type_type, fixture_type_NoneType,
+    assert_ssizeC(fixture_types_all->len, ==, 32);
+    assert_ptr_array(fixture_types_all->types, fixture_type_invalidated, fixture_type_exception,
+            fixture_type_type, fixture_type_NoneType, fixture_type_bool, fixture_type_int,
+            fixture_type_intstore, fixture_type_float, fixture_type_floatstore, fixture_type_iter,
+            fixture_type_range, fixture_type_bytes, fixture_type_bytearray, fixture_type_str,
+            fixture_type_chrarray, fixture_type_str_1byte, fixture_type_chrarray_1byte,
+            fixture_type_str_2bytes, fixture_type_chrarray_2bytes, fixture_type_str_4bytes,
+            fixture_type_chrarray_4bytes, fixture_type_tuple, fixture_type_list,
+            fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty,
+            fixture_type_set_dirty, fixture_type_frozendict, fixture_type_dict,
+            fixture_type_frozendict_dirty, fixture_type_dict_dirty, fixture_type_function, NULL);
+
+    assert_ssizeC(fixture_types_most->len, ==, 30);
+    assert_ptr_array(fixture_types_most->types, fixture_type_type, fixture_type_NoneType,
             fixture_type_bool, fixture_type_int, fixture_type_intstore, fixture_type_float,
             fixture_type_floatstore, fixture_type_iter, fixture_type_range, fixture_type_bytes,
-            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_tuple,
+            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_str_1byte,
+            fixture_type_chrarray_1byte, fixture_type_str_2bytes, fixture_type_chrarray_2bytes,
+            fixture_type_str_4bytes, fixture_type_chrarray_4bytes, fixture_type_tuple,
             fixture_type_list, fixture_type_frozenset, fixture_type_set,
             fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_frozendict,
             fixture_type_dict, fixture_type_frozendict_dirty, fixture_type_dict_dirty,
             fixture_type_function, NULL);
 
-    assert_ssizeC(fixture_types_mutable->len, ==, 9);
+    assert_ssizeC(fixture_types_mutable->len, ==, 12);
     assert_ptr_array(fixture_types_mutable->types, fixture_type_intstore, fixture_type_floatstore,
-            fixture_type_bytearray, fixture_type_chrarray, fixture_type_list, fixture_type_set,
-            fixture_type_set_dirty, fixture_type_dict, fixture_type_dict_dirty, NULL);
+            fixture_type_bytearray, fixture_type_chrarray, fixture_type_chrarray_1byte,
+            fixture_type_chrarray_2bytes, fixture_type_chrarray_4bytes, fixture_type_list,
+            fixture_type_set, fixture_type_set_dirty, fixture_type_dict, fixture_type_dict_dirty,
+            NULL);
 
     assert_ssizeC(fixture_types_numeric->len, ==, 4);
     assert_ptr_array(fixture_types_numeric->types, fixture_type_int, fixture_type_intstore,
             fixture_type_float, fixture_type_floatstore, NULL);
 
-    assert_ssizeC(fixture_types_iterable->len, ==, 16);
+    assert_ssizeC(fixture_types_iterable->len, ==, 22);
     assert_ptr_array(fixture_types_iterable->types, fixture_type_iter, fixture_type_range,
             fixture_type_bytes, fixture_type_bytearray, fixture_type_str, fixture_type_chrarray,
+            fixture_type_str_1byte, fixture_type_chrarray_1byte, fixture_type_str_2bytes,
+            fixture_type_chrarray_2bytes, fixture_type_str_4bytes, fixture_type_chrarray_4bytes,
             fixture_type_tuple, fixture_type_list, fixture_type_frozenset, fixture_type_set,
             fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_frozendict,
             fixture_type_dict, fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL);
 
-    assert_ssizeC(fixture_types_collection->len, ==, 15);
+    assert_ssizeC(fixture_types_collection->len, ==, 21);
     assert_ptr_array(fixture_types_collection->types, fixture_type_range, fixture_type_bytes,
-            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_tuple,
+            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_str_1byte,
+            fixture_type_chrarray_1byte, fixture_type_str_2bytes, fixture_type_chrarray_2bytes,
+            fixture_type_str_4bytes, fixture_type_chrarray_4bytes, fixture_type_tuple,
             fixture_type_list, fixture_type_frozenset, fixture_type_set,
             fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_frozendict,
             fixture_type_dict, fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL);
 
-    assert_ssizeC(fixture_types_sequence->len, ==, 7);
+    assert_ssizeC(fixture_types_sequence->len, ==, 13);
     assert_ptr_array(fixture_types_sequence->types, fixture_type_range, fixture_type_bytes,
-            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_tuple,
+            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_str_1byte,
+            fixture_type_chrarray_1byte, fixture_type_str_2bytes, fixture_type_chrarray_2bytes,
+            fixture_type_str_4bytes, fixture_type_chrarray_4bytes, fixture_type_tuple,
             fixture_type_list, NULL);
 
-    assert_ssizeC(fixture_types_string->len, ==, 4);
+    assert_ssizeC(fixture_types_string->len, ==, 10);
     assert_ptr_array(fixture_types_string->types, fixture_type_bytes, fixture_type_bytearray,
-            fixture_type_str, fixture_type_chrarray, NULL);
+            fixture_type_str, fixture_type_chrarray, fixture_type_str_1byte,
+            fixture_type_chrarray_1byte, fixture_type_str_2bytes, fixture_type_chrarray_2bytes,
+            fixture_type_str_4bytes, fixture_type_chrarray_4bytes, NULL);
 
     assert_ssizeC(fixture_types_setlike->len, ==, 4);
     assert_ptr_array(fixture_types_setlike->types, fixture_type_frozenset, fixture_type_set,
@@ -230,17 +254,20 @@ static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *
     assert_ptr_array(fixture_types_mapping->types, fixture_type_frozendict, fixture_type_dict,
             fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL);
 
-    assert_ssizeC(fixture_types_immutable->len, ==, 15);
+    assert_ssizeC(fixture_types_immutable->len, ==, 18);
     assert_ptr_array(fixture_types_immutable->types, fixture_type_type, fixture_type_NoneType,
             fixture_type_bool, fixture_type_int, fixture_type_float, fixture_type_iter,
-            fixture_type_range, fixture_type_bytes, fixture_type_str, fixture_type_tuple,
+            fixture_type_range, fixture_type_bytes, fixture_type_str, fixture_type_str_1byte,
+            fixture_type_str_2bytes, fixture_type_str_4bytes, fixture_type_tuple,
             fixture_type_frozenset, fixture_type_frozenset_dirty, fixture_type_frozendict,
             fixture_type_frozendict_dirty, fixture_type_function, NULL);
 
-    assert_ssizeC(fixture_types_not_numeric->len, ==, 20);
+    assert_ssizeC(fixture_types_not_numeric->len, ==, 26);
     assert_ptr_array(fixture_types_not_numeric->types, fixture_type_type, fixture_type_NoneType,
             fixture_type_bool, fixture_type_iter, fixture_type_range, fixture_type_bytes,
-            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_tuple,
+            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_str_1byte,
+            fixture_type_chrarray_1byte, fixture_type_str_2bytes, fixture_type_chrarray_2bytes,
+            fixture_type_str_4bytes, fixture_type_chrarray_4bytes, fixture_type_tuple,
             fixture_type_list, fixture_type_frozenset, fixture_type_set,
             fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_frozendict,
             fixture_type_dict, fixture_type_frozendict_dirty, fixture_type_dict_dirty,
@@ -273,21 +300,29 @@ static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *
             fixture_type_dict, fixture_type_frozendict_dirty, fixture_type_dict_dirty,
             fixture_type_function, NULL);
 
-    assert_ssizeC(fixture_types_not_setlike->len, ==, 20);
+    assert_ssizeC(fixture_types_not_setlike->len, ==, 26);
     assert_ptr_array(fixture_types_not_setlike->types, fixture_type_type, fixture_type_NoneType,
             fixture_type_bool, fixture_type_int, fixture_type_intstore, fixture_type_float,
             fixture_type_floatstore, fixture_type_iter, fixture_type_range, fixture_type_bytes,
-            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_tuple,
+            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_str_1byte,
+            fixture_type_chrarray_1byte, fixture_type_str_2bytes, fixture_type_chrarray_2bytes,
+            fixture_type_str_4bytes, fixture_type_chrarray_4bytes, fixture_type_tuple,
             fixture_type_list, fixture_type_frozendict, fixture_type_dict,
             fixture_type_frozendict_dirty, fixture_type_dict_dirty, fixture_type_function, NULL);
 
-    assert_ssizeC(fixture_types_not_mapping->len, ==, 20);
+    assert_ssizeC(fixture_types_not_mapping->len, ==, 26);
     assert_ptr_array(fixture_types_not_mapping->types, fixture_type_type, fixture_type_NoneType,
             fixture_type_bool, fixture_type_int, fixture_type_intstore, fixture_type_float,
             fixture_type_floatstore, fixture_type_iter, fixture_type_range, fixture_type_bytes,
-            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_tuple,
+            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, fixture_type_str_1byte,
+            fixture_type_chrarray_1byte, fixture_type_str_2bytes, fixture_type_chrarray_2bytes,
+            fixture_type_str_4bytes, fixture_type_chrarray_4bytes, fixture_type_tuple,
             fixture_type_list, fixture_type_frozenset, fixture_type_set,
             fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_function, NULL);
+
+    assert_ssizeC(fixture_types_string_not_variant->len, ==, 4);
+    assert_ptr_array(fixture_types_string_not_variant->types, fixture_type_bytes,
+            fixture_type_bytearray, fixture_type_str, fixture_type_chrarray, NULL);
 
     assert_ssizeC(fixture_types_immutable_not_str->len, ==, 14);
     assert_ptr_array(fixture_types_immutable_not_str->types, fixture_type_type,
@@ -296,9 +331,10 @@ static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *
             fixture_type_frozenset, fixture_type_frozenset_dirty, fixture_type_frozendict,
             fixture_type_frozendict_dirty, fixture_type_function, NULL);
 
-    assert_ssizeC(fixture_types_immutable_paired->len, ==, 9);
+    assert_ssizeC(fixture_types_immutable_paired->len, ==, 12);
     assert_ptr_array(fixture_types_immutable_paired->types, fixture_type_int, fixture_type_float,
-            fixture_type_bytes, fixture_type_str, fixture_type_tuple, fixture_type_frozenset,
+            fixture_type_bytes, fixture_type_str, fixture_type_str_1byte, fixture_type_str_2bytes,
+            fixture_type_str_4bytes, fixture_type_tuple, fixture_type_frozenset,
             fixture_type_frozenset_dirty, fixture_type_frozendict, fixture_type_frozendict_dirty,
             NULL);
 
@@ -308,12 +344,30 @@ static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *
 // Ensure the various param_values_types_* arrays were initialzed properly.
 static MunitResult test_param_values_types(const MunitParameter params[], fixture_t *fixture)
 {
-    assert_ptr_array(param_values_types_all, fixture_type_type->name, fixture_type_NoneType->name,
+    assert_ptr_array(param_values_types_all, fixture_type_invalidated->name,
+            fixture_type_exception->name, fixture_type_type->name, fixture_type_NoneType->name,
             fixture_type_bool->name, fixture_type_int->name, fixture_type_intstore->name,
             fixture_type_float->name, fixture_type_floatstore->name, fixture_type_iter->name,
             fixture_type_range->name, fixture_type_bytes->name, fixture_type_bytearray->name,
-            fixture_type_str->name, fixture_type_chrarray->name, fixture_type_tuple->name,
-            fixture_type_list->name, fixture_type_frozenset->name, fixture_type_set->name,
+            fixture_type_str->name, fixture_type_chrarray->name, fixture_type_str_1byte->name,
+            fixture_type_chrarray_1byte->name, fixture_type_str_2bytes->name,
+            fixture_type_chrarray_2bytes->name, fixture_type_str_4bytes->name,
+            fixture_type_chrarray_4bytes->name, fixture_type_tuple->name, fixture_type_list->name,
+            fixture_type_frozenset->name, fixture_type_set->name,
+            fixture_type_frozenset_dirty->name, fixture_type_set_dirty->name,
+            fixture_type_frozendict->name, fixture_type_dict->name,
+            fixture_type_frozendict_dirty->name, fixture_type_dict_dirty->name,
+            fixture_type_function->name, NULL);
+
+    assert_ptr_array(param_values_types_most, fixture_type_type->name, fixture_type_NoneType->name,
+            fixture_type_bool->name, fixture_type_int->name, fixture_type_intstore->name,
+            fixture_type_float->name, fixture_type_floatstore->name, fixture_type_iter->name,
+            fixture_type_range->name, fixture_type_bytes->name, fixture_type_bytearray->name,
+            fixture_type_str->name, fixture_type_chrarray->name, fixture_type_str_1byte->name,
+            fixture_type_chrarray_1byte->name, fixture_type_str_2bytes->name,
+            fixture_type_chrarray_2bytes->name, fixture_type_str_4bytes->name,
+            fixture_type_chrarray_4bytes->name, fixture_type_tuple->name, fixture_type_list->name,
+            fixture_type_frozenset->name, fixture_type_set->name,
             fixture_type_frozenset_dirty->name, fixture_type_set_dirty->name,
             fixture_type_frozendict->name, fixture_type_dict->name,
             fixture_type_frozendict_dirty->name, fixture_type_dict_dirty->name,
@@ -321,9 +375,10 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
 
     assert_ptr_array(param_values_types_mutable, fixture_type_intstore->name,
             fixture_type_floatstore->name, fixture_type_bytearray->name,
-            fixture_type_chrarray->name, fixture_type_list->name, fixture_type_set->name,
-            fixture_type_set_dirty->name, fixture_type_dict->name, fixture_type_dict_dirty->name,
-            NULL);
+            fixture_type_chrarray->name, fixture_type_chrarray_1byte->name,
+            fixture_type_chrarray_2bytes->name, fixture_type_chrarray_4bytes->name,
+            fixture_type_list->name, fixture_type_set->name, fixture_type_set_dirty->name,
+            fixture_type_dict->name, fixture_type_dict_dirty->name, NULL);
 
     assert_ptr_array(param_values_types_numeric, fixture_type_int->name,
             fixture_type_intstore->name, fixture_type_float->name, fixture_type_floatstore->name,
@@ -331,7 +386,10 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
 
     assert_ptr_array(param_values_types_iterable, fixture_type_iter->name, fixture_type_range->name,
             fixture_type_bytes->name, fixture_type_bytearray->name, fixture_type_str->name,
-            fixture_type_chrarray->name, fixture_type_tuple->name, fixture_type_list->name,
+            fixture_type_chrarray->name, fixture_type_str_1byte->name,
+            fixture_type_chrarray_1byte->name, fixture_type_str_2bytes->name,
+            fixture_type_chrarray_2bytes->name, fixture_type_str_4bytes->name,
+            fixture_type_chrarray_4bytes->name, fixture_type_tuple->name, fixture_type_list->name,
             fixture_type_frozenset->name, fixture_type_set->name,
             fixture_type_frozenset_dirty->name, fixture_type_set_dirty->name,
             fixture_type_frozendict->name, fixture_type_dict->name,
@@ -339,7 +397,10 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
 
     assert_ptr_array(param_values_types_collection, fixture_type_range->name,
             fixture_type_bytes->name, fixture_type_bytearray->name, fixture_type_str->name,
-            fixture_type_chrarray->name, fixture_type_tuple->name, fixture_type_list->name,
+            fixture_type_chrarray->name, fixture_type_str_1byte->name,
+            fixture_type_chrarray_1byte->name, fixture_type_str_2bytes->name,
+            fixture_type_chrarray_2bytes->name, fixture_type_str_4bytes->name,
+            fixture_type_chrarray_4bytes->name, fixture_type_tuple->name, fixture_type_list->name,
             fixture_type_frozenset->name, fixture_type_set->name,
             fixture_type_frozenset_dirty->name, fixture_type_set_dirty->name,
             fixture_type_frozendict->name, fixture_type_dict->name,
@@ -347,11 +408,17 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
 
     assert_ptr_array(param_values_types_sequence, fixture_type_range->name,
             fixture_type_bytes->name, fixture_type_bytearray->name, fixture_type_str->name,
-            fixture_type_chrarray->name, fixture_type_tuple->name, fixture_type_list->name, NULL);
+            fixture_type_chrarray->name, fixture_type_str_1byte->name,
+            fixture_type_chrarray_1byte->name, fixture_type_str_2bytes->name,
+            fixture_type_chrarray_2bytes->name, fixture_type_str_4bytes->name,
+            fixture_type_chrarray_4bytes->name, fixture_type_tuple->name, fixture_type_list->name,
+            NULL);
 
     assert_ptr_array(param_values_types_string, fixture_type_bytes->name,
             fixture_type_bytearray->name, fixture_type_str->name, fixture_type_chrarray->name,
-            NULL);
+            fixture_type_str_1byte->name, fixture_type_chrarray_1byte->name,
+            fixture_type_str_2bytes->name, fixture_type_chrarray_2bytes->name,
+            fixture_type_str_4bytes->name, fixture_type_chrarray_4bytes->name, NULL);
 
     assert_ptr_array(param_values_types_setlike, fixture_type_frozenset->name,
             fixture_type_set->name, fixture_type_frozenset_dirty->name,
@@ -364,7 +431,8 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
     assert_ptr_array(param_values_types_immutable, fixture_type_type->name,
             fixture_type_NoneType->name, fixture_type_bool->name, fixture_type_int->name,
             fixture_type_float->name, fixture_type_iter->name, fixture_type_range->name,
-            fixture_type_bytes->name, fixture_type_str->name, fixture_type_tuple->name,
+            fixture_type_bytes->name, fixture_type_str->name, fixture_type_str_1byte->name,
+            fixture_type_str_2bytes->name, fixture_type_str_4bytes->name, fixture_type_tuple->name,
             fixture_type_frozenset->name, fixture_type_frozenset_dirty->name,
             fixture_type_frozendict->name, fixture_type_frozendict_dirty->name,
             fixture_type_function->name, NULL);
@@ -372,8 +440,11 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
     assert_ptr_array(param_values_types_not_numeric, fixture_type_type->name,
             fixture_type_NoneType->name, fixture_type_bool->name, fixture_type_iter->name,
             fixture_type_range->name, fixture_type_bytes->name, fixture_type_bytearray->name,
-            fixture_type_str->name, fixture_type_chrarray->name, fixture_type_tuple->name,
-            fixture_type_list->name, fixture_type_frozenset->name, fixture_type_set->name,
+            fixture_type_str->name, fixture_type_chrarray->name, fixture_type_str_1byte->name,
+            fixture_type_chrarray_1byte->name, fixture_type_str_2bytes->name,
+            fixture_type_chrarray_2bytes->name, fixture_type_str_4bytes->name,
+            fixture_type_chrarray_4bytes->name, fixture_type_tuple->name, fixture_type_list->name,
+            fixture_type_frozenset->name, fixture_type_set->name,
             fixture_type_frozenset_dirty->name, fixture_type_set_dirty->name,
             fixture_type_frozendict->name, fixture_type_dict->name,
             fixture_type_frozendict_dirty->name, fixture_type_dict_dirty->name,
@@ -413,6 +484,9 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
             fixture_type_intstore->name, fixture_type_float->name, fixture_type_floatstore->name,
             fixture_type_iter->name, fixture_type_range->name, fixture_type_bytes->name,
             fixture_type_bytearray->name, fixture_type_str->name, fixture_type_chrarray->name,
+            fixture_type_str_1byte->name, fixture_type_chrarray_1byte->name,
+            fixture_type_str_2bytes->name, fixture_type_chrarray_2bytes->name,
+            fixture_type_str_4bytes->name, fixture_type_chrarray_4bytes->name,
             fixture_type_tuple->name, fixture_type_list->name, fixture_type_frozendict->name,
             fixture_type_dict->name, fixture_type_frozendict_dirty->name,
             fixture_type_dict_dirty->name, fixture_type_function->name, NULL);
@@ -422,9 +496,16 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
             fixture_type_intstore->name, fixture_type_float->name, fixture_type_floatstore->name,
             fixture_type_iter->name, fixture_type_range->name, fixture_type_bytes->name,
             fixture_type_bytearray->name, fixture_type_str->name, fixture_type_chrarray->name,
+            fixture_type_str_1byte->name, fixture_type_chrarray_1byte->name,
+            fixture_type_str_2bytes->name, fixture_type_chrarray_2bytes->name,
+            fixture_type_str_4bytes->name, fixture_type_chrarray_4bytes->name,
             fixture_type_tuple->name, fixture_type_list->name, fixture_type_frozenset->name,
             fixture_type_set->name, fixture_type_frozenset_dirty->name,
             fixture_type_set_dirty->name, fixture_type_function->name, NULL);
+
+    assert_ptr_array(param_values_types_string_not_variant, fixture_type_bytes->name,
+            fixture_type_bytearray->name, fixture_type_str->name, fixture_type_chrarray->name,
+            NULL);
 
     assert_ptr_array(param_values_types_immutable_not_str, fixture_type_type->name,
             fixture_type_NoneType->name, fixture_type_bool->name, fixture_type_int->name,
@@ -435,7 +516,8 @@ static MunitResult test_param_values_types(const MunitParameter params[], fixtur
 
     assert_ptr_array(param_values_types_immutable_paired, fixture_type_int->name,
             fixture_type_float->name, fixture_type_bytes->name, fixture_type_str->name,
-            fixture_type_tuple->name, fixture_type_frozenset->name,
+            fixture_type_str_1byte->name, fixture_type_str_2bytes->name,
+            fixture_type_str_4bytes->name, fixture_type_tuple->name, fixture_type_frozenset->name,
             fixture_type_frozenset_dirty->name, fixture_type_frozendict->name,
             fixture_type_frozendict_dirty->name, NULL);
 
@@ -476,8 +558,7 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
         for (peer = type->peers; peer->type != NULL; peer++) {
             peer_type_t *peer_peer = find_peer_type(peer->type->peers, type);
             assert_not_null(peer_peer);
-            assert_ptr(peer_peer->rand_items, ==, peer->rand_items);
-            assert_ptr(peer_peer->rand_values, ==, peer->rand_values);
+            assert_ptr(peer_peer->rand_elems, ==, peer->rand_elems);
         }
     }
 
@@ -486,8 +567,8 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
         ypObject *keys[1];
         ypObject *values[1];
         ypObject *self;
-        obj_array_fill(keys, NULL, type->rand_items);
-        obj_array_fill(values, NULL, type->rand_values);
+        obj_array_fill(keys, NULL, type->rand_elems->items);
+        obj_array_fill(values, NULL, type->rand_elems->values);
         self = new_itemsK(type, fixture_type_tuple, 1, keys[0], values[0]);
         assert_type_is(self, type->yp_type);
         assert_len(self, 1);
@@ -551,8 +632,10 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
 
     {
         ypObject *of_type = rand_obj(NULL, type);
-        assert_not_exception(of_type);
-        assert_type_is(of_type, type->yp_type);
+        if (type != fixture_type_exception) {
+            assert_not_exception(of_type);
+        }
+        assert_obj(yp_type(of_type), is, type->yp_type);
         yp_decref(of_type);
     }
 
@@ -568,14 +651,18 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
     {
         ypObject       *of_type = rand_obj(NULL, type);
         fixture_type_t *type_from_object = fixture_type_from_object(of_type);
-        if (type == fixture_type_frozenset_dirty) {
+        if (type->yp_type == yp_t_frozenset) {
             assert_ptr(type_from_object, ==, fixture_type_frozenset);
-        } else if (type == fixture_type_set_dirty) {
+        } else if (type->yp_type == yp_t_set) {
             assert_ptr(type_from_object, ==, fixture_type_set);
-        } else if (type == fixture_type_frozendict_dirty) {
+        } else if (type->yp_type == yp_t_frozendict) {
             assert_ptr(type_from_object, ==, fixture_type_frozendict);
-        } else if (type == fixture_type_dict_dirty) {
+        } else if (type->yp_type == yp_t_dict) {
             assert_ptr(type_from_object, ==, fixture_type_dict);
+        } else if (type->yp_type == yp_t_str) {
+            assert_ptr(type_from_object, ==, fixture_type_str);
+        } else if (type->yp_type == yp_t_chrarray) {
+            assert_ptr(type_from_object, ==, fixture_type_chrarray);
         } else {
             assert_ptr(type_from_object, ==, type);
         }
@@ -613,8 +700,9 @@ static MunitResult test_rand_obj_uniqueness(const MunitParameter params[], fixtu
     test_uniqueness(rand_obj_any_hashable(uq));
     test_uniqueness(rand_obj_any_hashable_not_str(uq));
     test_uniqueness(rand_obj_any_not_iterable(uq));
-    if (type != fixture_type_NoneType && type != fixture_type_bool) {
-        // rand_obj cannot ensure uniqueness for None and bool.
+    if (type != fixture_type_invalidated && type != fixture_type_exception &&
+            type != fixture_type_NoneType && type != fixture_type_bool) {
+        // rand_obj cannot ensure uniqueness for invalidated, exception, None, and bool.
         test_uniqueness(rand_obj(uq, type));
     }
 
@@ -651,10 +739,11 @@ static MunitResult test_rand_obj_uniqueness(const MunitParameter params[], fixtu
     } while (0)
 
     if (type->is_collection) {
-        test_uniqueness_array(type->rand_items);
+        test_uniqueness_array(type->rand_elems->items);
+        test_uniqueness_array(type->rand_elems->items_ordered);
     }
     if (type->is_mapping) {
-        test_uniqueness_array(type->rand_values);
+        test_uniqueness_array(type->rand_elems->values);
     }
 
 #undef test_uniqueness_array

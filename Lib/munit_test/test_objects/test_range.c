@@ -21,7 +21,7 @@ static void _test_rangeC(
     yp_int_t      itemsC[8];
     yp_int_t      stepC;
     ypObject     *items[yp_lengthof_array(itemsC)];
-    obj_array_fill(items, uq, fixture_type_range->rand_items);
+    obj_array_fill(items, uq, fixture_type_range->rand_elems->items);
     for (i = 0; i < yp_lengthof_array(itemsC); i++) itemsC[i] = yp_asintC_not_raises(items[i]);
     stepC = itemsC[1] - itemsC[0];
 
@@ -164,10 +164,22 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(N(args_two, args_three, args_four, kwargs_cls, kwargs_step, kwargs_rand));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_callN(yp_t_range, N(invalidated)), yp_InvalidatedError);
+        assert_isexception(yp_callN(yp_t_range, N(ist_0, invalidated)), yp_InvalidatedError);
+        assert_isexception(yp_callN(yp_t_range, N(ist_0, ist_2, invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_isexception(yp_callN(yp_t_range, N(yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(yp_callN(yp_t_range, N(ist_0, yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(yp_callN(yp_t_range, N(ist_0, ist_2, yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_callN(yp_t_range, N(exception)), exception);
+        assert_isexception(yp_callN(yp_t_range, N(ist_0, exception)), exception);
+        assert_isexception(yp_callN(yp_t_range, N(ist_0, ist_2, exception)), exception);
+    }
 
     yp_decrefN(N(str_rand, str_step, str_x, str_cls, f_value, ist_2, ist_1, ist_0));
     return MUNIT_OK;
@@ -381,7 +393,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, fixture_type_range->rand_items);
+    obj_array_fill(items, uq, fixture_type_range->rand_elems->items);
 
     // range_getslice
     {

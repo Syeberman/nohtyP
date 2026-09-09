@@ -57,7 +57,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Previously-deleted item.
     if (type->is_mutable) {
@@ -103,7 +103,7 @@ static void _test_comparisons_not_supported(fixture_type_t *type, fixture_type_t
     ypObject     *items[2];
     ypObject     *so;
     ypObject     *empty = type->newN(0);
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
     so = type->newN(N(items[0], items[1]));
 
 #define assert_not_supported(expression)      \
@@ -141,7 +141,7 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
     fixture_type_t *x_type = peer->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Non-empty so.
     {
@@ -196,8 +196,18 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
                     assert_obj(any_cmp(so, x), is, x_superset));
         }
 
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(so, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
         // Exception passthrough.
-        assert_isexception(any_cmp(so, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(so, exception), exception);
+        }
 
         assert_setlike(so, items[0], items[1]);  // so unchanged.
         yp_decref(so);
@@ -224,8 +234,18 @@ static void _test_comparisons(fixture_type_t *type, peer_type_t *peer,
                     assert_obj(any_cmp(empty, x), is, so_empty));
         }
 
+        // Invalidated argument.
+        {
+            ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+            assert_isexception(any_cmp(empty, invalidated), yp_InvalidatedError);
+            yp_decref(invalidated);
+        }
+
         // Exception passthrough.
-        assert_isexception(any_cmp(empty, yp_SyntaxError), yp_SyntaxError);
+        {
+            ypObject *exception = rand_obj(NULL, fixture_type_exception);
+            assert_isexception(any_cmp(empty, exception), exception);
+        }
 
         assert_len(empty, 0);  // empty unchanged.
         yp_decref(empty);
@@ -332,7 +352,7 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
     fixture_type_t **x_type;
     uniqueness_t    *uq = uniqueness_new();
     ypObject        *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     for (peer = type->peers; peer->type != NULL; peer++) {
         _test_comparisons(type, peer, yp_isdisjoint, /*x_same=*/yp_False,
@@ -343,8 +363,8 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[2], items[3])), result = yp_isdisjoint(so, x),
-                      assert_obj(result, is, yp_True), yp_decref(so));
+            yp_tupleN(N(items[2], items[3])), result = yp_isdisjoint(so, x),
+            assert_obj(result, is, yp_True), yp_decref(so));
 
     // Optimization: early exit if so is empty, even if the iterator will fail.
     {
@@ -380,7 +400,7 @@ static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixtu
     fixture_type_t **x_type;
     uniqueness_t    *uq = uniqueness_new();
     ypObject        *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     for (peer = type->peers; peer->type != NULL; peer++) {
         _test_comparisons(type, peer, yp_issubset, /*x_same=*/yp_True,
@@ -391,8 +411,8 @@ static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixtu
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[2], items[3])), result = yp_issubset(so, x),
-                      assert_obj(result, is, yp_False), yp_decref(so));
+            yp_tupleN(N(items[2], items[3])), result = yp_issubset(so, x),
+            assert_obj(result, is, yp_False), yp_decref(so));
 
     // Optimization: early exit if so is empty, even if the iterator will fail.
     {
@@ -419,7 +439,7 @@ static MunitResult test_issuperset(const MunitParameter params[], fixture_t *fix
     fixture_type_t **x_type;
     uniqueness_t    *uq = uniqueness_new();
     ypObject        *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     for (peer = type->peers; peer->type != NULL; peer++) {
         _test_comparisons(type, peer, yp_issuperset, /*x_same=*/yp_True,
@@ -430,8 +450,8 @@ static MunitResult test_issuperset(const MunitParameter params[], fixture_t *fix
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[0], items[1])), result = yp_issuperset(so, x),
-                      assert_obj(result, is, yp_True), yp_decref(so));
+            yp_tupleN(N(items[0], items[1])), result = yp_issuperset(so, x),
+            assert_obj(result, is, yp_True), yp_decref(so));
 
     // x is not an iterable.
     for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
@@ -618,7 +638,7 @@ static void _test_union(fixture_type_t *type, peer_type_t *peer)
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Basic union: items[0] only in so, items[1] in both, items[2] only in x.
     {
@@ -721,9 +741,8 @@ static void _test_union(fixture_type_t *type, peer_type_t *peer)
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[1], items[2])), result = yp_union(so, x),
-                      assert_setlike(result, items[0], items[1], items[2]),
-                      yp_decrefN(N(so, result)));
+            yp_tupleN(N(items[1], items[2])), result = yp_union(so, x),
+            assert_setlike(result, items[0], items[1], items[2]), yp_decrefN(N(so, result)));
 
     // Optimization: lazy shallow copy of a friendly immutable x when immutable so is empty.
     if (are_friend_types(type, x_type)) {
@@ -788,10 +807,19 @@ static void _test_union(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_union(so, invalidated), yp_InvalidatedError);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_union(so, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_union(so, exception), exception);
         yp_decrefN(N(so));
     }
 
@@ -819,7 +847,7 @@ static void _test_intersection(fixture_type_t *type, peer_type_t *peer)
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Basic intersection: items[0] only in so, items[1] in both, items[2] only in x.
     {
@@ -909,8 +937,8 @@ static void _test_intersection(fixture_type_t *type, peer_type_t *peer)
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[1], items[2])), result = yp_intersection(so, x),
-                      assert_setlike(result, items[1]), yp_decrefN(N(so, result)));
+            yp_tupleN(N(items[1], items[2])), result = yp_intersection(so, x),
+            assert_setlike(result, items[1]), yp_decrefN(N(so, result)));
 
     // Optimization: empty immortal when immutable so is empty.
     // TODO This could apply for any iterable x.
@@ -976,10 +1004,19 @@ static void _test_intersection(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_intersection(so, invalidated), yp_InvalidatedError);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_intersection(so, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_intersection(so, exception), exception);
         yp_decrefN(N(so));
     }
 
@@ -1007,7 +1044,7 @@ static void _test_difference(fixture_type_t *type, peer_type_t *peer)
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Basic difference: items[0] only in so, items[1] in both, items[2] only in x.
     {
@@ -1097,8 +1134,8 @@ static void _test_difference(fixture_type_t *type, peer_type_t *peer)
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[1], items[2])), result = yp_difference(so, x),
-                      assert_setlike(result, items[0]), yp_decrefN(N(so, result)));
+            yp_tupleN(N(items[1], items[2])), result = yp_difference(so, x),
+            assert_setlike(result, items[0]), yp_decrefN(N(so, result)));
 
     // Optimization: empty immortal when immutable so is empty.
     // TODO This could apply for any iterable x.
@@ -1164,10 +1201,19 @@ static void _test_difference(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_difference(so, invalidated), yp_InvalidatedError);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_difference(so, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_difference(so, exception), exception);
         yp_decrefN(N(so));
     }
 
@@ -1195,7 +1241,7 @@ static void _test_symmetric_difference(fixture_type_t *type, peer_type_t *peer)
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Basic symmetric_difference: items[0] only in so, items[1] in both, items[2] only in x.
     {
@@ -1297,8 +1343,8 @@ static void _test_symmetric_difference(fixture_type_t *type, peer_type_t *peer)
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[1], items[2])), result = yp_symmetric_difference(so, x),
-                      assert_setlike(result, items[0], items[2]), yp_decrefN(N(so, result)));
+            yp_tupleN(N(items[1], items[2])), result = yp_symmetric_difference(so, x),
+            assert_setlike(result, items[0], items[2]), yp_decrefN(N(so, result)));
 
     // Optimization: lazy shallow copy of a friendly immutable x when immutable so is empty.
     if (are_friend_types(type, x_type)) {
@@ -1363,10 +1409,19 @@ static void _test_symmetric_difference(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_symmetric_difference(so, invalidated), yp_InvalidatedError);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception(yp_symmetric_difference(so, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_symmetric_difference(so, exception), exception);
         yp_decrefN(N(so));
     }
 
@@ -1394,7 +1449,7 @@ static void _test_update(fixture_type_t *type, peer_type_t *peer)
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Immutables don't support update.
     if (!type->is_mutable) {
@@ -1544,10 +1599,20 @@ static void _test_update(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_update(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_update(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1577,7 +1642,7 @@ static void _test_intersection_update(fixture_type_t *type, peer_type_t *peer)
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Immutables don't support intersection_update.
     if (!type->is_mutable) {
@@ -1715,10 +1780,20 @@ static void _test_intersection_update(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_intersection_update(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_intersection_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_intersection_update(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1748,7 +1823,7 @@ static void _test_difference_update(fixture_type_t *type, peer_type_t *peer)
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Immutables don't support difference_update.
     if (!type->is_mutable) {
@@ -1886,10 +1961,20 @@ static void _test_difference_update(fixture_type_t *type, peer_type_t *peer)
         yp_decrefN(N(so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_difference_update(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_difference_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_difference_update(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1919,7 +2004,7 @@ static void _test_symmetric_difference_update(fixture_type_t *type, peer_type_t 
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[4];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Immutables don't support symmetric_difference_update.
     if (!type->is_mutable) {
@@ -2068,11 +2153,21 @@ static void _test_symmetric_difference_update(fixture_type_t *type, peer_type_t 
         yp_decrefN(N(so));
     }
 
-    // Exception passthrough.
+    // Invalidated argument.
     {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_isexception_exc(
-                yp_symmetric_difference_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+                yp_symmetric_difference_update(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_symmetric_difference_update(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -2101,7 +2196,7 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support push.
     if (!type->is_mutable) {
@@ -2174,10 +2269,20 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(pair.hashable, pair.unhashable, so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_push(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_push(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_push(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -2193,7 +2298,7 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support pushunique.
     if (!type->is_mutable) {
@@ -2266,10 +2371,20 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
         yp_decrefN(N(pair.hashable, pair.unhashable, so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(yp_pushunique(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(yp_pushunique(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_pushunique(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -2285,7 +2400,7 @@ static void _test_remove(
 {
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[4];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support remove.
     if (!type->is_mutable) {
@@ -2380,10 +2495,20 @@ static void _test_remove(
         yp_decrefN(N(expected, so));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_isexception_exc(any_remove(so, invalidated, &exc), yp_InvalidatedError);
+        assert_setlike(so, items[0], items[1]);
+        yp_decrefN(N(so, invalidated));
+    }
+
     // Exception passthrough.
     {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_isexception_exc(any_remove(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_remove(so, exception, &exc), exception);
         assert_setlike(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -2413,7 +2538,7 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
     yp_ssize_t      i;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[6];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Immutables don't support pop.
     if (!type->is_mutable) {

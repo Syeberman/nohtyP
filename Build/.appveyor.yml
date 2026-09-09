@@ -1,5 +1,8 @@
 version: 0.5.{build}
 
+# AppVeyor limits the total build time to 60 minutes, so we test a subset of the available
+# compilers. We choose the newest and the oldest versions for each compiler and OS/arch combination.
+
 branches:
   only:
     - main
@@ -16,9 +19,8 @@ image:
   - Ubuntu2204
   - macOS-Sonoma
   - Visual Studio 2022
-  - Visual Studio 2019
-  - Ubuntu
-  - Visual Studio 2017
+  # - Visual Studio 2019  # Cut for time
+  # - Visual Studio 2017  # Cut for time
   - Visual Studio 2015
 
 platform:
@@ -38,8 +40,6 @@ matrix:
     # TODO Are there any 32-bit compilers on the Ubuntu images?
     - image: Ubuntu2204
       platform: x86
-    - image: Ubuntu
-      platform: x86
 
 # Secure values are generated at https://ci.appveyor.com/tools/encrypt.
 environment:
@@ -54,13 +54,15 @@ for:
       only:
         - image: Ubuntu2204
     environment:
-      YP_COMPILER_OSES: gcc_11:posix gcc_10:posix gcc_9:posix
+      # Cut for time: gcc_12:posix gcc_11:posix gcc_10:posix
+      YP_COMPILER_OSES: gcc_13:posix gcc_9:posix
       YP_CI_CODECOV_UPLOAD: true
   - matrix:
       only:
         - image: macOS-Sonoma
     environment:
-      YP_COMPILER_OSES: gcc_12:darwin gcc_11:darwin gcc_10:darwin
+      # Cut for time: gcc_11:darwin
+      YP_COMPILER_OSES: gcc_12:darwin gcc_10:darwin
   - matrix:
       only:
         - image: Visual Studio 2022
@@ -76,11 +78,6 @@ for:
       YP_COMPILER_OSES: msvs_16:win32
   - matrix:
       only:
-        - image: Ubuntu
-    environment:
-      YP_COMPILER_OSES: gcc_8:posix gcc_7:posix
-  - matrix:
-      only:
         - image: Visual Studio 2017
     environment:
       YP_COMPILER_OSES: msvs_15:win32 gcc_7:win32 msvs_140:win32
@@ -90,17 +87,21 @@ for:
       only:
         - image: Visual Studio 2015
     environment:
-      YP_COMPILER_OSES: gcc_6:win32 gcc_5:win32 msvs_120:win32 msvs_110:win32 msvs_100:win32 msvs_90:win32
+      # Cut for time: msvs_120:win32 msvs_100:win32
+      YP_COMPILER_OSES: gcc_6:win32 gcc_5:win32 msvs_110:win32 msvs_90:win32
       # TODO Figure out why gcc_5:win32:amd64 isn't available
       YP_SKIP_TARGETS: gcc_5:win32:amd64 msvs_100:win32:amd64 msvs_90:win32:amd64
 
 # XXX On Visual Studio 2017 (and 2015?), environment variables are not shared between pwsh's.
 install:
+  # ` ; [void]$true` after a command silently resets $?, which Get-ChildItem sets on unknown paths.
+  - pwsh: |
+      Get-ChildItem -Force -ErrorAction Ignore -Path "/usr/bin/", "C:/Python*", "${HOME}/venv*" > Build/.Get-ChildItem.log ; [void]$true
   # TODO The Visual Studio 2017 and 2015 images stop at Python 3.8...which is EOL.
   - pwsh: |
       if (! (Test-Path ".venv/bin/Activate.ps1")) {
         Write-Output "Creating virtual environment"
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -Path .venv
+        Remove-Item -Recurse -Force -ErrorAction Ignore -Path .venv
         if (${isWindows}) {
           if (Test-Path "C:/Python312-x64/python") {
             & "C:/Python312-x64/python" -m venv .venv
@@ -164,6 +165,8 @@ build_script:
   - pwsh: |
       try { Build/.appveyor.ps1 build }
       catch {
+        7z a build.log.zip Build/*.log Build/site_toolsconfig.py
+        appveyor PushArtifact build.log.zip
         Write-Error ${PSItem}
         throw "build failed"
       }

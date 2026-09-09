@@ -575,6 +575,9 @@ yp_func(c_ypObject_p, "yp_isalnum", ((c_ypObject_p, "s"), ))
 # ypObject *yp_isalpha(ypObject *s);
 yp_func(c_ypObject_p, "yp_isalpha", ((c_ypObject_p, "s"), ))
 
+# ypObject *yp_isascii(ypObject *s);
+yp_func(c_ypObject_p, "yp_isascii", ((c_ypObject_p, "s"), ))
+
 # ypObject *yp_isdecimal(ypObject *s);
 yp_func(c_ypObject_p, "yp_isdecimal", ((c_ypObject_p, "s"), ))
 
@@ -836,12 +839,19 @@ yp_func(c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc")))
 c_yp_malloc_func_t = CFUNCTYPE(c_void_p, c_yp_ssize_t_p, c_yp_ssize_t)
 c_yp_malloc_resize_func_t = CFUNCTYPE(c_void_p, c_yp_ssize_t_p, c_void_p, c_yp_ssize_t, c_yp_ssize_t)
 c_yp_free_func_t = CFUNCTYPE(c_void, c_void_p)
+class c_yp_memory_allocator_t(Structure):
+    _fields_ = [
+        ("struct_size", c_yp_ssize_t),
+        ("malloc", c_yp_malloc_func_t),
+        ("malloc_resize", c_yp_malloc_resize_func_t),
+        ("free", c_yp_free_func_t),
+    ]
+c_yp_memory_allocator_t_p = POINTER(c_yp_memory_allocator_t)
 class c_yp_initialize_parameters_t(Structure):
     _fields_ = [
         ("struct_size", c_yp_ssize_t),
-        ("yp_malloc", c_yp_malloc_func_t),
-        ("yp_malloc_resize", c_yp_malloc_resize_func_t),
-        ("yp_free", c_yp_free_func_t),
+        ("allocator", c_yp_memory_allocator_t_p),
+        ("text_character_database", c_void_p), # FIXME
         ("everything_immortal", c_int),
     ]
 
@@ -849,12 +859,7 @@ class c_yp_initialize_parameters_t(Structure):
 yp_func(c_void, "yp_initialize", ((POINTER(c_yp_initialize_parameters_t), "kwparams"), ),
         errcheck=False)
 
-# void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
-_yp_mem_default_malloc = c_yp_malloc_func_t(("yp_mem_default_malloc", ypdll))
-# void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
-_yp_mem_default_malloc_resize = c_yp_malloc_resize_func_t(("yp_mem_default_malloc_resize", ypdll))
-# void yp_mem_default_free(void *p);
-_yp_mem_default_free = c_yp_free_func_t(("yp_mem_default_free", ypdll))
+_yp_mem_default_allocator = c_yp_memory_allocator_t_p.in_dll(ypdll, "yp_mem_default_allocator")
 
 
 # Some nohtyP objects need to hold references to Python objects; in particular, yp_iter and
@@ -864,16 +869,20 @@ _yp_reverse_refs = collections.defaultdict(list)
 
 @c_yp_free_func_t
 def yp_free_hook(p):
-    _yp_mem_default_free(p)
+    _yp_mem_default_allocator.contents.free(p)
     _yp_reverse_refs.pop(p, None)
 
 
 # Initialize nohtyP
 _yp_initparams = c_yp_initialize_parameters_t(
     struct_size=sizeof(c_yp_initialize_parameters_t),
-    yp_malloc=_yp_mem_default_malloc,
-    yp_malloc_resize=_yp_mem_default_malloc_resize,
-    yp_free=yp_free_hook,
+    allocator = pointer(c_yp_memory_allocator_t(
+        struct_size=sizeof(c_yp_memory_allocator_t),
+        malloc=_yp_mem_default_allocator.contents.malloc,
+        malloc_resize=_yp_mem_default_allocator.contents.malloc_resize,
+        free=yp_free_hook,
+    )),
+    text_character_database=None, # FIXME
     everything_immortal=False
 )
 _yp_initialize(_yp_initparams)
@@ -1085,6 +1094,8 @@ class ypObject(c_ypObject_p):
     def isalnum(self): return _yp_isalnum(self)
 
     def isalpha(self): return _yp_isalpha(self)
+
+    def isascii(self): return _yp_isascii(self)
 
     def isdecimal(self): return _yp_isdecimal(self)
 

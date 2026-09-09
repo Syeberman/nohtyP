@@ -58,6 +58,11 @@ extern "C" {
 #define PRIssize "lld"
 #endif
 
+#define ypStringLib_MAX_UNICODE (0x10FFFFu)
+#define ypStringLib_MIN_SURROGATE (0xD800u)
+#define ypStringLib_MAX_SURROGATE (0xDFFFu)
+#define ypStringLib_NUM_SURROGATES (ypStringLib_MAX_SURROGATE - ypStringLib_MIN_SURROGATE + 1)
+
 // Work around preprocessing bug in msvs_120 and earlier: https://stackoverflow.com/a/3985071/770500
 #define _ESC(...) __VA_ARGS__
 
@@ -434,28 +439,25 @@ for i in range(1, 35):
     _assert_typeC_raises_exc(                  \
             yp_hash_t, a, op, b, (__VA_ARGS__), PRIssize, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
 
-// value is the expected value, either yp_True or yp_False; not_value is the negation of value.
-#define _assert_bool(obj, value, not_value, obj_fmt, ...)                                        \
+// Asserts that obj is a bool with the expected value. Will fail if expected is not a bool.
+#define _assert_bool(obj, expected, obj_fmt, expected_str, ...)                                  \
     do {                                                                                         \
-        if (obj == value) {                                                                      \
-            /* pass */                                                                           \
-        } else if (obj == not_value) {                                                           \
-            munit_errorf("assertion failed: " obj_fmt " == " #value, __VA_ARGS__);               \
-        } else {                                                                                 \
+        if (yp_type(obj) != yp_t_bool) {                                                         \
             _ypmt_error_exception(obj, "expected a bool or an exception", obj_fmt, __VA_ARGS__); \
+        } else if (obj != expected) {                                                            \
+            munit_errorf("assertion failed: " obj_fmt " == %s", __VA_ARGS__, expected_str);      \
         }                                                                                        \
     } while (0)
+#define _assert_bool_false(obj, obj_fmt, ...) \
+    _assert_bool(obj, yp_False, obj_fmt, "yp_False", __VA_ARGS__)
+#define _assert_bool_true(obj, obj_fmt, ...) \
+    _assert_bool(obj, yp_True, obj_fmt, "yp_True", __VA_ARGS__)
 
-#define assert_falsy(obj)                                                         \
+#define assert_bool(obj, expected)                                                \
     do {                                                                          \
-        ypObject *_ypmt_FALSY_result = yp_bool(obj);                              \
-        _assert_bool(_ypmt_FALSY_result, yp_False, yp_True, "yp_bool(%s)", #obj); \
-    } while (0)
-
-#define assert_truthy(obj)                                                         \
-    do {                                                                           \
-        ypObject *_ypmt_TRUTHY_result = yp_bool(obj);                              \
-        _assert_bool(_ypmt_TRUTHY_result, yp_True, yp_False, "yp_bool(%s)", #obj); \
+        ypObject *_ypmt_BOOL_obj = (obj);                                         \
+        ypObject *_ypmt_BOOL_expected = (expected);                               \
+        _assert_bool(_ypmt_BOOL_obj, _ypmt_BOOL_expected, "%s", #expected, #obj); \
     } while (0)
 
 // Cheeky little hack to make assert_obj(a, is, b) and assert_obj(a, is_not, b) work.
@@ -466,8 +468,7 @@ for i in range(1, 35):
 #define _assert_obj(a, op, b, a_fmt, b_fmt, ...)                                              \
     do {                                                                                      \
         ypObject *_ypmt_OBJ_result = yp_##op(a, b);                                           \
-        _assert_bool(_ypmt_OBJ_result, yp_True, yp_False, "yp_" #op "(" a_fmt ", " b_fmt ")", \
-                __VA_ARGS__);                                                                 \
+        _assert_bool_true(_ypmt_OBJ_result, "yp_" #op "(" a_fmt ", " b_fmt ")", __VA_ARGS__); \
     } while (0)
 
 // op can be: is, is_not, lt, le, eq, ne, ge, gt, contains, in, not_in, isdisjoint, issubset,
@@ -545,6 +546,31 @@ for i in range(1, 35):
         ypObject  *_ypmt_LEN_obj = (obj);                                            \
         yp_ssize_t _ypmt_LEN_expected = (expected);                                  \
         _assert_len(_ypmt_LEN_obj, _ypmt_LEN_expected, "%s", "%s", #obj, #expected); \
+    } while (0)
+
+// items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
+// only to obj_fmt.
+#define _assert_string(obj, items, obj_fmt, item_strs, ...)                                    \
+    do {                                                                                       \
+        yp_ssize_t _ypmt_STR_n = yp_lengthof_array(items);                                     \
+        yp_ssize_t _ypmt_STR_i;                                                                \
+        _assert_len(obj, _ypmt_STR_n, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_STR_n);        \
+        for (_ypmt_STR_i = 0; _ypmt_STR_i < _ypmt_STR_n; _ypmt_STR_i++) {                      \
+            _assert_typeC_exc(yp_uint32_t, yp_getindex_asordC(obj, _ypmt_STR_i, &exc), ==,     \
+                    items[_ypmt_STR_i], "u",                                                   \
+                    "yp_getindex_asordC(" obj_fmt ", %" PRIssize ", &exc)", "%s", __VA_ARGS__, \
+                    _ypmt_STR_i, item_strs[_ypmt_STR_i]);                                      \
+        }                                                                                      \
+    } while (0)
+
+// Asserts that obj is a string containing exactly the given items in that order. Items are ordinal
+// values as C integers and/or C characters. Validates yp_lenC and yp_getindex_asordC.
+#define assert_string(obj, ...)                                                          \
+    do {                                                                                 \
+        ypObject   *_ypmt_STR_obj = (obj);                                               \
+        yp_uint32_t _ypmt_STR_items[] = {__VA_ARGS__};                                   \
+        char       *_ypmt_STR_item_strs[] = {STRINGIFY(__VA_ARGS__)};                    \
+        _assert_string(_ypmt_STR_obj, _ypmt_STR_items, "%s", _ypmt_STR_item_strs, #obj); \
     } while (0)
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
@@ -736,6 +762,17 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
         yp_decref(name);                 \
     } while (0)
 
+// Execute, execute, assert, decref: eead. Like ead, but executes two expressions that both need
+// to be discarded.
+// FIXME Use this in tests that would benefit from it.
+#define eead(name0, expression0, name1, expression1, assertion) \
+    do {                                                        \
+        ypObject *(name0) = (expression0);                      \
+        ypObject *(name1) = (expression1);                      \
+        assertion;                                              \
+        yp_decrefN(2, (name1), (name0));                        \
+    } while (0)
+
 
 #define _faulty_iter_test_raises(setup, iter_name, iter_expression, statement, tear_down,        \
         test_name, exc_suffix, expected, statement_str)                                          \
@@ -764,6 +801,7 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
     } while (0)
 
 // XXX yp_SyntaxError is chosen as nohtyP.c neither raises nor catches it.
+// FIXME Consider a function to return a random exception that is compatible with new_faulty_iter.
 // XXX The tests with yp_GeneratorExit are to ensure it's not treated like yp_StopIteration.
 #define _faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down,       \
         exc_suffix, statement_str)                                                                 \
@@ -846,6 +884,10 @@ extern int _assert_mapping_helper(ypObject *mi, yp_uint64_t *mi_state, yp_ssize_
 // A version of yp_isexceptionCN that accepts an array.
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions);
 
+// A version of yp_getindexC that returns the string element's ordinal value. Raises an exception if
+// the item is not an appropriate int or str object for an ordinal. sequence is expected but not
+// required to be a string object (bytes, str, etc). Sets *exc on error.
+extern yp_uint32_t yp_getindex_asordC(ypObject *sequence, yp_ssize_t i, ypObject **exc);
 
 // A safe sprintf that asserts on buffer overflow. Only call for arrays of fixed size (uses
 // yp_lengthof_array).
@@ -862,9 +904,9 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
 // Declares a variable name of type ypObject * and initializes it with a new reference to a function
 // object. The parameters argument must be surrounded by parentheses.
 // XXX Older compilers reject an empty parameters argument; use define_function2 instead.
-#define define_function(name, code, parameters)                                                     \
-    yp_parameter_decl_t _##name##_parameters[] = {UNPACK parameters};                               \
-    yp_function_decl_t  _##name##_declaration = {                                                   \
+#define define_function(name, code, parameters)                                                    \
+    yp_parameter_decl_t _##name##_parameters[] = {UNPACK parameters};                              \
+    yp_function_decl_t  _##name##_declaration = {                                                  \
             (code), 0, yp_lengthof_array(_##name##_parameters), _##name##_parameters, NULL, NULL}; \
     ypObject *name = yp_functionC(&_##name##_declaration)
 
@@ -878,8 +920,9 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
 extern void pprint(FILE *f, ypObject *obj);
 
 
-typedef struct _fixture_type_t fixture_type_t;
-typedef struct _peer_type_t    peer_type_t;
+typedef struct _fixture_type_t  fixture_type_t;
+typedef struct _rand_elements_t rand_elements_t;
+typedef struct _peer_type_t     peer_type_t;
 typedef ypObject *(*objobjfunc)(ypObject *);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
@@ -893,31 +936,28 @@ typedef void (*rand_objs_func)(uniqueness_t *, yp_ssize_t, ypObject **);
 // also be used to describe special-purpose objects (i.e. fixture_type_set_dirty is a set containing
 // deleted items).
 typedef struct _fixture_type_t {
-    char           *name;     // The name of the type (i.e. int, bytearray, dict).
-    ypObject       *yp_type;  // The type object (i.e. yp_t_float, yp_t_list).
-    ypObject       *falsy;    // The falsy immortal for this type, or NULL. (Only immutables.)
-    fixture_type_t *pair;     // The other type in this object pair, or points back to this type.
+    char           *name;        // The name of the type (i.e. int, bytearray, dict).
+    ypObject       *yp_type;     // The type object (i.e. yp_t_float, yp_t_list).
+    ypObject       *falsy;       // The falsy immortal for this type, or NULL. (Only immutables.)
+    fixture_type_t *pair;        // The other type in this type pair, or points back to this type.
+    fixture_type_t *variant_of;  // The other type this is a variant of; NULL if not a variant.
 
     rand_obj_supplier_func _new_rand;  // Internal: used by rand_obj/etc.
 
-    objobjfunc   new_;   // The object converter, aka the single-argument constructor.
-    peer_type_t *peers;  // An array of "peer types" (see peer_type_t). Null-terminated.
+    objobjfunc       new_;        // The object converter, aka the single-argument constructor.
+    peer_type_t     *peers;       // An array of "peer types" (see peer_type_t). Null-terminated.
+    rand_elements_t *rand_elems;  // Creates random elements for iterables.
 
-    // Functions for iterables, where rand_items returns objects that can be accepted by newN and
-    // subsequently yielded by yp_iter. (For mappings, newN creates an object with the given keys
-    // and random, unique values.)
-    objvarargfunc  newN;        // Creates a iterable for the given items (i.e. yp_tupleN).
-    rand_objs_func rand_items;  // Fills an array with n random objects.
+    // Creates an iterable for the given items (i.e. yp_tupleN). For mappings, newN creates an
+    // object with the given keys and random, unique values.
+    objvarargfunc newN;
 
-    // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
-    // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys). newK is
+    // Creates an iterable for the given key/value pairs (i.e. yp_frozendictK). newK is
     // also supported for collections that can store key/value pairs (i.e. iter, tuple, and list).
-    objvarargfunc  newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
-    rand_objs_func rand_values;  // Fills an array with n random objects for values.
+    objvarargfunc newK;
 
-    // Similar to rand_items, except the objects returned all support ordered comparisons with each
-    // other, and the items are returned in ascending order (i.e. i[0] < i[1] < ...).
-    rand_objs_func rand_ordered_items;
+    // Creates a string from the C integer and/or C character ordinal values.
+    objvarargfunc fromordsCN;
 
     // Flags to describe the properties of the type.
     int is_mutable;
@@ -948,13 +988,52 @@ typedef struct _fixture_type_t {
 // Note that pairs, and the types themselves, are all considered peers, and are all included in
 // fixture_type_t.peers. For example, a tuple can be converted to both a list and a tuple.
 typedef struct _peer_type_t {
-    fixture_type_t *type;         // The peer type.
-    rand_objs_func  rand_items;   // As per fixture_type_t.rand_items; NULL if not supported.
-    rand_objs_func  rand_values;  // As per fixture_type_t.rand_values; NULL if not supported.
+    fixture_type_t *type;  // The peer type.
+
+    // Creates random elements that are suitable for both types; NULL if not supported.
+    rand_elements_t *rand_elems;
 } peer_type_t;
 
-// TODO Versions of each of these that build as the mutable type and then freezes, to test that
-// the freezing process still yields a viable object.
+// Functions used to create random elements for iterables.
+typedef struct _rand_elements_t {
+    // Fills an array with n random objects suitable for newN, or for the keys of newK.
+    rand_objs_func items;
+
+    // Fills an array with n random objects suitable for the values of newK.
+    rand_objs_func values;
+
+    // Similar to items, except the objects returned all support ordered comparisons with each
+    // other, and the items are returned in ascending order (i.e. i[0] < i[1] < ...).
+    rand_objs_func items_ordered;
+} rand_elements_t;
+
+
+// The individual types under test. Most of these have "obvious" implementations, but there are
+// exceptions, and some of those exceptions place restrictions on tests that include such types.
+//
+// - fixture_type_range: Constructor arguments must follow a range pattern. To support this,
+//   rand_elems->items returns integers following a range pattern, and constructors should be called
+//   with a slice of rand_elems->items.
+// - fixture_type_str_1byte, etc: These are variants of fixture_type_str/etc stored in specific
+//   encodings at creation (latin-1, ucs-2, or ucs-4) in order to test the interactions of strings
+//   with different in-memory representations. Ideally, the constructors should only be called with
+//   rand_elems->items objects, however this limits the tests that can be written: for example, a
+//   mixed-encoding startswith test would not be able to test the positive case. Furthermore, many
+//   tests expect to be able to create empty objects. As such, the restriction is that the
+//   constructors should be called with **at least one** rand_elems->items object, or no objects;
+//   constructors will assert if the created object is non-empty and has a **smaller** encoding than
+//   expected. While these variants are all peers of each other, some peer relationships have NULL
+//   rand_elems as they have no shared items; tests must therefore use each type's rand_elems
+//   specifically, or skip peers with NULL rand_elems.
+// - fixture_type_frozenset_dirty, fixture_type_frozendict_dirty, etc: These are variants of
+//   fixture_type_frozenset/fixture_type_frozendict/etc which are created with one deleted item,
+//   making their hash tables "dirty". To accomplish this for immutable types, a mutable object is
+//   created and then frozen. There are no restrictions on the constructors for these types.
+//
+// TODO Versions of each of these that build as the mutable type and then freezes, to test that the
+// freezing process still yields a viable object.
+extern fixture_type_t *fixture_type_invalidated;
+extern fixture_type_t *fixture_type_exception;
 extern fixture_type_t *fixture_type_type;
 extern fixture_type_t *fixture_type_NoneType;
 extern fixture_type_t *fixture_type_bool;
@@ -968,6 +1047,12 @@ extern fixture_type_t *fixture_type_bytes;
 extern fixture_type_t *fixture_type_bytearray;
 extern fixture_type_t *fixture_type_str;
 extern fixture_type_t *fixture_type_chrarray;
+extern fixture_type_t *fixture_type_str_1byte;
+extern fixture_type_t *fixture_type_chrarray_1byte;
+extern fixture_type_t *fixture_type_str_2bytes;
+extern fixture_type_t *fixture_type_chrarray_2bytes;
+extern fixture_type_t *fixture_type_str_4bytes;
+extern fixture_type_t *fixture_type_chrarray_4bytes;
 extern fixture_type_t *fixture_type_tuple;
 extern fixture_type_t *fixture_type_list;
 extern fixture_type_t *fixture_type_frozenset;
@@ -990,8 +1075,11 @@ typedef struct _fixture_types_t {
     fixture_type_t **types;  // An array of types. Null-terminated.
 } fixture_types_t;
 
-// "All", except invalidated and exception.
+// All, including invalidated and exception.
 extern fixture_types_t *fixture_types_all;
+
+// All, except invalidated and exception.
+extern fixture_types_t *fixture_types_most;
 
 extern fixture_types_t *fixture_types_mutable;
 extern fixture_types_t *fixture_types_numeric;
@@ -1011,12 +1099,14 @@ extern fixture_types_t *fixture_types_not_string;
 extern fixture_types_t *fixture_types_not_setlike;
 extern fixture_types_t *fixture_types_not_mapping;
 extern fixture_types_t *fixture_types_not_callable;
+extern fixture_types_t *fixture_types_string_not_variant;
 extern fixture_types_t *fixture_types_immutable_not_str;
 extern fixture_types_t *fixture_types_immutable_paired;
 
 // Arrays of MunitParameterEnum values for "type" and similar parameters (i.e. the names of types).
 // Can't be included in fixture_types_t because the compiler requires this to be a constant.
 extern char *param_values_types_all[];
+extern char *param_values_types_most[];
 extern char *param_values_types_mutable[];
 extern char *param_values_types_numeric[];
 extern char *param_values_types_iterable[];
@@ -1035,6 +1125,7 @@ extern char *param_values_types_not_string[];
 extern char *param_values_types_not_setlike[];
 extern char *param_values_types_not_mapping[];
 extern char *param_values_types_not_callable[];
+extern char *param_values_types_string_not_variant[];
 extern char *param_values_types_immutable_not_str[];
 extern char *param_values_types_immutable_paired[];
 
@@ -1078,7 +1169,7 @@ extern uniqueness_t *uniqueness_new(void);
 // Discards all references in the tracker and frees memory. uq cannot be used afterwards.
 extern void uniqueness_dealloc(uniqueness_t *uq);
 
-// Returns a random object of any type.
+// Returns a random object of any type (except invalidated and exception).
 extern ypObject *rand_obj_any(uniqueness_t *uq);
 
 // Returns a random mutable object of any type.
@@ -1094,14 +1185,15 @@ extern ypObject *rand_obj_any_hashable_not_str(uniqueness_t *uq);
 // While the objects are equal to each other, they will be unequal to any other object in uq.
 extern hashability_pair_t rand_obj_any_hashability_pair(uniqueness_t *uq);
 
-// Returns a random object of any non-iterable type.
+// Returns a random object of any non-iterable type (except invalidated and exception).
 extern ypObject *rand_obj_any_not_iterable(uniqueness_t *uq);
 
-// Returns a random object of any non-callable type.
+// Returns a random object of any non-callable type (except invalidated and exception).
 extern ypObject *rand_obj_any_not_callable(uniqueness_t *uq);
 
-// Returns a random object of the given type. uq must be NULL for fixture_type_NoneType and
-// fixture_type_bool, as there are too few values for these types to guarantee uniqueness.
+// Returns a random object of the given type. uq must be NULL for fixture_type_invalidated and
+// *_exception. uq must also be NULL for *_NoneType and *_bool, as there are too few values for
+// these types to guarantee uniqueness.
 extern ypObject *rand_obj(uniqueness_t *uq, fixture_type_t *type);
 
 // Returns an iter yielding the n items in order.
@@ -1132,7 +1224,7 @@ extern ypObject *new_faulty_iter(
 //
 //      uniqueness_t *uq = uniqueness_new();
 //      ypObject *items[5];
-//      obj_array_fill(items, uq, type->rand_items);
+//      obj_array_fill(items, uq, type->rand_elems->items);
 #define obj_array_fill(array, uq, filler) (filler)((uq), yp_lengthof_array(array), (array))
 
 // Discards all references in the ypObject* array of length n. Skips NULL elements.
@@ -1145,6 +1237,9 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 
 // yp_lenC, asserting an exception is not raised.
 yp_ssize_t yp_lenC_not_raises(ypObject *container);
+
+// Comparison methods, asserting an exception is not raised.
+int yp_ltC_not_raises(ypObject *x, ypObject *y);
 
 // yp_asintC, asserting an exception is not raised.
 // TODO Most tests should probably be using the "index" version of this, without rounding.
@@ -1207,6 +1302,7 @@ SUITE_OF_TESTS_DECLS(test_mapping);
 SUITE_OF_TESTS_DECLS(test_sequence);
 SUITE_OF_TESTS_DECLS(test_setlike);
 SUITE_OF_TESTS_DECLS(test_string);
+SUITE_OF_TESTS_DECLS(test_string_char_db);
 
 
 #ifdef __cplusplus

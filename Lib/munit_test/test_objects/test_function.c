@@ -314,13 +314,13 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
     // Invalid signatures.
     {
-        yp_ssize_t i;
-        // ypObject   *str_1 = yp_str_frombytesC2(-1, "1");
-        ypObject *str_star_a = yp_str_frombytesC2(-1, "*a");
-        // ypObject   *str_star_1 = yp_str_frombytesC2(-1, "*1");
-        ypObject *str_star_star = yp_str_frombytesC2(-1, "**");
-        ypObject *str_star_star_a = yp_str_frombytesC2(-1, "**a");
-        // ypObject   *str_star_star_1 = yp_str_frombytesC2(-1, "**1");
+        yp_ssize_t  i;
+        ypObject   *str_1 = yp_str_frombytesC2(-1, "1");
+        ypObject   *str_star_a = yp_str_frombytesC2(-1, "*a");
+        ypObject   *str_star_1 = yp_str_frombytesC2(-1, "*1");
+        ypObject   *str_star_star = yp_str_frombytesC2(-1, "**");
+        ypObject   *str_star_star_a = yp_str_frombytesC2(-1, "**a");
+        ypObject   *str_star_star_1 = yp_str_frombytesC2(-1, "**1");
         signature_t signatures[] = {
                 {1, {{str_slash}}},                           // / cannot be first
                 {2, {{str_star}, {str_slash}}},               // / cannot be after *
@@ -350,10 +350,10 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
                 // Non-identifiers
                 {1, {{str_empty}}},
-                // TODO Implement str_isidentifier: {1, {{str_1}}},
-                // TODO Implement str_isidentifier: {1, {{str_star_1}}},
+                {1, {{str_1}}},
+                {1, {{str_star_1}}},
                 {1, {{str_star_star}}},
-                // TODO Implement str_isidentifier: {1, {{str_star_star_1}}},
+                {1, {{str_star_star_1}}},
 
                 // Non-unique names
                 {2, {{str_a}, {str_a}}},
@@ -370,7 +370,8 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
             yp_function_decl_t decl = {None_code, 0, signature.n, signature.params, NULL, NULL};
             assert_raises(yp_functionC(&decl), yp_ParameterSyntaxError);
         }
-        yp_decrefN(N(str_star_a, str_star_star, str_star_star_a));
+        yp_decrefN(
+                N(str_star_star_1, str_star_star_a, str_star_star, str_star_1, str_star_a, str_1));
     }
 
     // Parameter names must be strs.
@@ -408,10 +409,19 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                 chrarray_star_star_kwargs));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        define_function(f, None_code, ({invalidated}));
+        assert_isexception(f, yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     {
-        define_function(f, None_code, ({yp_OSError}));
-        assert_isexception(f, yp_OSError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        define_function(f, None_code, ({exception}));
+        assert_isexception(f, exception);
     }
 
     yp_decrefN(N(
@@ -2543,7 +2553,7 @@ static MunitResult test_iscallableC(const MunitParameter params[], fixture_t *fi
     }
 
     // x is an exception.
-    assert_false(yp_iscallableC(yp_SyntaxError));
+    assert_false(yp_iscallableC(rand_obj(NULL, fixture_type_exception)));
 
     return MUNIT_OK;
 }
@@ -2575,8 +2585,18 @@ static MunitResult test_func_iscallable(const MunitParameter params[], fixture_t
         yp_decrefN(N(kwargs_rand, kwargs_obj, list_empty));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_obj(yp_callN(yp_func_iscallable, N(invalidated)), is, yp_False);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_raises(yp_callN(yp_func_iscallable, N(yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_raises(yp_callN(yp_func_iscallable, N(exception)), exception);
+    }
 
     yp_decrefN(N(x, str_rand, str_obj));
     return MUNIT_OK;
@@ -3084,10 +3104,10 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
 }
 
 
-static MunitParameterEnum test_all_params[] = {{param_key_type, param_values_types_all}, {NULL}};
+static MunitParameterEnum test_most_params[] = {{param_key_type, param_values_types_most}, {NULL}};
 
 MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_new_immortal, NULL),
-        TEST(test_iscallableC, test_all_params), TEST(test_func_iscallable, test_all_params),
+        TEST(test_iscallableC, test_most_params), TEST(test_func_iscallable, test_most_params),
         TEST(test_callN, NULL), TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL),
         TEST(test_copy, NULL), TEST(test_deepcopy, NULL), TEST(test_bool, NULL),
         TEST(test_hash, NULL), TEST(test_call_t_function, NULL), TEST(test_oom, NULL), {NULL}};

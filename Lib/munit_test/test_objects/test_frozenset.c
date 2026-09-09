@@ -24,7 +24,7 @@ static void _test_newN(
     uniqueness_t      *uq = uniqueness_new();
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Basic newN.
     {
@@ -77,10 +77,19 @@ static void _test_newN(
         assert_obj(any_newN(-1), is, type->falsy);
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_newN(N(invalidated)), yp_InvalidatedError);
+        assert_isexception(any_newN(N(yp_None, invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_newN(N(yp_SyntaxError)), yp_SyntaxError);
-        assert_isexception(any_newN(N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_newN(N(exception)), exception);
+        assert_isexception(any_newN(N(yp_None, exception)), exception);
     }
 
     obj_array_decref(items);
@@ -96,7 +105,7 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
     hashability_pair_t pair = rand_obj_any_hashability_pair(uq);
     ypObject          *not_iterable = rand_obj_any_not_iterable(uq);
     ypObject          *items[2];
-    obj_array_fill(items, uq, peer->rand_items);
+    obj_array_fill(items, uq, peer->rand_elems->items);
 
     // Basic new.
     {
@@ -169,9 +178,17 @@ static void _test_new(fixture_type_t *type, peer_type_t *peer, ypObject *(*any_n
     // x is not an iterable.
     assert_raises(any_new(not_iterable), yp_TypeError);
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(any_new(invalidated), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
     if (test_exception_passthrough) {
-        assert_isexception(any_new(yp_SyntaxError), yp_SyntaxError);
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(any_new(exception), exception);
     }
 
     obj_array_decref(items);
@@ -371,8 +388,18 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(N(kwargs_rand, kwargs_cls, kwargs_iterable, args_two, set_empty));
     }
 
+    // Invalidated argument.
+    {
+        ypObject *invalidated = rand_obj(NULL, fixture_type_invalidated);
+        assert_isexception(yp_callN(type->yp_type, N(invalidated)), yp_InvalidatedError);
+        yp_decref(invalidated);
+    }
+
     // Exception passthrough.
-    assert_isexception(yp_callN(type->yp_type, N(yp_SyntaxError)), yp_SyntaxError);
+    {
+        ypObject *exception = rand_obj(NULL, fixture_type_exception);
+        assert_isexception(yp_callN(type->yp_type, N(exception)), exception);
+    }
 
     yp_decrefN(N(str_iterable, str_cls, str_rand));
     uniqueness_dealloc(uq);
@@ -389,7 +416,7 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     define_frozenset_mi_state(keysleft_0_index_0, 0, 0);
     uniqueness_t *uq = uniqueness_new();
     ypObject     *items[2];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // Corrupted states.
     {
@@ -439,7 +466,7 @@ static MunitResult test_oom(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     uniqueness_t   *uq = uniqueness_new();
     ypObject       *items[16];
-    obj_array_fill(items, uq, type->rand_items);
+    obj_array_fill(items, uq, type->rand_elems->items);
 
     // _ypSet_issubset_withiter
     {
